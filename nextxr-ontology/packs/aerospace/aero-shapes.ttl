@@ -1,0 +1,26 @@
+@prefix aero: <https://ontology.nextxr.io/v3/aero#> .
+@prefix cfp:  <https://ontology.nextxr.io/v3/cfp#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+#  AEROSPACE SHACL SHAPES
+#
+#  Most aerospace classes inherit validation from:
+#    - nxr:PhysicalAssetShape (all Equipment subclasses)
+#    - nxr:SpaceShape (all spatial subclasses)
+#
+#  This file adds ADDITIONAL constraints where aerospace classes
+#  have structural requirements beyond the inherited base.
+#################################################################
+
+### TurbineTestRig must be located in a test cell ###
+aero:TurbineTestRigShape a sh:NodeShape ;
+    sh:targetClass aero:TurbineTestRig ;
+    sh:node nxr:BaseEntityShape ;
+    sh:property [
+        sh:path aero:testsMRO ;
+        sh:minCount 1 ;
+        sh:message "A TurbineTestRig must test within at least one TurbineTestCell (aero:testsMRO)." ;
+    ] .

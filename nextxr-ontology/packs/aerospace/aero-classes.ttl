@@ -1,0 +1,208 @@
+@prefix aero: <https://ontology.nextxr.io/v3/aero#> .
+@prefix cfp:  <https://ontology.nextxr.io/v3/cfp#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix bfo:  <http://purl.obolibrary.org/obo/> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+
+#################################################################
+#  AEROSPACE MRO DOMAIN PACK  v1.0
+#
+#  Extension layer for aerospace maintenance, repair, and overhaul
+#  facilities. Adds turbine test cells, avionics bays, hydraulic
+#  test equipment, and ground power infrastructure.
+#
+#  Ontology stack position:
+#    BFO -> SOSA -> platform -> CFP -> AEROSPACE
+#
+#  Extends CFP downward only. Never edits layers 1-4.
+#################################################################
+
+<https://ontology.nextxr.io/v3/aero> a owl:Ontology ;
+    dct:title "NextXR Aerospace MRO Pack" ;
+    owl:versionInfo "1.0.0" ;
+    dct:description "Domain pack for aerospace MRO facilities: turbine test cells, avionics bays, hydraulic test labs, and ground support equipment." ;
+    owl:imports <https://ontology.nextxr.io/v3/cfp> .
+
+
+#################################################################
+#  AEROSPACE RELATIONSHIP PREDICATES
+#################################################################
+
+aero:testsMRO a owl:ObjectProperty ;
+    rdfs:subPropertyOf cfp:serves ;
+    rdfs:label "tests MRO" ;
+    skos:definition "A test rig or equipment performs MRO testing within a test cell or bay." ;
+    rdfs:domain nxr:Equipment ;
+    rdfs:range nxr:Space .
+
+aero:suppliesGroundPower a owl:ObjectProperty ;
+    rdfs:subPropertyOf cfp:serves ;
+    rdfs:label "supplies ground power" ;
+    skos:definition "A ground power unit provides electrical power to a test cell or bay during MRO operations." ;
+    rdfs:domain nxr:Equipment ;
+    rdfs:range nxr:Space .
+
+
+#################################################################
+#  AEROSPACE DATATYPE PROPERTIES
+#################################################################
+
+aero:testCellClass a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "test cell class" ;
+    skos:definition "Classification of test cell: turbofan, turboprop, turboshaft, APU." ;
+    rdfs:range xsd:string .
+
+aero:thrustRatingKN a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "thrust rating (kN)" ;
+    skos:definition "Maximum thrust rating of the test cell in kilonewtons." ;
+    rdfs:range xsd:double .
+
+aero:cleanroomClass a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "cleanroom ISO class" ;
+    skos:definition "ISO 14644-1 cleanroom classification (e.g. 7 = Class 10000)." ;
+    rdfs:range xsd:integer .
+
+aero:hydraulicRating a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:label "hydraulic rating (PSI)" ;
+    skos:definition "Maximum hydraulic system pressure rating in PSI." ;
+    rdfs:range xsd:double .
+
+
+#################################################################
+#  AEROSPACE OBSERVABLE PROPERTIES + QUDT UNITS
+#################################################################
+
+aero:exhaustGasTemp a sosa:ObservableProperty ;
+    rdfs:label "Exhaust Gas Temperature" ;
+    nxr:expectedUnit unit:DEG_C ;
+    nxr:expectedQuantityKind quantitykind:Temperature .
+
+aero:hydraulicPressure a sosa:ObservableProperty ;
+    rdfs:label "Hydraulic Pressure" ;
+    nxr:expectedUnit unit:PSI ;
+    nxr:expectedQuantityKind quantitykind:Pressure .
+
+aero:shaftSpeedN1 a sosa:ObservableProperty ;
+    rdfs:label "Shaft Speed N1" ;
+    nxr:expectedUnit unit:REV-PER-MIN ;
+    nxr:expectedQuantityKind quantitykind:AngularVelocity .
+
+aero:avionicsBayTemp a sosa:ObservableProperty ;
+    rdfs:label "Avionics Bay Temperature" ;
+    nxr:expectedUnit unit:DEG_C ;
+    nxr:expectedQuantityKind quantitykind:Temperature .
+
+aero:fuelFlow a sosa:ObservableProperty ;
+    rdfs:label "Fuel Flow" ;
+    nxr:expectedUnit unit:KiloGM-PER-HR ;
+    nxr:expectedQuantityKind quantitykind:MassFlowRate .
+
+aero:vibrationG a sosa:ObservableProperty ;
+    rdfs:label "Vibration (g-force)" ;
+    nxr:expectedUnit unit:NUM ;
+    nxr:expectedQuantityKind quantitykind:Dimensionless .
+
+### QUDT references not already declared ###
+unit:PSI a qudt:Unit ; rdfs:label "pound per square inch" .
+unit:REV-PER-MIN a qudt:Unit ; rdfs:label "revolutions per minute" .
+unit:KiloGM-PER-HR a qudt:Unit ; rdfs:label "kilograms per hour" .
+
+quantitykind:AngularVelocity a qudt:QuantityKind ; rdfs:label "Angular Velocity" .
+quantitykind:MassFlowRate a qudt:QuantityKind ; rdfs:label "Mass Flow Rate" .
+
+
+#################################################################
+#  1 - AEROSPACE SPATIAL CLASSES
+#################################################################
+
+aero:TurbineTestCell a owl:Class ;
+    rdfs:subClassOf cfp:Room ;
+    rdfs:label "Turbine Test Cell" ;
+    skos:definition "An acoustically isolated, blast-resistant chamber for running turbine engines at full power during MRO testing. Contains thrust stands, exhaust ducts, and fuel systems." ;
+    nxr:taxonomyCategory "Location" .
+
+aero:AvionicsBay a owl:Class ;
+    rdfs:subClassOf cfp:Room ;
+    rdfs:label "Avionics Bay" ;
+    skos:definition "A temperature-controlled workspace for testing, repairing, and calibrating avionics equipment. Requires tight thermal control (typically 22 +/- 2 C)." ;
+    nxr:taxonomyCategory "Location" .
+
+aero:CleanroomZone a owl:Class ;
+    rdfs:subClassOf cfp:Zone ;
+    rdfs:label "Cleanroom Zone" ;
+    skos:definition "An ISO-classified clean environment for precision component assembly and inspection. Particle count and humidity are actively controlled." ;
+    nxr:taxonomyCategory "Location" .
+
+aero:HangarBay a owl:Class ;
+    rdfs:subClassOf cfp:Room ;
+    rdfs:label "Hangar Bay" ;
+    skos:definition "A large enclosed space for aircraft parking, maintenance, and component removal. Served by overhead cranes and ground power." ;
+    nxr:taxonomyCategory "Location" .
+
+
+#################################################################
+#  2 - AEROSPACE EQUIPMENT CLASSES
+#################################################################
+
+aero:TurbineTestRig a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Turbine Test Rig" ;
+    skos:definition "A test stand instrumented for running gas turbine engines (turbofan, turboprop, or APU) under controlled conditions. Monitors EGT, shaft speed (N1/N2), fuel flow, vibration, and oil pressure." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:HydraulicActuator a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Hydraulic Actuator" ;
+    skos:definition "A hydraulic test rig or flight control actuator under MRO testing. Monitors system pressure, flow rate, and actuator position for leak detection and performance verification." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:GroundPowerUnit a owl:Class ;
+    rdfs:subClassOf cfp:Transformer ;
+    rdfs:label "Ground Power Unit" ;
+    skos:definition "A mobile or fixed power supply providing 28VDC or 115VAC 400Hz power to aircraft and test rigs. Extends Transformer with aerospace-specific voltage profiles." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:HangarDoor a owl:Class ;
+    rdfs:subClassOf cfp:RollerShutter ;
+    rdfs:label "Hangar Door" ;
+    skos:definition "A large bi-fold or sliding door for aircraft entry/exit. Monitors cycle count, motor current, and safety interlocks." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:ToolCrib a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Tool Crib" ;
+    skos:definition "A controlled storage and issue point for calibrated tools and GSE (ground support equipment). Tracks tool check-out/in and calibration status." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:FuelFarm a owl:Class ;
+    rdfs:subClassOf cfp:WaterTank ;
+    rdfs:label "Fuel Farm" ;
+    skos:definition "Bulk aviation fuel storage (Jet A-1). Monitors fuel level, temperature, water content, and delivery flow." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+
+#################################################################
+#  3 - AEROSPACE SENSOR CLASSES
+#################################################################
+
+aero:EGTSensor a owl:Class ;
+    rdfs:subClassOf cfp:TemperatureSensor ;
+    rdfs:label "EGT Sensor" ;
+    skos:definition "A thermocouple or pyrometer measuring exhaust gas temperature on a turbine test rig. Rated for 1200 C continuous." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:VibrationProbe a owl:Class ;
+    rdfs:subClassOf cfp:VibrationSensor ;
+    rdfs:label "Vibration Probe" ;
+    skos:definition "An accelerometer or proximity probe measuring shaft vibration on rotating machinery. Reports in g-force or mm/s." ;
+    nxr:taxonomyCategory "PhysicalAsset" .

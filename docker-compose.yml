@@ -1,0 +1,160 @@
+
+# Collins Aerospace PoC — Unified deployment for all 3 products
+#
+# Quick start (infrastructure only, run servers locally):
+#     docker compose up -d
+#
+# Full stack (all 3 products containerized):
+#     docker compose --profile full up -d --build
+#
+# Services:
+#   neo4j       — NextXR graph store (port 7474/7687)
+#   redis       — NextXR event bus (port 6379)
+#   postgres    — AUTOMIND database (port 5433, NOT 5432 to avoid conflicts)
+#   redis-am    — AUTOMIND Celery broker (port 6380)
+#   server      — NextXR Digital Twin API (port 8000) [profile: full]
+#   automind    — AUTOMIND workflow engine (port 8001) [profile: full]
+#   automind-worker — AUTOMIND Celery worker [profile: full]
+#   goalcert    — GoalCert Simulation Engine (port 8002) [profile: full]
+
+services:
+  # ── NextXR Infrastructure ──
+  neo4j:
+    image: neo4j:5-community
+    container_name: nxr-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/nextxr2026
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "nextxr2026", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nxr-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── AUTOMIND Infrastructure ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: automind-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: automind
+      POSTGRES_USER: automind
+      POSTGRES_PASSWORD: automind2026
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U automind"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis-am:
+    image: redis:7-alpine
+    container_name: automind-redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_am_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── NextXR Server (profile: full) ──
+  server:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nxr-server
+    ports:
+      - "8000:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: nextxr2026
+      NXR_REDIS_URL: redis://redis:6379/0
+      AUTOMIND_URL: http://automind:8001
+      GOALCERT_URL: http://goalcert:8002
+
+  # ── AUTOMIND Server (profile: full) ──
+  automind:
+    profiles: ["full"]
+    build:
+      context: ./automind-engine
+      dockerfile: backend/Dockerfile
+    container_name: automind-server
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-am:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://automind:automind2026@postgres:5432/automind
+      REDIS_URL: redis://redis-am:6379/0
+      SECRET_KEY: collins-poc-secret-2026
+      DEBUG: "true"
+
+  automind-worker:
+    profiles: ["full"]
+    build:
+      context: ./automind-engine
+      dockerfile: backend/Dockerfile
+    container_name: automind-worker
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-am:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://automind:automind2026@postgres:5432/automind
+      REDIS_URL: redis://redis-am:6379/0
+      SECRET_KEY: collins-poc-secret-2026
+
+  # ── GoalCert Server (profile: full) ──
+  goalcert:
+    profiles: ["full"]
+    build:
+      context: ./goalcert-engine
+      dockerfile: backend/Dockerfile
+    container_name: goalcert-server
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: sqlite:///./goalcert.db
+
+volumes:
+  neo4j_data:
+  redis_data:
+  pg_data:
+  redis_am_data:
