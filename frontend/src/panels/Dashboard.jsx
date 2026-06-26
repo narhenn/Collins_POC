@@ -2,10 +2,14 @@ import { PanelHeader, KpiCard, Card } from '../components/ui/Card'
 import { SeverityPill } from '../components/ui/Modal'
 import NoTwin from '../components/NoTwin'
 import FeedControls from '../components/FeedControls'
-import { usePolling } from '../hooks/useApi'
+import { usePolling, useApi } from '../hooks/useApi'
 import { useTwin } from '../context/TwinContext'
 import { timeOf } from '../lib/format'
 import api from '../api/client'
+
+const PRODUCT_COLORS = { nextxr: 'var(--accent-teal)', goalcert: 'var(--accent-blue)', automind: 'var(--accent-purple)' }
+const PRODUCT_LABELS = { nextxr: 'NextXR', goalcert: 'GoalCert', automind: 'AUTOMIND' }
+const PHASE_LABELS = { detection: 'Detection', training: 'Training & Dispatch', ar_repair: 'AR Repair', knowledge: 'Knowledge Capture' }
 
 /** Operations overview: live KPIs, active findings, and risk by asset —
  *  all from the real graph for the active twin. */
@@ -45,6 +49,8 @@ export default function Dashboard() {
         <KpiCard label="Change Log Events" value={stats?.changelog_events ?? '—'}
                  change="tamper-evident" />
       </div>
+
+      <WorkflowPipeline tenant={activeTenant} />
 
       <div className="grid-2">
         <Card title="Active Findings">
@@ -145,6 +151,53 @@ export default function Dashboard() {
       </div>
       )}
     </div>
+  )
+}
+
+/** 18-step Collins workflow pipeline visualization */
+function WorkflowPipeline({ tenant }) {
+  const { data } = usePolling(() => api.workflowPipeline(tenant), 3000, [tenant], { skip: !tenant })
+  if (!data || !data.steps) return null
+
+  const { steps, completed, progress_pct } = data
+  const phases = ['detection', 'training', 'ar_repair', 'knowledge']
+
+  return (
+    <Card title={<><i className="ti ti-timeline" style={{marginRight:6}} />Collins Workflow Pipeline <span className="pill pill-surface" style={{fontSize:9}}>{completed}/18 steps · {progress_pct}%</span></>}>
+      <div style={{ marginBottom: 12 }}>
+        <div className="bar-track" style={{ height: 6 }}>
+          <div className="bar-fill" style={{ width: `${progress_pct}%`, background: progress_pct > 50 ? 'var(--accent-teal)' : 'var(--accent-blue)', transition: 'width 0.5s' }} />
+        </div>
+      </div>
+      {phases.map(phase => {
+        const phaseSteps = steps.filter(s => s.phase === phase)
+        return (
+          <div key={phase} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--muted)', marginBottom: 6 }}>
+              {PHASE_LABELS[phase] || phase}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {phaseSteps.map(s => {
+                const bg = s.status === 'complete' ? 'rgba(34,204,119,.15)' : s.status === 'active' || s.status === 'in_progress' ? 'rgba(75,139,245,.12)' : 'var(--surface)'
+                const border = s.status === 'complete' ? 'rgba(34,204,119,.3)' : s.status === 'active' || s.status === 'in_progress' ? 'rgba(75,139,245,.3)' : 'var(--border)'
+                const dot = s.status === 'complete' ? 'var(--accent-green)' : s.status === 'active' || s.status === 'in_progress' ? 'var(--accent-blue)' : 'var(--hint)'
+                return (
+                  <div key={s.step} title={`Step ${s.step}: ${s.name} (${PRODUCT_LABELS[s.product]})`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 6, background: bg, border: `1px solid ${border}`, fontSize: 10 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                    <span style={{ color: 'var(--text)', fontWeight: 500 }}>{s.step}</span>
+                    <span className="muted">{s.name}</span>
+                    <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: PRODUCT_COLORS[s.product] + '18', color: PRODUCT_COLORS[s.product], fontWeight: 600 }}>
+                      {PRODUCT_LABELS[s.product]}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </Card>
   )
 }
 

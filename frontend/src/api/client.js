@@ -163,6 +163,7 @@ export const api = {
   getGoalcertRun: (runId) => request(`/integration/goalcert/run/${runId}`),
   getGoalcertReport: (runId) => request(`/integration/goalcert/run/${runId}/report`),
   getGoalcertEvents: (runId) => request(`/integration/goalcert/run/${runId}/events`),
+  workflowPipeline: (tenant) => request(`/integration/pipeline/${tenant}`),
 }
 
 export default api

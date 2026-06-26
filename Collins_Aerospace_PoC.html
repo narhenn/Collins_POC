@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoalCert x NextXR — Collins Aerospace PoC</title>
+    <title>GoalCert x NextXR x AUTOMIND — Collins Aerospace PoC</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11/mermaid.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -89,7 +89,7 @@
         .hero p {
             font-size: 17px;
             opacity: 0.85;
-            max-width: 720px;
+            max-width: 780px;
             margin: 0 auto;
             font-weight: 300;
             position: relative;
@@ -102,9 +102,7 @@
             flex-wrap: wrap;
             position: relative;
         }
-        .hero-sub div {
-            text-align: center;
-        }
+        .hero-sub div { text-align: center; }
         .hero-sub .val {
             font-size: 28px;
             font-weight: 700;
@@ -116,6 +114,40 @@
             letter-spacing: 1px;
             opacity: 0.7;
             margin-top: 2px;
+        }
+
+        /* ── Product Banner ── */
+        .product-banner {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0;
+            margin-top: 36px;
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            max-width: 820px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .product-banner-item {
+            padding: 20px 24px;
+            text-align: center;
+        }
+        .product-banner-item .pb-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        .product-banner-item .pb-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .product-banner-item .pb-steps {
+            font-size: 11px;
+            opacity: 0.75;
         }
 
         /* ── Container ── */
@@ -166,60 +198,127 @@
             justify-content: center;
         }
 
-        /* ── Act cards ── */
-        .act-grid {
-            display: grid;
-            gap: 24px;
-            margin: 24px 0;
+        /* ── Journey Timeline ── */
+        .journey {
+            position: relative;
+            margin: 0;
+            padding: 0;
         }
-        .act-card {
+        .journey-phase {
+            margin-bottom: 8px;
+        }
+        .journey-phase-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .journey-phase-label .phase-line {
+            flex: 1;
+            height: 1px;
+            opacity: 0.3;
+        }
+
+        .journey-steps {
             display: grid;
-            grid-template-columns: 80px 1fr;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .journey-step {
+            display: flex;
             gap: 0;
             background: white;
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            transition: box-shadow 0.2s;
+            transition: box-shadow 0.2s, transform 0.15s;
         }
-        .act-card:hover {
-            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        .journey-step:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
         }
-        .act-num {
+        .step-num-col {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 24px 12px;
-            color: white;
-            font-weight: 700;
+            justify-content: flex-start;
+            padding: 14px 10px;
+            min-width: 52px;
+            gap: 4px;
         }
-        .act-num .n {
-            font-size: 28px;
+        .step-num-col .sn {
+            font-size: 20px;
+            font-weight: 800;
+            color: white;
             line-height: 1;
         }
-        .act-num .tag {
-            font-size: 9px;
+        .step-num-col .st {
+            font-size: 8px;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-top: 4px;
-            opacity: 0.85;
+            letter-spacing: 0.5px;
+            color: rgba(255,255,255,0.7);
+            text-align: center;
         }
-        .act-body {
-            padding: 24px 28px;
+        .step-body {
+            padding: 14px 16px;
+            flex: 1;
         }
-        .act-body h3 {
-            font-size: 18px;
+        .step-body h4 {
+            font-size: 13px;
             font-weight: 700;
             color: var(--navy);
             margin-bottom: 4px;
         }
-        .act-products {
+        .step-meta {
             display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
+            gap: 6px;
+            margin-bottom: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }
+        .step-time {
+            font-size: 10px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            background: var(--surface);
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .step-body p {
+            font-size: 12px;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        .step-output {
+            font-size: 11px;
+            color: var(--navy);
+            background: var(--surface);
+            border-radius: 5px;
+            padding: 6px 10px;
+            line-height: 1.5;
+        }
+        .step-output strong {
+            color: var(--teal);
+            font-weight: 600;
+        }
+        .step-agent {
+            font-size: 10px;
+            color: var(--purple);
+            font-weight: 600;
+            margin-top: 6px;
+        }
+
+        /* ── Product tags ── */
         .product-tag {
             font-size: 10px;
             font-weight: 600;
@@ -232,47 +331,17 @@
             background: rgba(24, 169, 153, 0.1);
             color: var(--teal);
         }
-        .product-tag.sim {
+        .product-tag.goalcert {
             background: rgba(224, 150, 47, 0.1);
             color: var(--amber);
         }
-        .product-tag.agent {
+        .product-tag.automind {
             background: rgba(139, 109, 240, 0.1);
             color: var(--purple);
         }
-        .act-body p {
-            font-size: 14px;
-            color: #444;
-            margin-bottom: 12px;
-        }
-        .act-detail {
-            background: var(--surface);
-            border-radius: 8px;
-            padding: 16px;
-            font-size: 13px;
-            color: #555;
-            line-height: 1.7;
-        }
-        .act-detail strong {
-            color: var(--navy);
-        }
-        .act-detail ul {
-            margin: 6px 0 0 16px;
-        }
-        .act-demo {
-            margin-top: 14px;
-            padding: 12px 16px;
-            background: linear-gradient(135deg, rgba(75, 139, 245, 0.06), rgba(24, 169, 153, 0.06));
-            border-left: 3px solid var(--blue);
-            border-radius: 0 8px 8px 0;
-            font-size: 13px;
-            color: var(--navy);
-        }
-        .act-demo strong {
+        .product-tag.ar {
+            background: rgba(75, 139, 245, 0.1);
             color: var(--blue);
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         /* ── Tier table ── */
@@ -295,6 +364,7 @@
         .tier-table td {
             padding: 10px 16px;
             border-bottom: 1px solid var(--border);
+            vertical-align: top;
         }
         .tier-table tr:nth-child(even) td {
             background: var(--surface);
@@ -306,62 +376,116 @@
             font-size: 11px;
             font-weight: 600;
         }
-        .tier-pill.a { background: #FDEAEA; color: var(--red); }
-        .tier-pill.b { background: #FFF3E0; color: #E67E22; }
-        .tier-pill.c { background: #E8F5E9; color: #2E7D32; }
+        .tier-pill.critical { background: #FDEAEA; color: var(--red); }
+        .tier-pill.high { background: #FFF3E0; color: #E67E22; }
+        .tier-pill.med { background: #E8F5E9; color: #2E7D32; }
 
-        /* ── Timeline ── */
-        .timeline {
-            position: relative;
-            padding: 8px 0 8px 36px;
+        /* ── Agent cards ── */
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
         }
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 15px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: linear-gradient(to bottom, var(--blue), var(--teal), var(--green));
-            border-radius: 2px;
+        .agent-card {
+            background: var(--surface);
+            border-left: 4px solid var(--purple);
+            padding: 20px 22px;
+            border-radius: 0 10px 10px 0;
         }
-        .tl-item {
-            position: relative;
-            margin-bottom: 20px;
-        }
-        .tl-item::before {
-            content: '';
-            position: absolute;
-            left: -28px;
-            top: 14px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--blue);
-            border: 3px solid white;
-            box-shadow: 0 0 0 2px var(--blue);
-        }
-        .tl-item:nth-child(3)::before { background: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
-        .tl-item:nth-child(4)::before { background: var(--red); box-shadow: 0 0 0 2px var(--red); }
-        .tl-item:nth-child(5)::before { background: var(--purple); box-shadow: 0 0 0 2px var(--purple); }
-        .tl-item:nth-child(6)::before { background: var(--teal); box-shadow: 0 0 0 2px var(--teal); }
-        .tl-item:nth-child(7)::before { background: var(--green); box-shadow: 0 0 0 2px var(--green); }
-        .tl-time {
-            font-size: 12px;
+        .agent-card.twin-agent { border-left-color: var(--teal); }
+        .agent-card.goalcert-agent { border-left-color: var(--amber); }
+        .agent-card.automind-agent { border-left-color: var(--purple); }
+        .agent-card.ar-agent { border-left-color: var(--blue); }
+        .agent-card h4 {
+            font-size: 14px;
             font-weight: 700;
-            color: var(--blue);
-            margin-bottom: 4px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .tl-title {
-            font-size: 15px;
-            font-weight: 600;
             color: var(--navy);
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
-        .tl-desc {
-            font-size: 13px;
+        .agent-card .agent-product {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 10px;
+        }
+        .agent-card .agent-row {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            gap: 6px;
+            font-size: 12px;
+            margin-bottom: 4px;
+            line-height: 1.5;
+        }
+        .agent-card .agent-row .lbl {
+            font-weight: 600;
             color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-top: 2px;
+        }
+        .agent-card .agent-row .val {
+            color: #444;
+        }
+
+        /* ── SLA table ── */
+        .sla-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 13px;
+        }
+        .sla-table th {
+            background: var(--navy);
+            color: white;
+            padding: 10px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .sla-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        .sla-table tr:nth-child(even) td {
+            background: var(--surface);
+        }
+        .sla-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--teal);
+        }
+
+        /* ── Map table ── */
+        .map-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+        .map-table th {
+            background: var(--navy);
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .map-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .map-table tr:nth-child(even) td {
+            background: var(--surface);
         }
 
         /* ── KPI grid ── */
@@ -396,84 +520,54 @@
             margin-top: 4px;
         }
 
-        /* ── Mapping table ── */
-        .map-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 13px;
-        }
-        .map-table th {
-            background: var(--navy);
-            color: white;
-            padding: 12px 16px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-        }
-        .map-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            vertical-align: top;
-        }
-        .map-table tr:nth-child(even) td {
-            background: var(--surface);
-        }
-        .map-table .arrow {
-            color: var(--blue);
-            font-weight: 600;
-            text-align: center;
-        }
-
-        /* ── Agent cards ── */
-        .agent-grid {
+        /* ── Product ownership strip ── */
+        .ownership-strip {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: 1fr 1fr 1fr 1fr;
             gap: 16px;
             margin: 24px 0;
         }
-        .agent-card {
-            background: var(--surface);
-            border-left: 4px solid var(--purple);
-            padding: 18px 20px;
-            border-radius: 0 8px 8px 0;
+        .ownership-card {
+            border-radius: 10px;
+            overflow: hidden;
         }
-        .agent-card h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--navy);
-            margin-bottom: 6px;
+        .ownership-header {
+            padding: 16px 18px;
+            color: white;
         }
-        .agent-card p {
-            font-size: 13px;
-            color: #555;
-            line-height: 1.6;
+        .ownership-header .oh-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: 0.8;
+            margin-bottom: 4px;
         }
-
-        /* ── Integration box ── */
-        .integration-box {
-            background: linear-gradient(135deg, rgba(75, 139, 245, 0.04), rgba(24, 169, 153, 0.04));
-            border: 2px solid var(--blue);
-            border-radius: 12px;
-            padding: 28px;
-            margin: 24px 0;
-        }
-        .integration-box h4 {
+        .ownership-header .oh-name {
             font-size: 16px;
             font-weight: 700;
-            color: var(--navy);
-            margin-bottom: 12px;
         }
-        .integration-box ul {
-            margin-left: 20px;
-            font-size: 14px;
+        .ownership-header .oh-steps {
+            font-size: 11px;
+            opacity: 0.75;
+            margin-top: 3px;
+        }
+        .ownership-steps-list {
+            padding: 14px 18px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+        }
+        .ownership-steps-list ul {
+            list-style: none;
+            font-size: 12px;
             color: #444;
-            line-height: 2;
+            line-height: 1.9;
         }
-        .integration-box strong {
-            color: var(--navy);
+        .ownership-steps-list li::before {
+            content: '›';
+            margin-right: 6px;
+            font-weight: 700;
         }
 
         /* ── Callout ── */
@@ -496,11 +590,57 @@
             background: #E3F2FD;
             border-left: 4px solid var(--blue);
         }
-        .callout strong {
+        .callout strong { color: var(--navy); }
+
+        /* ── Integration box ── */
+        .integration-box {
+            background: linear-gradient(135deg, rgba(75, 139, 245, 0.04), rgba(24, 169, 153, 0.04));
+            border: 2px solid var(--blue);
+            border-radius: 12px;
+            padding: 28px;
+            margin: 24px 0;
+        }
+        .integration-box h4 {
+            font-size: 16px;
+            font-weight: 700;
             color: var(--navy);
+            margin-bottom: 12px;
+        }
+        .integration-box ul {
+            margin-left: 20px;
+            font-size: 14px;
+            color: #444;
+            line-height: 2;
+        }
+        .integration-box strong { color: var(--navy); }
+
+        /* ── Stack table ── */
+        .stack-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 13px;
+        }
+        .stack-table th {
+            background: var(--navy);
+            color: white;
+            padding: 10px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .stack-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .stack-table tr:nth-child(even) td {
+            background: var(--surface);
         }
 
-        /* ── Loop diagram text ── */
+        /* ── Loop diagram ── */
         .loop-text {
             display: grid;
             grid-template-columns: 1fr auto 1fr auto 1fr;
@@ -512,7 +652,7 @@
             font-weight: 600;
         }
         .loop-box {
-            padding: 14px;
+            padding: 16px 12px;
             border-radius: 10px;
             color: white;
         }
@@ -532,7 +672,7 @@
         .footer strong { color: white; }
         .footer-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 32px;
         }
         .footer-grid ul {
@@ -555,16 +695,40 @@
             opacity: 0.6;
         }
 
+        /* ── Legend ── */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
         /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .ownership-strip { grid-template-columns: 1fr 1fr; }
+        }
         @media (max-width: 768px) {
             .hero { padding: 40px 20px 36px; }
             .hero h1 { font-size: 26px; }
             .section { padding: 32px 20px; }
-            .act-card { grid-template-columns: 1fr; }
-            .act-num { flex-direction: row; gap: 8px; padding: 12px 20px; }
             .footer-grid { grid-template-columns: 1fr; }
             .loop-text { grid-template-columns: 1fr; gap: 8px; }
             .loop-arrow { transform: rotate(90deg); }
+            .ownership-strip { grid-template-columns: 1fr; }
+            .product-banner { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -575,774 +739,1249 @@
     <div class="hero-badges">
         <span class="hero-badge">Proof of Concept</span>
         <span class="hero-badge">Collins Aerospace</span>
-        <span class="hero-badge">Multi-Tenant</span>
+        <span class="hero-badge">End-to-End Workflow</span>
+        <span class="hero-badge">3 Products Integrated</span>
     </div>
-    <h1>Collins Aerospace MRO<br><span>Fault to Fix in a Living Twin</span></h1>
-    <p>Three products — Digital Twin, Simulation Engine, Agentic AI — working as one autonomous platform. From building a facility twin to detecting faults to diagnosing root cause to expanding infrastructure, all in a single coordinated flow.</p>
+    <h1>Collins Aerospace MRO<br><span>Sensor Alert to Knowledge — Fully Autonomous</span></h1>
+    <p>From the moment a temperature spike hits a CNC machine sensor to the day the next technician solves the same fault in 3 minutes — three products, one continuous workflow, zero manual handoffs.</p>
+
     <div class="hero-sub">
+        <div>
+            <div class="val">18</div>
+            <div class="lbl">Workflow Steps</div>
+        </div>
+        <div>
+            <div class="val">10</div>
+            <div class="lbl">AI Agents</div>
+        </div>
         <div>
             <div class="val">3</div>
             <div class="lbl">Products Integrated</div>
         </div>
         <div>
-            <div class="val">20</div>
-            <div class="lbl">AI Agents</div>
+            <div class="val">&lt;100ms</div>
+            <div class="lbl">AR Stream Latency</div>
         </div>
         <div>
-            <div class="val">15</div>
-            <div class="lbl">Physics Models</div>
+            <div class="val">80%</div>
+            <div class="lbl">Training Time Reduction</div>
         </div>
-        <div>
-            <div class="val">3-Tier</div>
-            <div class="lbl">Detection Engine</div>
+    </div>
+
+    <div class="product-banner">
+        <div class="product-banner-item" style="background: rgba(24,169,153,0.18); border-right: 1px solid rgba(255,255,255,0.1);">
+            <div class="pb-label">Product 1</div>
+            <div class="pb-name">NextXR Digital Twin</div>
+            <div class="pb-steps">Steps 1–4, 13 · Sensor to Visualization</div>
         </div>
-        <div>
-            <div class="val">&lt; 7 min</div>
-            <div class="lbl">Alert to Diagnosis</div>
+        <div class="product-banner-item" style="background: rgba(224,150,47,0.18); border-right: 1px solid rgba(255,255,255,0.1);">
+            <div class="pb-label">Product 2</div>
+            <div class="pb-name">GoalCert Simulation Engine</div>
+            <div class="pb-steps">Steps 5–9, 14–18 · Training to Knowledge</div>
+        </div>
+        <div class="product-banner-item" style="background: rgba(139,109,240,0.18);">
+            <div class="pb-label">Product 3</div>
+            <div class="pb-name">AUTOMIND</div>
+            <div class="pb-steps">Steps 4, 12 · Orchestration &amp; Analytics</div>
         </div>
     </div>
 </div>
 
 <div class="container">
 
-<!-- ═══════════════════ §1 — THE THREE PRODUCTS ═══════════════════ -->
+<!-- ═══════════════════ §1 — 18-STEP WORKFLOW JOURNEY ═══════════════════ -->
 <div class="section">
     <div class="section-num">Section 01</div>
-    <div class="section-title">The Three Products</div>
-    <div class="section-subtitle">Each product is a standalone capability. Together they form a closed-loop autonomous platform.</div>
+    <div class="section-title">The 18-Step End-to-End Workflow</div>
+    <div class="section-subtitle">Every step from the moment a sensor fires to the moment that knowledge is permanently wired into the system for every future technician.</div>
 
-    <div class="loop-text">
-        <div class="loop-box" style="background: var(--teal);">
-            <div style="font-size: 22px; margin-bottom: 4px;">Digital Twin</div>
-            <div style="font-size: 11px; opacity: 0.85;">Neo4j graph + 3D BIM + SHACL ontology<br>The persistent substrate. Everything lives here.</div>
+    <!-- PHASE A: Detection & Visualization (Steps 1-4) -->
+    <div class="journey-phase">
+        <div class="journey-phase-label" style="background: rgba(24,169,153,0.08); color: var(--teal);">
+            <span>Phase A — Detection &amp; Visualization</span>
+            <div class="phase-line" style="background: var(--teal);"></div>
+            <span style="white-space:nowrap;">Steps 1–4 · NextXR Digital Twin</span>
         </div>
-        <div class="loop-arrow">&rarr;</div>
-        <div class="loop-box" style="background: var(--amber); color: var(--navy);">
-            <div style="font-size: 22px; margin-bottom: 4px;">Simulation Engine</div>
-            <div style="font-size: 11px; opacity: 0.85;">15 physics models + 3-tier behavior rules<br>Generates telemetry. Detects anomalies. Fires alerts.</div>
-        </div>
-        <div class="loop-arrow">&rarr;</div>
-        <div class="loop-box" style="background: var(--purple);">
-            <div style="font-size: 22px; margin-bottom: 4px;">Agentic AI</div>
-            <div style="font-size: 11px; opacity: 0.85;">20 agents across 5 flows<br>Builds twins. Diagnoses faults. Expands infrastructure.</div>
+        <div class="journey-steps">
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                    <div class="sn">01</div>
+                    <div class="st">Sensor</div>
+                </div>
+                <div class="step-body">
+                    <h4>Sensor Alert — Temperature Spike</h4>
+                    <div class="step-meta">
+                        <span class="product-tag twin">Digital Twin</span>
+                        <span class="step-time">T+0 sec</span>
+                    </div>
+                    <p>IoT sensor reading indicates temperature spike: 85°C vs. normal 65°C on CNC Machine #47. Alert triggered, Digital Twin notified via IoT Gateway.</p>
+                    <div class="step-output"><strong>Output:</strong> Alert triggered · Twin notified</div>
+                    <div class="step-agent">Agent: IoT Gateway</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                    <div class="sn">02</div>
+                    <div class="st">Ingest</div>
+                </div>
+                <div class="step-body">
+                    <h4>Alert Ingestion &amp; Classification</h4>
+                    <div class="step-meta">
+                        <span class="product-tag twin">Digital Twin</span>
+                        <span class="step-time">T+1 sec</span>
+                    </div>
+                    <p>Alert Router receives alert, identifies equipment (CNC Machine #47), classifies fault type and severity. Equipment status updated in the Twin.</p>
+                    <div class="step-output"><strong>Output:</strong> Equipment: FAULTY · Severity: HIGH</div>
+                    <div class="step-agent">Agent: Alert Router Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                    <div class="sn">03</div>
+                    <div class="st">3D View</div>
+                </div>
+                <div class="step-body">
+                    <h4>Digital Twin Visualization</h4>
+                    <div class="step-meta">
+                        <span class="product-tag twin">Digital Twin</span>
+                        <span class="step-time">T+2–3 sec</span>
+                    </div>
+                    <p>Twin engine loads 3D model, displays equipment state in real-time, highlights the problem area in red. SOC Dashboard receives interactive visualization.</p>
+                    <div class="step-output"><strong>Output:</strong> Interactive 3D visualization · Problem area highlighted</div>
+                    <div class="step-agent">Agent: Technician via SOC Dashboard</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                    <div class="sn">04</div>
+                    <div class="st">Scenario</div>
+                </div>
+                <div class="step-body">
+                    <h4>Scenario Analysis &amp; Generation</h4>
+                    <div class="step-meta">
+                        <span class="product-tag twin">Digital Twin</span>
+                        <span class="product-tag automind">AUTOMIND</span>
+                        <span class="step-time">T+3–5 sec</span>
+                    </div>
+                    <p>Scenario Engine queries knowledge base based on alert context. AUTOMIND orchestrates the diagnosis agent chain. Builds decision tree for repair with multi-step branches.</p>
+                    <div class="step-output"><strong>Output:</strong> Multi-step scenario · Decision branches ready</div>
+                    <div class="step-agent">Agent: Scenario Generation Agent · Powered by AUTOMIND</div>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <div class="callout info">
-        <strong>Closed-Loop Architecture:</strong> The Agentic AI builds the Digital Twin. The Simulation Engine runs physics on the Twin. When faults are detected, the Agentic AI diagnoses them and expands the Twin. The Simulation Engine immediately picks up the new entities. No product works in isolation — each one triggers the next.
+    <!-- PHASE B: Training & Dispatch (Steps 5-9) -->
+    <div class="journey-phase">
+        <div class="journey-phase-label" style="background: rgba(224,150,47,0.08); color: var(--amber);">
+            <span>Phase B — Training &amp; Dispatch</span>
+            <div class="phase-line" style="background: var(--amber);"></div>
+            <span style="white-space:nowrap;">Steps 5–9 · GoalCert Simulation Engine</span>
+        </div>
+        <div class="journey-steps">
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                    <div class="sn">05</div>
+                    <div class="st">Video</div>
+                </div>
+                <div class="step-body">
+                    <h4>Training Video Generation (AI)</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+5–12 sec</span>
+                    </div>
+                    <p>AI agent pulls from data lake, uses generative AI to synthesize a 5-minute training video specific to the CNC sensor replacement procedure.</p>
+                    <div class="step-output"><strong>Output:</strong> MP4 video · Voiceover · Step-by-step graphics</div>
+                    <div class="step-agent">Agent: AI Content Generation Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                    <div class="sn">06</div>
+                    <div class="st">LMS</div>
+                </div>
+                <div class="step-body">
+                    <h4>Training Delivery to LMS</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+12–15 sec</span>
+                    </div>
+                    <p>Training video and scenario steps are loaded into the LMS as a Just-In-Time Training course, ready for technician access.</p>
+                    <div class="step-output"><strong>Output:</strong> Course ID: JITC-CNC-SENSOR-REPLACE · Status: READY</div>
+                    <div class="step-agent">Agent: LMS Content Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                    <div class="sn">07</div>
+                    <div class="st">Notify</div>
+                </div>
+                <div class="step-body">
+                    <h4>Technician Notification</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+15 sec</span>
+                    </div>
+                    <p>Push notification sent to the nearest available technician with the course link, priority level, and equipment location via the Notification Engine.</p>
+                    <div class="step-output"><strong>Output:</strong> In-app notification · Course invitation sent</div>
+                    <div class="step-agent">Agent: Dispatch/Notification Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                    <div class="sn">08</div>
+                    <div class="st">Train</div>
+                </div>
+                <div class="step-body">
+                    <h4>Technician Training &amp; Skilling</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+15–20 min</span>
+                    </div>
+                    <p>Technician completes the 5-minute JIT training on their mobile device. Assessment verified, competency confirmed before dispatch.</p>
+                    <div class="step-output"><strong>Output:</strong> Training: COMPLETE · Competency: VERIFIED</div>
+                    <div class="step-agent">Agent: Technician (Field)</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                    <div class="sn">09</div>
+                    <div class="st">Dispatch</div>
+                </div>
+                <div class="step-body">
+                    <h4>Technician Dispatched</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+20–30 min</span>
+                    </div>
+                    <p>After training completion confirmed, technician dispatched to shop floor. Field navigation provided with exact equipment location.</p>
+                    <div class="step-output"><strong>Output:</strong> Dispatch confirmed · Technician en-route</div>
+                    <div class="step-agent">Agent: Field Dispatch Agent</div>
+                </div>
+            </div>
+
+        </div>
     </div>
+
+    <!-- PHASE C: AR Repair (Steps 10-13) -->
+    <div class="journey-phase">
+        <div class="journey-phase-label" style="background: rgba(75,139,245,0.08); color: var(--blue);">
+            <span>Phase C — AR-Guided Repair &amp; Completion</span>
+            <div class="phase-line" style="background: var(--blue);"></div>
+            <span style="white-space:nowrap;">Steps 10–13 · GoalCert AR + Digital Twin</span>
+        </div>
+        <div class="journey-steps">
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--blue), #3A72D4);">
+                    <div class="sn">10</div>
+                    <div class="st">AR Start</div>
+                </div>
+                <div class="step-body">
+                    <h4>AR Remote Assistance Initiated</h4>
+                    <div class="step-meta">
+                        <span class="product-tag ar">AR Session</span>
+                        <span class="step-time">T+30 sec on-site</span>
+                    </div>
+                    <p>Technician arrives, opens AR app, streams live camera feed to SOC expert. AR session established with sub-100ms latency.</p>
+                    <div class="step-output"><strong>Output:</strong> AR session active · Video feed established · Latency &lt;100ms</div>
+                    <div class="step-agent">Agent: Technician + SOC Expert</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--blue), #3A72D4);">
+                    <div class="sn">11</div>
+                    <div class="st">AR Guide</div>
+                </div>
+                <div class="step-body">
+                    <h4>Expert Guidance: Step-by-Step AR Overlay</h4>
+                    <div class="step-meta">
+                        <span class="product-tag ar">AR Session</span>
+                        <span class="step-time">T+0–40 min on-site</span>
+                    </div>
+                    <p>SOC Expert views live feed, annotates AR overlay with arrows and highlights for each repair step. Each step confirmed with visual proof captured.</p>
+                    <div class="step-output"><strong>Output:</strong> Step completion confirmed · Visual proof captured</div>
+                    <div class="step-agent">Agent: Expert + Technician</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--purple), #6B4DC7);">
+                    <div class="sn">12</div>
+                    <div class="st">Monitor</div>
+                </div>
+                <div class="step-body">
+                    <h4>Interaction Monitoring &amp; Reporting</h4>
+                    <div class="step-meta">
+                        <span class="product-tag automind">AUTOMIND</span>
+                        <span class="step-time">Continuous</span>
+                    </div>
+                    <p>AUTOMIND's analytics pipeline monitors entire interaction in parallel, captures video, logs step times, and tracks safety compliance throughout.</p>
+                    <div class="step-output"><strong>Output:</strong> Completion % · Time efficiency · Safety compliance</div>
+                    <div class="step-agent">Agent: Monitoring &amp; Analytics Agent · Powered by AUTOMIND</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                    <div class="sn">13</div>
+                    <div class="st">Complete</div>
+                </div>
+                <div class="step-body">
+                    <h4>Maintenance Completion</h4>
+                    <div class="step-meta">
+                        <span class="product-tag twin">Digital Twin</span>
+                        <span class="step-time">T+35–40 min</span>
+                    </div>
+                    <p>Technician completes final repair step. Digital Twin receives sensor confirmation — temperature normalised. Equipment status updated to OPERATIONAL.</p>
+                    <div class="step-output"><strong>Output:</strong> Maintenance: COMPLETE · Equipment: OPERATIONAL</div>
+                    <div class="step-agent">Agent: Technician + Scenario Agent</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PHASE D: Knowledge Capture (Steps 14-18) -->
+    <div class="journey-phase">
+        <div class="journey-phase-label" style="background: rgba(34,204,119,0.08); color: #1A9A5C;">
+            <span>Phase D — Knowledge Capture &amp; Future Reuse</span>
+            <div class="phase-line" style="background: var(--green);"></div>
+            <span style="white-space:nowrap;">Steps 14–18 · GoalCert Simulation Engine</span>
+        </div>
+        <div class="journey-steps">
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, #1A9A5C, #147A49);">
+                    <div class="sn">14</div>
+                    <div class="st">Archive</div>
+                </div>
+                <div class="step-body">
+                    <h4>AR Session Close &amp; Archive</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+40–41 min</span>
+                    </div>
+                    <p>AR session ended, session video archived to the data lake, indexed with equipment metadata for future retrieval.</p>
+                    <div class="step-output"><strong>Output:</strong> Video file stored · Indexed for future retrieval</div>
+                    <div class="step-agent">Agent: AR Archive Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, #1A9A5C, #147A49);">
+                    <div class="sn">15</div>
+                    <div class="st">Report</div>
+                </div>
+                <div class="step-body">
+                    <h4>Automated Report Generation</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+41–50 min</span>
+                    </div>
+                    <p>AI synthesises a complete maintenance report from monitoring logs, session video, and compliance data. Includes executive summary and detailed step log.</p>
+                    <div class="step-output"><strong>Output:</strong> PDF Report · Executive summary · Safety verification</div>
+                    <div class="step-agent">Agent: Report Generation Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, #1A9A5C, #147A49);">
+                    <div class="sn">16</div>
+                    <div class="st">Convert</div>
+                </div>
+                <div class="step-body">
+                    <h4>Knowledge Conversion</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+50–60 min</span>
+                    </div>
+                    <p>AI transforms the session into reusable knowledge: trimmed video clips, markdown procedure document, tagged for equipment type and fault signature.</p>
+                    <div class="step-output"><strong>Output:</strong> Knowledge Article · Video clips · Tagged for discovery</div>
+                    <div class="step-agent">Agent: Content Conversion Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, #1A9A5C, #147A49);">
+                    <div class="sn">17</div>
+                    <div class="st">Index</div>
+                </div>
+                <div class="step-body">
+                    <h4>Knowledge Base Indexing</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">T+60–65 min</span>
+                    </div>
+                    <p>New knowledge article indexed in LMS search engine, added to equipment knowledge graph so it surfaces automatically for future relevant faults.</p>
+                    <div class="step-output"><strong>Output:</strong> Article discoverable · Added to knowledge graph</div>
+                    <div class="step-agent">Agent: Knowledge Management Agent</div>
+                </div>
+            </div>
+
+            <div class="journey-step">
+                <div class="step-num-col" style="background: linear-gradient(135deg, #1A9A5C, #147A49);">
+                    <div class="sn">18</div>
+                    <div class="st">Reuse</div>
+                </div>
+                <div class="step-body">
+                    <h4>Future Reuse</h4>
+                    <div class="step-meta">
+                        <span class="product-tag goalcert">GoalCert</span>
+                        <span class="step-time">Future</span>
+                    </div>
+                    <p>Next technician encountering a similar fault gets recommended training surfaced automatically — 3 to 5 minutes instead of the original 20. Training time reduced 80%.</p>
+                    <div class="step-output"><strong>Output:</strong> Recommended training shown · 80% time reduction</div>
+                    <div class="step-agent">Agent: Recommendation Agent</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
 </div>
 
 <!-- ═══════════════════ §2 — COMPLETE FLOW DIAGRAM ═══════════════════ -->
 <div class="section">
     <div class="section-num">Section 02</div>
-    <div class="section-title">Complete PoC Flow</div>
-    <div class="section-subtitle">The full storyline from onboarding a Collins facility to autonomous fault remediation.</div>
+    <div class="section-title">End-to-End Flow Diagram</div>
+    <div class="section-subtitle">Color-coded by product — from the first sensor event to the knowledge graph update that makes every future repair faster.</div>
 
     <div class="diagram-wrap">
         <div class="mermaid">
-graph TD
-    A["CONCIERGE AGENT\nInterviews Collins Facilities Manager\n'What kind of facility? What systems?'"] --> B["DOMAIN CLASSIFIER\nIdentifies: Aerospace MRO\nLoads aerospace domain pack"]
-    B --> C["TWIN BUILDER\nCreates 15+ entities:\nBuilding, Floors, Test Bays,\nAHUs, Chiller, UPS, Transformer"]
-    C --> D["3D SCENE GENERATOR\nGenerates navigable GLB model\nColor-coded by entity type"]
-    D --> E["DIGITAL TWIN LIVE\nTenant: collins-sg-mro\nFull graph + 3D model\nAll entities SHACL-validated"]
-    E --> F["DYNAMICS ENGINE STARTS\nTopological sort of entity graph\n15 physics models ticking\nReal-time telemetry via SSE"]
-    F --> G["STEADY STATE\nAll KPIs nominal\nChiller COP: 4.2\nSupply Air: 21.8 C\nUPS SoC: 98%"]
-    G --> H["CHILLER DEGRADATION\nCondenser fouling modeled\nCOP drops gradually\nSupply air temp rises"]
-    H --> I["TIER-C FIRES\nTemperature 3 C above setpoint\nSustained for 3+ minutes\nFinding created"]
-    H --> J["TIER-B FIRES\nZ-score exceeds 3 sigma\nStatistical anomaly confirmed\nFinding created"]
-    H --> K["TIER-A FIRES\nPhysics residual > 4 C\nThermal model diverges\nFinding created"]
-    I --> L["INCIDENT CREATED\nAll 3 findings grouped\nRisk score: ELEVATED\n3D model highlights chiller RED"]
-    J --> L
-    K --> L
-    L --> M["DIAGNOSIS AGENT\nPulls findings + dependents\nBFS depth=3 traversal\nCross-references history"]
-    M --> N["ROOT CAUSE\nChiller COP degradation\nCondenser fouling / refrigerant loss\nConfidence: 0.92"]
-    N --> O["REMEDIATION PLAN\n4 Action nodes created:\n1. Reduce load 40%\n2. Inspect condenser\n3. Clean + recharge\n4. Schedule 90-day PM"]
-    O --> P["GOALCERT HANDOFF\nAction nodes feed GoalCert:\nTraining video generation\nLMS staging\nAR-guided repair"]
-    O --> Q["GAP DETECTED\nNo redundant cooling path\nSingle point of failure\nfor Avionics Test Bay 2"]
-    Q --> R["TWIN EXPAND\nAdds backup Chiller entity\nWires to cooling manifold\nSHACL-validated + committed"]
-    R --> S["SIMULATION RESUMES\nTopology reloaded\nBackup chiller simulating\nin standby mode"]
-    S --> T["CROSS-TENANT INTEL\nMelbourne HQ had same incident\n2 weeks ago. Resolution:\nCondenser coil replacement, 2.5h"]
+flowchart TD
+    S1["01 · IoT SENSOR\nTemperature: 85°C vs 65°C\nCNC Machine #47"] --> S2["02 · ALERT ROUTER\nEquipment: FAULTY\nSeverity: HIGH"]
+    S2 --> S3["03 · DIGITAL TWIN VIEWER\nLoads 3D Model\nHighlights Problem Area"]
+    S3 --> S4A["04 · SCENARIO ENGINE\nKnowledge Base Query\nDecision Tree Built"]
+    S4A --> S4B["04 · AUTOMIND\nOrchestrates Diagnosis\nAgent Chain"]
+    S4B --> S5["05 · AI VIDEO ENGINE\nSynthesises 5-min\nTraining Video from Data Lake"]
+    S5 --> S6["06 · LMS STAGING\nCourse ID: JITC-CNC-SENSOR-REPLACE\nStatus: READY"]
+    S6 --> S7["07 · NOTIFICATION ENGINE\nPush to Available Technician\nPriority + Course Link"]
+    S7 --> S8["08 · TECHNICIAN TRAINS\n5-min JIT Training\nAssessment Verified"]
+    S8 --> S9["09 · DISPATCH\nTechnician En-Route\nNavigation Provided"]
+    S9 --> S10["10 · AR SESSION OPEN\nLive Camera Feed → SOC Expert\nLatency &lt;100ms"]
+    S10 --> S11["11 · AR OVERLAY GUIDANCE\nExpert Annotates Each Step\nVisual Proof Captured"]
+    S11 --> S12["12 · AUTOMIND MONITOR\nAnalytics Pipeline\nContinuous Logging"]
+    S11 --> S13["13 · MAINTENANCE COMPLETE\nSensor Confirms Normal Temp\nTwin: OPERATIONAL"]
+    S13 --> S14["14 · AR ARCHIVE\nSession Video → Data Lake\nIndexed for Retrieval"]
+    S14 --> S15["15 · REPORT GENERATION\nAI Synthesises PDF\nExecutive Summary + Steps"]
+    S15 --> S16["16 · KNOWLEDGE CONVERSION\nVideo Clips + Markdown Procedure\nTagged for Discovery"]
+    S16 --> S17["17 · KNOWLEDGE INDEXING\nAdded to Equipment Graph\nSearchable Immediately"]
+    S17 --> S18["18 · FUTURE REUSE\nNext Technician: 3–5 min\nTraining Time: ↓ 80%"]
 
-    style A fill:#8B6DF0,color:#fff
-    style B fill:#8B6DF0,color:#fff
-    style C fill:#8B6DF0,color:#fff
-    style D fill:#8B6DF0,color:#fff
-    style E fill:#18A999,color:#fff
-    style F fill:#E0962F,color:#0C2340
-    style G fill:#22CC77,color:#0C2340
-    style H fill:#E2564E,color:#fff
-    style I fill:#E2564E,color:#fff
-    style J fill:#E2564E,color:#fff
-    style K fill:#E2564E,color:#fff
-    style L fill:#C73E36,color:#fff
-    style M fill:#8B6DF0,color:#fff
-    style N fill:#8B6DF0,color:#fff
-    style O fill:#8B6DF0,color:#fff
-    style P fill:#4B8BF5,color:#fff
-    style Q fill:#E0962F,color:#0C2340
-    style R fill:#8B6DF0,color:#fff
-    style S fill:#E0962F,color:#0C2340
-    style T fill:#18A999,color:#fff
+    style S1 fill:#18A999,color:#fff
+    style S2 fill:#18A999,color:#fff
+    style S3 fill:#18A999,color:#fff
+    style S4A fill:#18A999,color:#fff
+    style S4B fill:#8B6DF0,color:#fff
+    style S5 fill:#E0962F,color:#0C2340
+    style S6 fill:#E0962F,color:#0C2340
+    style S7 fill:#E0962F,color:#0C2340
+    style S8 fill:#E0962F,color:#0C2340
+    style S9 fill:#E0962F,color:#0C2340
+    style S10 fill:#4B8BF5,color:#fff
+    style S11 fill:#4B8BF5,color:#fff
+    style S12 fill:#8B6DF0,color:#fff
+    style S13 fill:#18A999,color:#fff
+    style S14 fill:#E0962F,color:#0C2340
+    style S15 fill:#E0962F,color:#0C2340
+    style S16 fill:#E0962F,color:#0C2340
+    style S17 fill:#E0962F,color:#0C2340
+    style S18 fill:#22CC77,color:#0C2340
         </div>
     </div>
 
-    <div style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 8px; font-size: 12px; font-weight: 600;">
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--purple);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Agentic AI</span>
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--teal);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Digital Twin</span>
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--amber);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Simulation Engine</span>
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--red);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Fault Detection</span>
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--blue);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> GoalCert Handoff</span>
-        <span><span style="display:inline-block;width:14px;height:14px;background:var(--green);border-radius:3px;vertical-align:middle;margin-right:4px;"></span> Nominal State</span>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--teal);"></div> NextXR Digital Twin</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--amber);"></div> GoalCert Simulation Engine</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--purple);"></div> AUTOMIND</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div> AR Remote Assistance</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Future Reuse</div>
     </div>
 </div>
 
-<!-- ═══════════════════ §3 — THE SIX ACTS ═══════════════════ -->
+<!-- ═══════════════════ §3 — COMPONENT INTERACTION ARCHITECTURE ═══════════════════ -->
 <div class="section">
     <div class="section-num">Section 03</div>
-    <div class="section-title">The Six Acts</div>
-    <div class="section-subtitle">A narrated demo walkthrough — each act showcases one or more products and feeds into the next.</div>
-
-    <div class="act-grid">
-
-        <!-- Act 1 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--purple), #6B4DC7);">
-                <div class="n">1</div>
-                <div class="tag">Genesis</div>
-            </div>
-            <div class="act-body">
-                <h3>Build the Twin</h3>
-                <div class="act-products">
-                    <span class="product-tag agent">Agentic AI</span>
-                    <span class="product-tag twin">Digital Twin</span>
-                </div>
-                <p>Collins wants to onboard their Singapore MRO (Maintenance, Repair, Overhaul) facility. The Concierge agent conducts a natural-language interview with the facilities manager.</p>
-                <div class="act-detail">
-                    <strong>Behind the scenes:</strong>
-                    <ul>
-                        <li>Domain Classifier identifies <code>aerospace-mro</code> with 0.94 confidence</li>
-                        <li>Capability Composer loads the aerospace domain pack (vibration monitoring, avionics-grade thermal limits, UPS SoC thresholds)</li>
-                        <li>Schema Mapper creates ~15 entities: Building, 2 Floors, 4 Avionics Test Bays, 2 AirHandlers, 1 Chiller, 1 UPS, 1 Transformer, 2 Pumps, 1 Generator, environmental sensors</li>
-                        <li>Every entity is SHACL-validated against the ontology before commit</li>
-                        <li>GraphWriter writes to Neo4j with full hash-chained changelog</li>
-                        <li>Scene Generator creates a navigable 3D GLB model via treemap layout</li>
-                    </ul>
-                </div>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    The 3D BIM viewer lights up with the full facility. Every entity is clickable — shows canonical type, relationships, and behavior profile. Tenant: <code>collins-sg-mro</code>.
-                </div>
-            </div>
-        </div>
-
-        <!-- Act 2 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
-                <div class="n">2</div>
-                <div class="tag">Alive</div>
-            </div>
-            <div class="act-body">
-                <h3>The Facility Comes Alive</h3>
-                <div class="act-products">
-                    <span class="product-tag sim">Simulation Engine</span>
-                    <span class="product-tag twin">Digital Twin</span>
-                </div>
-                <p>The dynamics engine starts ticking on every entity in the twin. 15 physics models run simultaneously, topologically sorted so power feeds before it is consumed, cooling feeds before zones reference it.</p>
-                <div class="act-detail">
-                    <strong>Physics models running:</strong>
-                    <ul>
-                        <li><strong>ZoneThermalModel</strong> — ASHRAE RC lumped-capacitance for each test bay, with diurnal outdoor temperature and occupancy profiles</li>
-                        <li><strong>ChillerModel</strong> — Carnot COP with part-load factor and condition degradation</li>
-                        <li><strong>AirHandlerModel</strong> — Fan affinity laws (Q&prop;N, P&prop;N&sup3;), coil first-order lag, filter dust accumulation</li>
-                        <li><strong>UPSModel</strong> — Peukert battery discharge curves, SoC tracking, cycle counting</li>
-                        <li><strong>TransformerModel</strong> — IEEE C57.91 oil thermal rise, copper losses</li>
-                    </ul>
-                    <br>
-                    Real-time telemetry flows through the event bus (Redis Streams &rarr; SSE &rarr; browser). Every graph mutation is visible in the LiveOps panel as it happens.
-                </div>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    Dashboard shows 4 KPIs all green. Sensor cards show live values — Chiller COP: 4.2, UPS SoC: 98%, Supply Air: 21.8&deg;C, Filter &Delta;P: 120 Pa. Everything nominal. The twin is alive.
-                </div>
-            </div>
-        </div>
-
-        <!-- Act 3 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--red), var(--red-dark));">
-                <div class="n">3</div>
-                <div class="tag">Fault</div>
-            </div>
-            <div class="act-body">
-                <h3>The Incident</h3>
-                <div class="act-products">
-                    <span class="product-tag sim">Simulation Engine</span>
-                </div>
-                <p>The chiller feeding Avionics Test Bay 2 starts degrading. The simulation engine models condenser fouling — COP drops gradually, supply air temperature rises. Three tiers of detection fire in sequence:</p>
-
-                <table class="tier-table">
-                    <tr>
-                        <th>Tier</th>
-                        <th>Rule</th>
-                        <th>What Fires</th>
-                        <th>When</th>
-                    </tr>
-                    <tr>
-                        <td><span class="tier-pill c">Tier C</span></td>
-                        <td><code>hvac.temp_threshold</code></td>
-                        <td>Supply air 3&deg;C above setpoint, sustained 3+ minutes</td>
-                        <td>T+3 min</td>
-                    </tr>
-                    <tr>
-                        <td><span class="tier-pill b">Tier B</span></td>
-                        <td><code>hvac.temp_zscore</code></td>
-                        <td>Temperature z-score exceeds 3&sigma; — statistical anomaly confirmed</td>
-                        <td>T+5 min</td>
-                    </tr>
-                    <tr>
-                        <td><span class="tier-pill a">Tier A</span></td>
-                        <td><code>hvac.thermal_physics</code></td>
-                        <td>First-order thermal model residual exceeds 4&deg;C — physics divergence</td>
-                        <td>T+7 min</td>
-                    </tr>
-                </table>
-
-                <p>Each Finding is written through GraphWriter &rarr; changelog &rarr; bus. All three findings are auto-grouped into an Incident. The dashboard risk score jumps from <strong>NOMINAL</strong> to <strong style="color:var(--red);">ELEVATED</strong>.</p>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    Dashboard turns amber/red. LiveOps shows findings streaming in real-time. The 3D model highlights the chiller in red. Click it — see all three findings with severity pills, timestamps, and the behavior rules that fired.
-                </div>
-            </div>
-        </div>
-
-        <!-- Act 4 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--purple), #6B4DC7);">
-                <div class="n">4</div>
-                <div class="tag">Diagnose</div>
-            </div>
-            <div class="act-body">
-                <h3>Diagnosis &amp; Remediation</h3>
-                <div class="act-products">
-                    <span class="product-tag agent">Agentic AI</span>
-                    <span class="product-tag twin">Digital Twin</span>
-                </div>
-                <p>The operational diagnosis flow activates. Three agents work in sequence to build a full remediation chain.</p>
-                <div class="act-detail">
-                    <strong>Agent 1 — Context Gatherer:</strong> Pulls all 3 findings on the chiller. Runs BFS traversal (depth=3) to find all dependent equipment: AHU-01 &rarr; Test Bay 2 &rarr; all sensors in that bay. Checks past incidents on this entity type.<br><br>
-
-                    <strong>Agent 2 — Diagnosis:</strong> Multi-tier corroboration analysis. Threshold + statistical + physics all confirming = confidence 0.92. Root cause: "Chiller COP degradation — condenser fouling or refrigerant charge loss." Creates a <code>Diagnosis</code> node linked to the Incident.<br><br>
-
-                    <strong>Agent 3 — Recommender:</strong> Generates step-by-step remediation:
-                    <ul>
-                        <li><strong>Action 1:</strong> Reduce Test Bay 2 load by 40% (immediate, prevent avionics damage)</li>
-                        <li><strong>Action 2:</strong> Inspect condenser coils within 4 hours</li>
-                        <li><strong>Action 3:</strong> If fouled — clean coils and recharge refrigerant</li>
-                        <li><strong>Action 4:</strong> Schedule preventive maintenance cycle every 90 days</li>
-                    </ul>
-                </div>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    Click through the full chain in the graph: Finding &rarr; Incident &rarr; Diagnosis &rarr; Recommendation &rarr; Action. Everything is hash-chained in the changelog. Tamper-evident audit trail.
-                </div>
-            </div>
-        </div>
-
-        <!-- Act 5 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--teal), #14857A);">
-                <div class="n">5</div>
-                <div class="tag">Expand</div>
-            </div>
-            <div class="act-body">
-                <h3>Autonomous Expansion</h3>
-                <div class="act-products">
-                    <span class="product-tag agent">Agentic AI</span>
-                    <span class="product-tag twin">Digital Twin</span>
-                    <span class="product-tag sim">Simulation Engine</span>
-                </div>
-                <p>The diagnosis reveals a critical infrastructure gap: <strong>no redundant cooling path</strong>. If this chiller fails completely, Test Bay 2 loses environmental control and all in-progress avionics tests are scrapped.</p>
-                <div class="act-detail">
-                    <strong>The system acts autonomously:</strong>
-                    <ul>
-                        <li>Twin Expand agent adds a backup <code>Chiller</code> entity (<code>chiller-backup-02</code>)</li>
-                        <li>Wires it with <code>nxr:feedsInto</code> relationships to the existing cooling manifold</li>
-                        <li>Adds a switchover <code>Valve</code> for manual/automatic failover</li>
-                        <li>All new entities are SHACL-validated and committed through the same write path</li>
-                        <li>The 3D model regenerates to show the backup chiller in the plant room</li>
-                        <li>The dynamics engine reloads its topology — picks up new entities automatically</li>
-                        <li>Backup chiller starts simulating in "standby" mode immediately</li>
-                    </ul>
-                </div>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    "We just added redundancy to a live facility without downtime. The simulation is already running on it." The backup chiller sensor card appears — COP nominal, status: standby, ready to take over.
-                </div>
-            </div>
-        </div>
-
-        <!-- Act 6 -->
-        <div class="act-card">
-            <div class="act-num" style="background: linear-gradient(135deg, var(--navy), var(--navy-light));">
-                <div class="n">6</div>
-                <div class="tag">Intel</div>
-            </div>
-            <div class="act-body">
-                <h3>Cross-Tenant Intelligence</h3>
-                <div class="act-products">
-                    <span class="product-tag twin">Digital Twin</span>
-                </div>
-                <p>Multi-tenancy is not just isolation — it is cross-facility intelligence.</p>
-                <div class="act-detail">
-                    Collins Melbourne HQ (<code>collins-melb-hq</code>) has been running for 3 weeks. Switch to that tenant — show a similar chiller incident resolved 2 weeks ago. Resolution: condenser coil replacement + refrigerant recharge. Downtime: 2.5 hours.<br><br>
-                    Switch back to <code>collins-sg-mro</code>. The system surfaces this:
-                    <blockquote style="margin: 12px 0; padding: 12px 16px; background: rgba(75, 139, 245, 0.06); border-left: 3px solid var(--blue); border-radius: 0 6px 6px 0; font-style: italic;">
-                        "Similar incident resolved at Melbourne HQ. Resolution: condenser coil replacement + refrigerant recharge. Downtime: 2.5 hours. Recommendation: apply same fix — estimated resolution 2h with parts on hand."
-                    </blockquote>
-                </div>
-                <div class="act-demo">
-                    <strong>Demo Moment</strong><br>
-                    "Knowledge does not stay in one building. Every facility in the Collins network learns from every other facility. The hash-chained changelog means this history is tamper-evident — auditable for aerospace compliance."
-                </div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- ═══════════════════ §4 — COMPONENT INTERACTION ═══════════════════ -->
-<div class="section">
-    <div class="section-num">Section 04</div>
     <div class="section-title">Component Interaction Architecture</div>
-    <div class="section-subtitle">How every component talks to every other component — all through the single write path.</div>
+    <div class="section-subtitle">How every component talks to every other component — with latency SLAs on the critical path connections.</div>
 
     <div class="diagram-wrap">
         <div class="mermaid">
 graph LR
-    subgraph AGENTIC["Agentic AI (20 Agents)"]
-        CON["Concierge\nAgent"]
-        DOM["Domain\nClassifier"]
-        SCH["Schema\nMapper"]
-        GW["Graph\nWriter Agent"]
-        CTX["Context\nGatherer"]
-        DIA["Diagnosis\nAgent"]
-        REC["Recommender\nAgent"]
-        EXP["Twin Expand\nAgent"]
+    subgraph IOT["IoT Layer"]
+        SENSOR["IoT Sensor\n(CNC #47)"]
+        GW["IoT Gateway"]
     end
 
-    subgraph TWIN["Digital Twin"]
-        NEO["Neo4j\nGraph Store"]
-        SHACL["SHACL\nValidation Gate"]
-        CL["Hash-Chained\nChangelog"]
-        BIM["3D BIM\nViewer"]
-        ONT["Ontology\n(Turtle + OWL)"]
+    subgraph TWIN["NextXR Digital Twin"]
+        AR_RT["Alert Router"]
+        DTE["Digital Twin Engine"]
+        VIZ["3D Visualization\nLayer"]
+        KB["Knowledge Base"]
+        SCEN["Scenario Engine"]
     end
 
-    subgraph SIM["Simulation Engine"]
-        DYN["Dynamics\nEngine"]
-        BEH["Behavior\nRegistry"]
-        TC["Tier-C\nThresholds"]
-        TB["Tier-B\nStatistical"]
-        TA["Tier-A\nPhysics"]
-        BUS["Event Bus\n(Redis/SSE)"]
+    subgraph AUTO["AUTOMIND"]
+        ORCH["Workflow\nOrchestrator"]
+        MON["Analytics\nPipeline"]
     end
 
-    subgraph GC["GoalCert Integration"]
-        ACT["Action Nodes\n(remediation steps)"]
-        VID["Training Video\nGeneration"]
-        LMS["LMS Course\nStaging"]
-        AR["AR Remote\nAssistance"]
+    subgraph GC["GoalCert Simulation Engine"]
+        VID["AI Video\nEngine"]
+        LAKE["Data Lake"]
+        LMS["LMS Course\nEngine"]
+        NOTIF["Notification\nEngine"]
+        AR_E["AR Engine\n(Mobile)"]
+        REPT["Report\nAgent"]
+        KNOW["Knowledge\nGraph"]
     end
 
-    CON -->|interview| DOM
-    DOM -->|classify| SCH
-    SCH -->|entities| GW
-    GW -->|validate| SHACL
-    SHACL -->|commit| NEO
-    NEO -->|3D model| BIM
-    GW -->|append| CL
-    GW -->|publish| BUS
+    subgraph FIELD["Field"]
+        TECH["Technician\nApp"]
+        SOC["SOC Expert\nDashboard"]
+    end
 
-    DYN -->|telemetry| BEH
-    BEH --> TC
-    BEH --> TB
-    BEH --> TA
-    TC -->|finding| SHACL
-    TB -->|finding| SHACL
-    TA -->|finding| SHACL
+    SENSOR -->|"&lt;1 sec"| GW
+    GW -->|"&lt;1 sec"| AR_RT
+    AR_RT -->|"&lt;200ms"| DTE
+    DTE --> VIZ
+    DTE -->|"&lt;3 sec"| SCEN
+    SCEN --> KB
+    SCEN --> ORCH
+    ORCH -->|"&lt;10 sec"| VID
+    LAKE --> VID
+    VID -->|"&lt;5 sec"| LMS
+    LMS --> NOTIF
+    NOTIF --> TECH
+    TECH --> AR_E
+    AR_E -->|"&lt;100ms"| SOC
+    SOC -->|"&lt;50ms"| AR_E
+    AR_E -->|"&lt;2 sec"| SCEN
+    MON --> REPT
+    REPT --> KNOW
+    KNOW --> LMS
 
-    CTX -->|query graph| NEO
-    DIA -->|diagnosis| SHACL
-    REC -->|actions| SHACL
-    EXP -->|new entities| SHACL
-    DYN -->|reads topology| NEO
-    BEH -->|reads bindings| ONT
-
-    ACT --> VID
-    VID --> LMS
-    LMS --> AR
-
-    style AGENTIC fill:#F3EEFF,stroke:#8B6DF0,stroke-width:2px
+    style IOT fill:#E6F7F5,stroke:#18A999,stroke-width:2px
     style TWIN fill:#E6F7F5,stroke:#18A999,stroke-width:2px
-    style SIM fill:#FFF5E6,stroke:#E0962F,stroke-width:2px
-    style GC fill:#E8F0FE,stroke:#4B8BF5,stroke-width:2px
+    style AUTO fill:#F3EEFF,stroke:#8B6DF0,stroke-width:2px
+    style GC fill:#FFF5E6,stroke:#E0962F,stroke-width:2px
+    style FIELD fill:#E8F0FE,stroke:#4B8BF5,stroke-width:2px
         </div>
     </div>
 
-    <div class="callout warn">
-        <strong>Single Write Path Enforcement:</strong> Every mutation in the entire system — REST API, agent nodes, simulation feed, BIM importer, twin seeding — routes through <code>GraphWriter</code> &rarr; SHACL validation &rarr; Neo4j commit &rarr; changelog append &rarr; bus publish. Nothing bypasses the gate. This means every change to the twin is ontology-validated, hash-chained, and auditable. For aerospace compliance, this is not optional — it is structural.
-    </div>
-</div>
-
-<!-- ═══════════════════ §5 — TIMELINE ═══════════════════ -->
-<div class="section">
-    <div class="section-num">Section 05</div>
-    <div class="section-title">Demo Timeline</div>
-    <div class="section-subtitle">End-to-end PoC demo flow with time markers.</div>
-
-    <div class="timeline">
-        <div class="tl-item">
-            <div class="tl-time">T+0:00</div>
-            <div class="tl-title">Act 1 — Build the Twin</div>
-            <div class="tl-desc">Concierge agent interview &rarr; domain classification &rarr; entity creation &rarr; 3D model generation. Show the empty canvas becoming a full aerospace MRO facility.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+2:00</div>
-            <div class="tl-title">Act 2 — Facility Comes Alive</div>
-            <div class="tl-desc">Start the dynamics engine. Watch sensor cards populate with live values. Dashboard KPIs go green. Event bus streams mutations in real-time.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+4:00</div>
-            <div class="tl-title">Act 3 — The Fault</div>
-            <div class="tl-desc">Chiller degradation begins. Tier-C fires at T+3min, Tier-B at T+5min, Tier-A at T+7min. Dashboard shifts from green to amber to red. Incident created.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+7:00</div>
-            <div class="tl-title">Act 4 — Diagnosis</div>
-            <div class="tl-desc">Operational agent chain runs: context &rarr; diagnosis &rarr; remediation plan. Full Finding &rarr; Incident &rarr; Diagnosis &rarr; Recommendation &rarr; Action chain visible in graph.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+9:00</div>
-            <div class="tl-title">Act 5 — Expand</div>
-            <div class="tl-desc">Twin Expand adds backup chiller. 3D model regenerates. Dynamics engine auto-picks up new entity. Backup chiller starts simulating in standby.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+11:00</div>
-            <div class="tl-title">Act 6 — Cross-Tenant</div>
-            <div class="tl-desc">Switch to Melbourne HQ tenant. Show resolved incident. Switch back. System surfaces cross-facility intelligence.</div>
-        </div>
-        <div class="tl-item">
-            <div class="tl-time">T+12:00</div>
-            <div class="tl-title">GoalCert Integration Point</div>
-            <div class="tl-desc">Show how Action nodes feed into GoalCert's pipeline: training video generation &rarr; LMS staging &rarr; technician notification &rarr; AR-guided repair. The three NextXR products are the foundation layer.</div>
-        </div>
+    <div class="callout info">
+        <strong>Critical Path Latency:</strong> The sensor-to-visualization path must complete in under 3 seconds total. The AR annotation loop (Expert &rarr; Technician &rarr; Step Confirmation &rarr; Scenario Engine) must complete within 150ms end-to-end to maintain a seamless guidance experience.
     </div>
 </div>
 
-<!-- ═══════════════════ §6 — AGENTS INVOLVED ═══════════════════ -->
+<!-- ═══════════════════ §4 — THE 10 AGENTS ═══════════════════ -->
 <div class="section">
-    <div class="section-num">Section 06</div>
-    <div class="section-title">Agents Activated in This PoC</div>
-    <div class="section-subtitle">12 of the 20 agents are directly involved in the Collins demo flow.</div>
+    <div class="section-num">Section 04</div>
+    <div class="section-title">The 10 AI Agents</div>
+    <div class="section-subtitle">Every agent in the workflow — with their trigger, output, product ownership, and what happens if they fail.</div>
 
     <div class="agent-grid">
-        <div class="agent-card">
-            <h4>Concierge Agent</h4>
-            <p>Natural-language interview with the facilities manager. Elicits facility type, systems, floor count, and equipment. Drives the bundle's question set. Loops on low-confidence classification.</p>
+
+        <div class="agent-card twin-agent">
+            <h4>IoT Alert Router</h4>
+            <div class="agent-product" style="color: var(--teal);">NextXR Digital Twin</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Sensor reading exceeds threshold (85°C vs 65°C)</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Equipment ID, fault classification, severity tag, Twin notification</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">1 → 2</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Retry with exponential backoff (3x); escalate to manual SOC alert if still failing after 30 sec</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Domain Classifier</h4>
-            <p>Identifies facility domain (<code>aerospace-mro</code>) with confidence scoring. Threshold: 0.7. Falls below &rarr; loops back to Concierge for more questions.</p>
+
+        <div class="agent-card twin-agent">
+            <h4>Scenario Generation Agent</h4>
+            <div class="agent-product" style="color: var(--teal);">NextXR Digital Twin · Orchestrated by AUTOMIND</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Alert classification complete, equipment context available</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Multi-step scenario with decision branches, repair procedure tree</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">4</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Load cached scenario template for equipment type; flag for human review</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Capability Composer</h4>
-            <p>Queries the Bundle Registry for matching domain packs. Loads the aerospace pack's entity templates, behavior rules, and monitoring configurations.</p>
+
+        <div class="agent-card goalcert-agent">
+            <h4>AI Video Generation Agent</h4>
+            <div class="agent-product" style="color: var(--amber);">GoalCert Simulation Engine</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Scenario steps confirmed, data lake query complete</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">MP4 training video (5 min), voiceover, step-by-step visual graphics</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">5</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Serve pre-rendered template video for equipment type; annotate with scenario-specific text overlays</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Schema Mapper</h4>
-            <p>Maps conversation findings to ontology entity list. Resolves canonical types against the SHACL-backed ontology. Outputs a validated entity manifest.</p>
+
+        <div class="agent-card goalcert-agent">
+            <h4>LMS Content Agent</h4>
+            <div class="agent-product" style="color: var(--amber);">GoalCert Simulation Engine</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Training video generation complete</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Course ID, LMS course record, xAPI learning record seeded</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">6</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Queue course for manual LMS staging; dispatch emergency notification with direct video link</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Validator Agent</h4>
-            <p>Dry-run SHACL validation on every proposed entity before commit. Catches ontology violations (missing required properties, illegal relationships) before they reach the graph.</p>
+
+        <div class="agent-card goalcert-agent">
+            <h4>Notification/Dispatch Agent</h4>
+            <div class="agent-product" style="color: var(--amber);">GoalCert Simulation Engine</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">LMS course status: READY; available technician in vicinity</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Push notification, course invitation, dispatch confirmation, field navigation</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">7 → 9</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Escalate to supervisor; broadcast to all available technicians in zone</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Graph Writer Agent</h4>
-            <p>Topologically orders entities (targets before sources), resolves template keys to real IDs, commits through GraphWriter. Registers the twin in TwinRegistry.</p>
+
+        <div class="agent-card ar-agent">
+            <h4>Scenario Engine (Replay)</h4>
+            <div class="agent-product" style="color: var(--blue);">GoalCert · AR Integration</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">AR session active; technician begins each repair step</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Step confirmation events, next-step instructions, completion flag</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">10 → 13</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Allow manual step override by SOC expert; log for post-session review</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Scene Generator</h4>
-            <p>Queries graph for all entities, generates spatial layout via treemap algorithm, creates navigable GLB model with color-coded meshes per entity type.</p>
+
+        <div class="agent-card ar-agent">
+            <h4>Expert Guidance Agent (SOC)</h4>
+            <div class="agent-product" style="color: var(--blue);">GoalCert · AR Integration</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Live AR camera feed received at SOC; technician requests guidance</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">AR annotation overlays (arrows, highlights), audio guidance, step approval</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">10 → 11</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Degrade to voice-only call; AI agent provides automated guidance from scenario steps</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Context Gatherer</h4>
-            <p>Reads findings, runs BFS traversal (depth=3) for dependent equipment, pulls past incidents on the entity type. Builds the full context packet for diagnosis.</p>
+
+        <div class="agent-card automind-agent">
+            <h4>Monitoring &amp; Analytics Agent</h4>
+            <div class="agent-product" style="color: var(--purple);">AUTOMIND</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Session start; runs continuously throughout the entire interaction</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Completion %, time efficiency metrics, safety compliance log, session recording</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">12 (Continuous)</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Buffer events locally; sync to analytics store on reconnect</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Diagnosis Agent</h4>
-            <p>Multi-tier corroboration analysis. Pattern-matches behavior IDs (threshold + z-score + physics = degradation signature). 24h in-memory cache. Creates Diagnosis node.</p>
+
+        <div class="agent-card goalcert-agent">
+            <h4>Report Generation Agent</h4>
+            <div class="agent-product" style="color: var(--amber);">GoalCert Simulation Engine</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Maintenance status: COMPLETE; monitoring logs available</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">PDF maintenance report with executive summary, detailed steps, safety verification</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">14 → 15</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Generate minimal report from structured logs; flag for manual narrative addition</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Recommender Agent</h4>
-            <p>Generates step-by-step remediation. Creates Recommendation + Action nodes linked to the Diagnosis. Each action has execution mode, priority, and estimated duration.</p>
+
+        <div class="agent-card goalcert-agent">
+            <h4>Content Conversion Agent</h4>
+            <div class="agent-product" style="color: var(--amber);">GoalCert Simulation Engine</div>
+            <div class="agent-row">
+                <span class="lbl">Trigger</span>
+                <span class="val">Session recording and report available; maintenance confirmed complete</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Output</span>
+                <span class="val">Knowledge article, trimmed video clips, markdown procedure, knowledge graph entry</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Steps</span>
+                <span class="val">16 → 18</span>
+            </div>
+            <div class="agent-row">
+                <span class="lbl">Fallback</span>
+                <span class="val">Store raw session recording; schedule conversion for off-peak processing</span>
+            </div>
         </div>
-        <div class="agent-card">
-            <h4>Twin Expand Agent</h4>
-            <p>Adds new entities to an existing twin without rebuilding. SHACL-validates, commits through GraphWriter, triggers topology reload in the dynamics engine.</p>
-        </div>
-        <div class="agent-card">
-            <h4>Bundle Author (Pre-demo)</h4>
-            <p>Authors the aerospace domain pack before the demo. 9-stage pipeline: interviewer &rarr; ontology drafter &rarr; rule author &rarr; behavior modeler &rarr; linter &rarr; publisher. Published pack used by the Twin Builder.</p>
-        </div>
+
     </div>
 </div>
 
-<!-- ═══════════════════ §7 — GOALCERT MAPPING ═══════════════════ -->
+<!-- ═══════════════════ §5 — CRITICAL PATH & LATENCY SLAs ═══════════════════ -->
 <div class="section">
-    <div class="section-num">Section 07</div>
-    <div class="section-title">Mapping to GoalCert Reference Flow</div>
-    <div class="section-subtitle">How each step in Prem's reference flow maps to the NextXR products and where GoalCert takes over.</div>
+    <div class="section-num">Section 05</div>
+    <div class="section-title">Critical Path &amp; Latency SLAs</div>
+    <div class="section-subtitle">The connections on the critical path — with maximum allowed latency and why each matters for the end-to-end experience.</div>
+
+    <table class="sla-table">
+        <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 25%;">Connection</th>
+            <th style="width: 12%;">SLA</th>
+            <th style="width: 10%;">Priority</th>
+            <th style="width: 48%;">Why It Matters</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>Sensor → Digital Twin</td>
+            <td><span class="sla-val">&lt;1 sec</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Any delay here means the technician response is delayed proportionally. The clock starts at the sensor.</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>Digital Twin → Visualization</td>
+            <td><span class="sla-val">&lt;200ms</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>SOC operator needs immediate visual feedback to assess severity and decide on escalation path.</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>Alert Router → Scenario Engine</td>
+            <td><span class="sla-val">&lt;3 sec</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Scenario generation is the gateway to training content — delay here ripples through the entire training pipeline.</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>Scenario Engine → Video Generation</td>
+            <td><span class="sla-val">&lt;10 sec</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Target is that the technician receives training within 15 seconds of alert. Video must begin rendering immediately.</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>Video Generation → LMS</td>
+            <td><span class="sla-val">&lt;5 sec</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Course must be READY before the notification is sent — technician should be able to start immediately on opening the link.</td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td>LMS → Technician Notification</td>
+            <td><span class="sla-val">&lt;2 sec</span></td>
+            <td><span class="tier-pill high">HIGH</span></td>
+            <td>Notification latency has a direct impact on total dispatch time.</td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td>AR Video Stream → SOC Expert</td>
+            <td><span class="sla-val">&lt;100ms</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Above 150ms the expert's annotations start to feel disconnected from the live video feed, creating guidance errors.</td>
+        </tr>
+        <tr>
+            <td>8</td>
+            <td>Expert Annotation → Technician Display</td>
+            <td><span class="sla-val">&lt;50ms</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>AR overlay must feel instantaneous to the technician — any lag creates confusion about which physical component is being indicated.</td>
+        </tr>
+        <tr>
+            <td>9</td>
+            <td>Step Confirmation → Scenario Engine</td>
+            <td><span class="sla-val">&lt;2 sec</span></td>
+            <td><span class="tier-pill critical">CRITICAL</span></td>
+            <td>Scenario engine must acknowledge step completion and serve next instruction before technician's attention drifts.</td>
+        </tr>
+        <tr>
+            <td>10</td>
+            <td>Maintenance Complete → Twin Resync</td>
+            <td><span class="sla-val">&lt;5 sec</span></td>
+            <td><span class="tier-pill high">HIGH</span></td>
+            <td>Twin must reflect OPERATIONAL status quickly so any concurrent monitoring dashboards and other technicians get accurate state.</td>
+        </tr>
+        <tr>
+            <td>11</td>
+            <td>Session Archive → Report Agent</td>
+            <td><span class="sla-val">&lt;60 sec</span></td>
+            <td><span class="tier-pill med">STANDARD</span></td>
+            <td>Report generation can tolerate moderate latency as it happens post-maintenance — target is delivery within 10 minutes of session close.</td>
+        </tr>
+        <tr>
+            <td>12</td>
+            <td>Knowledge Article → LMS Index</td>
+            <td><span class="sla-val">&lt;300 sec</span></td>
+            <td><span class="tier-pill med">STANDARD</span></td>
+            <td>Knowledge must be discoverable by the next technician encounter — same-shift indexing is acceptable.</td>
+        </tr>
+    </table>
+</div>
+
+<!-- ═══════════════════ §6 — DATA FLOW SPECIFICATIONS ═══════════════════ -->
+<div class="section">
+    <div class="section-num">Section 06</div>
+    <div class="section-title">Data Flow Specifications</div>
+    <div class="section-subtitle">The 12 data entities that flow through the system — their origin, destination, format, and the steps they are active in.</div>
 
     <table class="map-table">
         <tr>
-            <th style="width:30%;">GoalCert Reference Step</th>
-            <th style="width:5%;" class="arrow"></th>
-            <th style="width:30%;">NextXR Product</th>
-            <th style="width:35%;">Implementation</th>
+            <th style="width: 22%;">Data Entity</th>
+            <th style="width: 15%;">Origin</th>
+            <th style="width: 18%;">Destination</th>
+            <th style="width: 13%;">Format</th>
+            <th style="width: 10%;">Steps</th>
+            <th style="width: 22%;">Key Fields</th>
         </tr>
         <tr>
-            <td>Sensor Alert (CNC Machine #47)</td>
-            <td class="arrow">&rarr;</td>
-            <td><span class="product-tag sim">Simulation Engine</span></td>
-            <td>3-tier behavior rules fire on simulated telemetry. Finding nodes created in graph with full audit trail.</td>
+            <td><strong>Sensor Alert Event</strong></td>
+            <td>IoT Sensor</td>
+            <td>Alert Router → Digital Twin</td>
+            <td>JSON / MQTT</td>
+            <td>1 → 2</td>
+            <td>equipmentId, reading, threshold, timestamp, severity</td>
         </tr>
         <tr>
-            <td>Digital Twin — Load 3D Model, Show Equipment State</td>
-            <td class="arrow">&rarr;</td>
-            <td><span class="product-tag twin">Digital Twin</span></td>
-            <td>Neo4j graph + 3D BIM viewer. Entities color-coded by live status (green/amber/red). Click-through to properties and relationships.</td>
+            <td><strong>Equipment Metadata</strong></td>
+            <td>Digital Twin Graph</td>
+            <td>Scenario Engine, AR Engine</td>
+            <td>Graph Query Result</td>
+            <td>2 → 4, 10</td>
+            <td>canonicalType, location, maintenanceHistory, relationships</td>
         </tr>
         <tr>
-            <td>Scenario Engine — Analyze Fault, Build Decision Tree</td>
-            <td class="arrow">&rarr;</td>
-            <td><span class="product-tag sim">Simulation Engine</span> + <span class="product-tag agent">Agentic AI</span></td>
-            <td>3-tier detection (threshold + statistical + physics) builds the fault evidence. Operational diagnosis agent chain creates Finding &rarr; Incident &rarr; Diagnosis &rarr; Recommendation &rarr; Action.</td>
+            <td><strong>Scenario Steps</strong></td>
+            <td>Scenario Engine</td>
+            <td>Video Agent, AR Engine, LMS</td>
+            <td>Structured JSON</td>
+            <td>4 → 5, 11</td>
+            <td>stepId, instruction, toolRequired, safetyNote, estimatedTime</td>
         </tr>
         <tr>
-            <td>AI Video Generation</td>
-            <td class="arrow">&rarr;</td>
-            <td style="color: var(--blue); font-weight: 600;">GoalCert Product</td>
-            <td>Consumes Action nodes from the NextXR graph. Each Action has execution steps, priority, and equipment context — ready for video synthesis.</td>
+            <td><strong>Training Video</strong></td>
+            <td>AI Video Engine</td>
+            <td>LMS, Technician App</td>
+            <td>MP4 + VTT captions</td>
+            <td>5 → 6</td>
+            <td>courseId, duration, stepCount, thumbnailUrl, dataLakeRef</td>
         </tr>
         <tr>
-            <td>LMS Staging + Notification</td>
-            <td class="arrow">&rarr;</td>
-            <td style="color: var(--blue); font-weight: 600;">GoalCert Product</td>
-            <td>Action nodes contain all metadata needed for course generation: fault type, equipment canonical type, remediation steps, estimated duration.</td>
+            <td><strong>xAPI Learning Record</strong></td>
+            <td>LMS</td>
+            <td>Knowledge Graph, Analytics</td>
+            <td>xAPI Statement JSON</td>
+            <td>8, 17</td>
+            <td>actor, verb, object, result.score, result.duration, context.team</td>
         </tr>
         <tr>
-            <td>AR Remote Assistance</td>
-            <td class="arrow">&rarr;</td>
-            <td style="color: var(--blue); font-weight: 600;">GoalCert Product</td>
-            <td>Digital Twin provides real-time equipment state during AR session. Expert sees the same twin state the technician sees on-site. SSE event bus keeps both in sync.</td>
+            <td><strong>Live Video Stream</strong></td>
+            <td>Technician AR App</td>
+            <td>SOC Expert Dashboard</td>
+            <td>WebRTC / RTMP</td>
+            <td>10 → 13</td>
+            <td>sessionId, technicianId, codec, bitrate, latencyMs</td>
         </tr>
         <tr>
-            <td>Report Generation + Knowledge Capture</td>
-            <td class="arrow">&rarr;</td>
-            <td><span class="product-tag twin">Digital Twin</span> + <span style="color: var(--blue); font-weight: 600;">GoalCert</span></td>
-            <td>Hash-chained changelog provides tamper-evident audit trail. Cross-tenant incident history enables knowledge reuse. GoalCert adds video clips + LMS indexing.</td>
+            <td><strong>AR Annotations</strong></td>
+            <td>SOC Expert</td>
+            <td>Technician AR Overlay</td>
+            <td>JSON / WebSocket</td>
+            <td>11</td>
+            <td>type (arrow/highlight/text), position3D, stepRef, expertId, timestamp</td>
         </tr>
         <tr>
-            <td>Future Reuse — Next Technician, Similar Issue</td>
-            <td class="arrow">&rarr;</td>
-            <td><span class="product-tag twin">Digital Twin</span></td>
-            <td>Multi-tenant graph enables cross-facility intelligence. Melbourne HQ's resolved incident informs Singapore MRO's diagnosis. Knowledge compounds across the fleet.</td>
+            <td><strong>Step Confirmation</strong></td>
+            <td>Technician App</td>
+            <td>Scenario Engine, Monitoring Agent</td>
+            <td>Event / JSON</td>
+            <td>11 → 13</td>
+            <td>stepId, technicianId, confirmedAt, proofImageRef, outcome</td>
+        </tr>
+        <tr>
+            <td><strong>Monitoring Events</strong></td>
+            <td>AUTOMIND Pipeline</td>
+            <td>Analytics Dashboard, Report Agent</td>
+            <td>Event Stream</td>
+            <td>12 (Continuous)</td>
+            <td>eventType, timestamp, actorId, stepRef, safetyFlag, durationMs</td>
+        </tr>
+        <tr>
+            <td><strong>Session Recording</strong></td>
+            <td>AR Engine</td>
+            <td>Data Lake, Report Agent</td>
+            <td>MP4 + JSON metadata</td>
+            <td>14 → 15</td>
+            <td>sessionId, durationSec, stepCount, fileSize, dataLakeKey</td>
+        </tr>
+        <tr>
+            <td><strong>Maintenance Report PDF</strong></td>
+            <td>Report Generation Agent</td>
+            <td>Supervisor, Compliance Store, LMS</td>
+            <td>PDF</td>
+            <td>15</td>
+            <td>equipmentId, faultSummary, stepLog, safetyVerification, technicianSig</td>
+        </tr>
+        <tr>
+            <td><strong>Knowledge Article</strong></td>
+            <td>Content Conversion Agent</td>
+            <td>LMS Knowledge Graph, Search Index</td>
+            <td>Markdown + JSON metadata</td>
+            <td>16 → 18</td>
+            <td>title, equipmentType, faultSignature, tags, videoClipRefs, procedureSteps</td>
         </tr>
     </table>
+</div>
 
-    <div class="integration-box">
-        <h4>Integration Boundary</h4>
-        <ul>
-            <li><strong>NextXR provides the foundation:</strong> The Digital Twin (graph + 3D), the Simulation Engine (physics + detection), and the Agentic AI (diagnosis + remediation + expansion). These produce structured, ontology-validated Action nodes.</li>
-            <li><strong>GoalCert consumes the output:</strong> Action nodes &rarr; training video generation &rarr; LMS staging &rarr; technician notification &rarr; AR-guided repair &rarr; knowledge capture. GoalCert reads from the same graph via REST API.</li>
-            <li><strong>Shared substrate:</strong> Both platforms read/write the same Neo4j graph. The event bus (SSE) provides real-time sync. Multi-tenancy isolates Collins sites while enabling cross-tenant intelligence.</li>
-        </ul>
+<!-- ═══════════════════ §7 — PRODUCT MAPPING ═══════════════════ -->
+<div class="section">
+    <div class="section-num">Section 07</div>
+    <div class="section-title">Product Ownership Mapping</div>
+    <div class="section-subtitle">Which product owns which steps — and what exactly that product is responsible for delivering at each point in the workflow.</div>
+
+    <div class="ownership-strip">
+
+        <div class="ownership-card">
+            <div class="ownership-header" style="background: linear-gradient(135deg, var(--teal), #14857A);">
+                <div class="oh-label">Product 1</div>
+                <div class="oh-name">NextXR Digital Twin</div>
+                <div class="oh-steps">Steps 1, 2, 3, 4, 13</div>
+            </div>
+            <div class="ownership-steps-list">
+                <ul>
+                    <li><strong>Step 1:</strong> IoT sensor ingestion via IoT Gateway</li>
+                    <li><strong>Step 2:</strong> Alert routing, equipment ID, fault classification</li>
+                    <li><strong>Step 3:</strong> 3D model load, equipment state display, problem area highlight</li>
+                    <li><strong>Step 4:</strong> Scenario analysis — knowledge base query, decision tree via 3-tier behavior engine and diagnosis agents</li>
+                    <li><strong>Step 13:</strong> Maintenance completion — sensor confirmation, Twin resync to OPERATIONAL</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="ownership-card">
+            <div class="ownership-header" style="background: linear-gradient(135deg, var(--amber), #C77B1F);">
+                <div class="oh-label">Product 2</div>
+                <div class="oh-name">GoalCert Simulation Engine</div>
+                <div class="oh-steps">Steps 5, 6, 7, 8, 9, 14, 15, 16, 17, 18</div>
+            </div>
+            <div class="ownership-steps-list">
+                <ul>
+                    <li><strong>Step 5:</strong> AI training video generation from data lake</li>
+                    <li><strong>Step 6:</strong> LMS course staging and SCORM/xAPI packaging</li>
+                    <li><strong>Step 7:</strong> Push notification to technician with course link</li>
+                    <li><strong>Step 8:</strong> JIT training delivery and competency assessment</li>
+                    <li><strong>Step 9:</strong> Field dispatch with navigation</li>
+                    <li><strong>Step 14:</strong> AR session archive to data lake</li>
+                    <li><strong>Step 15:</strong> Automated PDF maintenance report</li>
+                    <li><strong>Step 16:</strong> Session-to-knowledge conversion</li>
+                    <li><strong>Step 17:</strong> Knowledge base indexing and graph update</li>
+                    <li><strong>Step 18:</strong> Future technician recommendation</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="ownership-card">
+            <div class="ownership-header" style="background: linear-gradient(135deg, var(--purple), #6B4DC7);">
+                <div class="oh-label">Product 3</div>
+                <div class="oh-name">AUTOMIND</div>
+                <div class="oh-steps">Steps 4, 12</div>
+            </div>
+            <div class="ownership-steps-list">
+                <ul>
+                    <li><strong>Step 4:</strong> Workflow orchestration for the diagnosis agent chain — AUTOMIND's visual workflow builder coordinates the scenario generation pipeline</li>
+                    <li><strong>Step 12:</strong> Monitoring analytics pipeline — AUTOMIND captures interaction data, session metrics, safety compliance signals, and feeds the Report Agent</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="ownership-card">
+            <div class="ownership-header" style="background: linear-gradient(135deg, var(--blue), #3A72D4);">
+                <div class="oh-label">Future Integration Point</div>
+                <div class="oh-name">AR Remote Assistance</div>
+                <div class="oh-steps">Steps 10, 11</div>
+            </div>
+            <div class="ownership-steps-list">
+                <ul>
+                    <li><strong>Step 10:</strong> AR session initiation — live camera stream from technician to SOC expert, sub-100ms latency target</li>
+                    <li><strong>Step 11:</strong> Expert AR annotation delivery — arrows, highlights, text overlays delivered in under 50ms to technician's device</li>
+                    <li>Shown as the GoalCert product roadmap integration point in this PoC</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="callout info">
+        <strong>Integration Boundary:</strong> NextXR Digital Twin provides the live equipment state and scenario intelligence. GoalCert consumes that output to generate training, manage the LMS, dispatch technicians, and capture knowledge. AUTOMIND orchestrates the agent chains and analytics pipeline that ties both platforms together.
     </div>
 </div>
 
-<!-- ═══════════════════ §8 — KPIs ═══════════════════ -->
+<!-- ═══════════════════ §8 — KPIs & SUCCESS METRICS ═══════════════════ -->
 <div class="section">
     <div class="section-num">Section 08</div>
-    <div class="section-title">Success Metrics &amp; KPIs</div>
-    <div class="section-subtitle">What we measure during the PoC to prove value.</div>
+    <div class="section-title">KPIs &amp; Success Metrics</div>
+    <div class="section-subtitle">What this PoC must demonstrate to prove end-to-end value to Collins Aerospace.</div>
 
     <div class="kpi-grid">
         <div class="kpi">
-            <div class="label">Twin Build Time</div>
-            <div class="value">&lt; 2 min</div>
-            <div class="hint">From interview start to live 3D model</div>
+            <div class="label">Alert to Training Ready</div>
+            <div class="value">&lt;15 sec</div>
+            <div class="hint">Sensor fire to LMS course READY</div>
         </div>
         <div class="kpi">
-            <div class="label">Fault Detection</div>
-            <div class="value">&lt; 7 min</div>
-            <div class="hint">3-tier corroborated incident</div>
+            <div class="label">JIT Training Time</div>
+            <div class="value">5 min</div>
+            <div class="hint">Full competency in 5 minutes</div>
         </div>
         <div class="kpi">
-            <div class="label">Diagnosis Latency</div>
-            <div class="value">&lt; 30 sec</div>
-            <div class="hint">From incident to remediation plan</div>
+            <div class="label">AR Stream Latency</div>
+            <div class="value">&lt;100ms</div>
+            <div class="hint">Expert video feed latency</div>
         </div>
         <div class="kpi">
-            <div class="label">Expansion Time</div>
-            <div class="value">&lt; 15 sec</div>
-            <div class="hint">Add entity + validate + simulate</div>
+            <div class="label">AR Annotation Latency</div>
+            <div class="value">&lt;50ms</div>
+            <div class="hint">Expert overlay to technician display</div>
         </div>
         <div class="kpi">
-            <div class="label">Physics Models</div>
-            <div class="value">15</div>
-            <div class="hint">Running simultaneously on one twin</div>
+            <div class="label">Report Generation</div>
+            <div class="value">&lt;10 min</div>
+            <div class="hint">Post-maintenance PDF report</div>
         </div>
         <div class="kpi">
-            <div class="label">Detection Accuracy</div>
-            <div class="value">&gt; 92%</div>
-            <div class="hint">Multi-tier corroboration confidence</div>
+            <div class="label">Knowledge Reuse Speed</div>
+            <div class="value">80%</div>
+            <div class="hint">Reduction in training time for next technician</div>
         </div>
         <div class="kpi">
-            <div class="label">Audit Trail</div>
+            <div class="label">Safety Compliance</div>
             <div class="value">100%</div>
-            <div class="hint">Every mutation hash-chained</div>
+            <div class="hint">Every step logged and verified</div>
         </div>
         <div class="kpi">
-            <div class="label">Tenant Isolation</div>
-            <div class="value">100%</div>
-            <div class="hint">Zero cross-tenant data leak</div>
-        </div>
-    </div>
-</div>
-
-<!-- ═══════════════════ §9 — MULTI-TENANCY ═══════════════════ -->
-<div class="section">
-    <div class="section-num">Section 09</div>
-    <div class="section-title">Multi-Tenancy Architecture</div>
-    <div class="section-subtitle">Every Collins facility is an isolated tenant. Intelligence flows between them.</div>
-
-    <div class="diagram-wrap">
-        <div class="mermaid">
-graph TB
-    subgraph SG["Tenant: collins-sg-mro"]
-        SG_T["Digital Twin\n15 entities"]
-        SG_S["Simulation\n15 physics models"]
-        SG_A["Agents\n12 active"]
-        SG_C["Changelog\nhash-chained"]
-    end
-
-    subgraph MELB["Tenant: collins-melb-hq"]
-        M_T["Digital Twin\n22 entities"]
-        M_S["Simulation\nrunning 3 weeks"]
-        M_A["Agents\ndiagnosis history"]
-        M_C["Changelog\n3 weeks of data"]
-    end
-
-    subgraph PLATFORM["Platform Layer"]
-        ONT["Shared Ontology\n(SHACL + OWL)"]
-        GATE["Validation Gate\n(single write path)"]
-        BUS["Event Bus\n(per-tenant streams)"]
-        REG["Bundle Registry\n(shared domain packs)"]
-    end
-
-    SG_T --- GATE
-    M_T --- GATE
-    GATE --- ONT
-    SG_S --- BUS
-    M_S --- BUS
-
-    M_C -.-|"cross-tenant\nintelligence"| SG_A
-
-    style SG fill:#E6F7F5,stroke:#18A999,stroke-width:2px
-    style MELB fill:#FFF5E6,stroke:#E0962F,stroke-width:2px
-    style PLATFORM fill:#F3EEFF,stroke:#8B6DF0,stroke-width:2px
+            <div class="label">Total Workflow</div>
+            <div class="value">18 Steps</div>
+            <div class="hint">Fully autonomous end-to-end</div>
         </div>
     </div>
 
     <div class="callout success">
-        <strong>Isolation + Intelligence:</strong> Each tenant's data is fully isolated — separate Neo4j subgraph (filtered by <code>tenantId</code>), separate event bus streams, separate changelog chains. But the platform layer is shared: same ontology, same validation gate, same domain packs. Cross-tenant intelligence is opt-in and read-only — Singapore can see that Melbourne resolved a similar incident, but cannot modify Melbourne's graph.
+        <strong>Compounding Value:</strong> Step 18 is the most important metric. The first technician takes 20 minutes to train. After knowledge capture and indexing, the next technician with the same fault signature gets recommended training in 3–5 minutes — a direct 80% reduction. Every incident makes the next one cheaper.
     </div>
 </div>
 
-<!-- ═══════════════════ §10 — TECHNICAL STACK ═══════════════════ -->
+<!-- ═══════════════════ §9 — TECHNICAL STACK ═══════════════════ -->
 <div class="section">
-    <div class="section-num">Section 10</div>
+    <div class="section-num">Section 09</div>
     <div class="section-title">Technical Stack</div>
-    <div class="section-subtitle">What is running under the hood during the demo.</div>
+    <div class="section-subtitle">What runs under the hood across all three products during the end-to-end workflow.</div>
 
-    <table class="map-table">
-        <tr>
-            <th>Layer</th>
-            <th>Technology</th>
-            <th>Role in PoC</th>
-        </tr>
-        <tr>
-            <td>Graph Store</td>
-            <td>Neo4j</td>
-            <td>Entity graph, relationships, real-time topology queries, BFS traversal for diagnosis</td>
-        </tr>
-        <tr>
-            <td>Ontology</td>
-            <td>OWL + SHACL (Turtle files)</td>
-            <td>Schema validation gate on every write. BFO + SOSA imports. Domain packs for aerospace.</td>
-        </tr>
-        <tr>
-            <td>Validation</td>
-            <td>pySHACL</td>
-            <td>Every mutation validated. Inference OFF by design (RDFS entailment would silently legalise illegal relationships).</td>
-        </tr>
-        <tr>
-            <td>API Server</td>
-            <td>FastAPI (Python)</td>
-            <td>REST API + SSE streaming. SPA fallback serves the React frontend.</td>
-        </tr>
-        <tr>
-            <td>Event Bus</td>
-            <td>Redis Streams (in-memory fallback)</td>
-            <td>Per-tenant event streams. SSE endpoint for real-time browser updates.</td>
-        </tr>
-        <tr>
-            <td>Changelog</td>
-            <td>SQLite + SHA-256 chain</td>
-            <td>Append-only ULID-keyed audit log. Tamper-evident hash chain verifiable at any time.</td>
-        </tr>
-        <tr>
-            <td>Agent Engine</td>
-            <td>Custom StateGraph (LangGraph-compatible)</td>
-            <td>SQLite checkpointing. Interrupt/resume for human-in-the-loop. 100-step cycle guard.</td>
-        </tr>
-        <tr>
-            <td>LLM Gateway</td>
-            <td>OpenAI API (with deterministic stubs)</td>
-            <td>Every LLM call has a required stub parameter — demo works with or without API key.</td>
-        </tr>
-        <tr>
-            <td>Physics Engine</td>
-            <td>15 custom models (Python)</td>
-            <td>ASHRAE thermal, Carnot COP, IEEE C57.91, Peukert discharge, fan affinity laws.</td>
-        </tr>
-        <tr>
-            <td>3D Viewer</td>
-            <td>Three.js + React Three Fiber</td>
-            <td>GLB models generated via trimesh + squarify. Live status coloring per entity.</td>
-        </tr>
-        <tr>
-            <td>Frontend</td>
-            <td>React 18 + Vite</td>
-            <td>17 panel views. Real-time SSE. 4 agent chat flows. Dark industrial theme.</td>
-        </tr>
-        <tr>
-            <td>Deployment</td>
-            <td>Docker + Docker Compose</td>
-            <td>Single <code>docker-compose up</code> spins up Neo4j, Redis, and the application server.</td>
-        </tr>
-    </table>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin: 24px 0;">
+
+        <div>
+            <div style="padding: 12px 16px; background: linear-gradient(135deg, var(--teal), #14857A); color: white; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px;">NextXR Digital Twin</div>
+            <table class="stack-table" style="margin: 0;">
+                <tr>
+                    <th>Layer</th>
+                    <th>Technology</th>
+                </tr>
+                <tr>
+                    <td>Graph Store</td>
+                    <td>Neo4j</td>
+                </tr>
+                <tr>
+                    <td>Ontology</td>
+                    <td>OWL + SHACL</td>
+                </tr>
+                <tr>
+                    <td>IoT Ingest</td>
+                    <td>MQTT + FastAPI</td>
+                </tr>
+                <tr>
+                    <td>3D Viewer</td>
+                    <td>Three.js + React Three Fiber</td>
+                </tr>
+                <tr>
+                    <td>Event Bus</td>
+                    <td>Redis Streams + SSE</td>
+                </tr>
+                <tr>
+                    <td>Scenario AI</td>
+                    <td>LangGraph-compatible StateGraph</td>
+                </tr>
+                <tr>
+                    <td>Audit Trail</td>
+                    <td>SQLite + SHA-256 chain</td>
+                </tr>
+            </table>
+        </div>
+
+        <div>
+            <div style="padding: 12px 16px; background: linear-gradient(135deg, var(--amber), #C77B1F); color: #0C2340; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px;">GoalCert Simulation Engine</div>
+            <table class="stack-table" style="margin: 0;">
+                <tr>
+                    <th>Layer</th>
+                    <th>Technology</th>
+                </tr>
+                <tr>
+                    <td>Video Gen</td>
+                    <td>Gen-AI + FFmpeg pipeline</td>
+                </tr>
+                <tr>
+                    <td>LMS</td>
+                    <td>SCORM/xAPI compatible LMS</td>
+                </tr>
+                <tr>
+                    <td>Data Lake</td>
+                    <td>S3-compatible object storage</td>
+                </tr>
+                <tr>
+                    <td>Notifications</td>
+                    <td>FCM / APNs push</td>
+                </tr>
+                <tr>
+                    <td>AR Stream</td>
+                    <td>WebRTC (sub-100ms)</td>
+                </tr>
+                <tr>
+                    <td>AR Overlay</td>
+                    <td>WebSocket + AR.js / ARKit</td>
+                </tr>
+                <tr>
+                    <td>Knowledge</td>
+                    <td>Vector DB + Graph index</td>
+                </tr>
+            </table>
+        </div>
+
+        <div>
+            <div style="padding: 12px 16px; background: linear-gradient(135deg, var(--purple), #6B4DC7); color: white; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px;">AUTOMIND</div>
+            <table class="stack-table" style="margin: 0;">
+                <tr>
+                    <th>Layer</th>
+                    <th>Technology</th>
+                </tr>
+                <tr>
+                    <td>Workflow Builder</td>
+                    <td>Visual node-graph editor</td>
+                </tr>
+                <tr>
+                    <td>Orchestration</td>
+                    <td>Agentic workflow engine</td>
+                </tr>
+                <tr>
+                    <td>Analytics</td>
+                    <td>Real-time event pipeline</td>
+                </tr>
+                <tr>
+                    <td>Monitoring</td>
+                    <td>Custom telemetry + dashboards</td>
+                </tr>
+                <tr>
+                    <td>LLM Gateway</td>
+                    <td>OpenAI API + deterministic stubs</td>
+                </tr>
+                <tr>
+                    <td>Checkpointing</td>
+                    <td>SQLite state persistence</td>
+                </tr>
+                <tr>
+                    <td>API</td>
+                    <td>FastAPI + WebSocket</td>
+                </tr>
+            </table>
+        </div>
+
+    </div>
 </div>
 
 </div><!-- /container -->
@@ -1351,25 +1990,36 @@ graph TB
 <div class="footer" style="max-width:1200px; margin:0 auto;">
     <div class="footer-grid">
         <div>
-            <strong>NextXR Products in This PoC</strong>
+            <strong>NextXR Digital Twin</strong>
             <ul>
-                <li>Digital Twin — Neo4j + SHACL + 3D BIM Viewer</li>
-                <li>Simulation Engine — 15 Physics Models + 3-Tier Behavior Rules</li>
-                <li>Agentic AI — 20 Agents, 5 Flows, StateGraph Engine</li>
+                <li>IoT Sensor Ingestion &amp; Alert Routing (Steps 1–2)</li>
+                <li>3D Visualization &amp; Equipment State (Step 3)</li>
+                <li>Scenario Analysis via 3-Tier Behavior Engine (Step 4)</li>
+                <li>Maintenance Completion &amp; Twin Resync (Step 13)</li>
             </ul>
         </div>
         <div>
-            <strong>GoalCert Integration Points</strong>
+            <strong>GoalCert Simulation Engine</strong>
             <ul>
-                <li>Action Nodes &rarr; Training Video Generation</li>
-                <li>Equipment State &rarr; AR Remote Assistance Sync</li>
-                <li>Hash-Chained Changelog &rarr; Compliance Audit Trail</li>
+                <li>AI Training Video Generation (Step 5)</li>
+                <li>LMS Staging, Dispatch &amp; Field Training (Steps 6–9)</li>
+                <li>AR Session Archive &amp; Report Generation (Steps 14–15)</li>
+                <li>Knowledge Conversion, Indexing &amp; Reuse (Steps 16–18)</li>
+            </ul>
+        </div>
+        <div>
+            <strong>AUTOMIND</strong>
+            <ul>
+                <li>Workflow Orchestration for Diagnosis Agent Chain (Step 4)</li>
+                <li>Monitoring &amp; Analytics Pipeline (Step 12)</li>
+                <li>Visual Workflow Builder — connects both platforms</li>
+                <li>Real-time compliance and safety monitoring</li>
             </ul>
         </div>
     </div>
     <div class="footer-bottom">
-        <strong>GoalCert &times; NextXR</strong> &mdash; Collins Aerospace MRO Proof of Concept &mdash; June 2026<br>
-        Scenario: Avionics Test Facility — Chiller Degradation &amp; Autonomous Remediation
+        <strong>GoalCert &times; NextXR &times; AUTOMIND</strong> &mdash; Collins Aerospace MRO Proof of Concept &mdash; June 2026<br>
+        Scenario: CNC Machine #47 Temperature Fault — Sensor to Knowledge, 18 Steps, Fully Autonomous
     </div>
 </div>
 
