@@ -206,3 +206,103 @@ aero:VibrationProbe a owl:Class ;
     rdfs:label "Vibration Probe" ;
     skos:definition "An accelerometer or proximity probe measuring shaft vibration on rotating machinery. Reports in g-force or mm/s." ;
     nxr:taxonomyCategory "PhysicalAsset" .
+
+
+#################################################################
+#  TURBINE EXTENSION v1.1
+#
+#  Completes the gas-turbine digital twin: the second spool (N2),
+#  lubrication system signals, engine pressure ratio, the internal
+#  engine modules (compressor / combustor / turbine), and the
+#  remaining sensor classes. These are the entities the 3D layer
+#  binds its hotspots to and the signals it streams in.
+#################################################################
+
+### Additional turbine observable properties + QUDT units ###
+
+aero:shaftSpeedN2 a sosa:ObservableProperty ;
+    rdfs:label "Shaft Speed N2" ;
+    skos:definition "High-pressure spool rotational speed." ;
+    nxr:expectedUnit unit:REV-PER-MIN ;
+    nxr:expectedQuantityKind quantitykind:AngularVelocity .
+
+aero:oilPressure a sosa:ObservableProperty ;
+    rdfs:label "Oil Pressure" ;
+    skos:definition "Lubrication system oil pressure." ;
+    nxr:expectedUnit unit:PSI ;
+    nxr:expectedQuantityKind quantitykind:Pressure .
+
+aero:oilTemperature a sosa:ObservableProperty ;
+    rdfs:label "Oil Temperature" ;
+    skos:definition "Bearing / lubrication oil temperature." ;
+    nxr:expectedUnit unit:DEG_C ;
+    nxr:expectedQuantityKind quantitykind:Temperature .
+
+aero:enginePressureRatio a sosa:ObservableProperty ;
+    rdfs:label "Engine Pressure Ratio (EPR)" ;
+    skos:definition "Ratio of turbine exhaust pressure to compressor inlet pressure; the primary thrust-setting parameter." ;
+    nxr:expectedUnit unit:NUM ;
+    nxr:expectedQuantityKind quantitykind:Dimensionless .
+
+
+### Engine module composition relationship ###
+
+aero:hasComponent a owl:ObjectProperty ;
+    rdfs:subPropertyOf nxr:hasPart ;
+    rdfs:label "has component" ;
+    skos:definition "A turbine engine is composed of internal modules (compressor, combustor, turbine)." ;
+    rdfs:domain aero:TurbineTestRig ;
+    rdfs:range aero:EngineModule .
+
+### Engine internal modules ###
+
+aero:EngineModule a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Engine Module" ;
+    skos:definition "An internal section of a gas-turbine engine under MRO." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:CompressorModule a owl:Class ;
+    rdfs:subClassOf aero:EngineModule ;
+    rdfs:label "Compressor Module" ;
+    skos:definition "Multi-stage axial compressor that raises inlet air pressure. Degrades via blade erosion and fouling, lowering efficiency and raising EGT." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:CombustorModule a owl:Class ;
+    rdfs:subClassOf aero:EngineModule ;
+    rdfs:label "Combustor Module" ;
+    skos:definition "Burns fuel in compressed air to drive the turbine. Nozzle coking shifts the fuel/air pattern and raises local hot-streak temperature." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:TurbineModule a owl:Class ;
+    rdfs:subClassOf aero:EngineModule ;
+    rdfs:label "Turbine Module" ;
+    skos:definition "Extracts shaft work from hot combustion gas. Blade creep and seal wear reduce efficiency and raise EGT for a given thrust." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+
+### Remaining turbine sensor classes ###
+
+aero:ShaftSpeedSensor a owl:Class ;
+    rdfs:subClassOf nxr:Sensor ;
+    rdfs:label "Shaft Speed Sensor" ;
+    skos:definition "A tachometer / speed pickup measuring spool rotational speed (N1 or N2)." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:OilTempSensor a owl:Class ;
+    rdfs:subClassOf cfp:TemperatureSensor ;
+    rdfs:label "Oil Temperature Sensor" ;
+    skos:definition "An RTD measuring lubrication oil temperature." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:OilPressureSensor a owl:Class ;
+    rdfs:subClassOf nxr:Sensor ;
+    rdfs:label "Oil Pressure Sensor" ;
+    skos:definition "A pressure transducer on the lubrication supply line." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+aero:FuelFlowSensor a owl:Class ;
+    rdfs:subClassOf nxr:Sensor ;
+    rdfs:label "Fuel Flow Sensor" ;
+    skos:definition "A flow meter measuring fuel mass flow to the combustor." ;
+    nxr:taxonomyCategory "PhysicalAsset" .

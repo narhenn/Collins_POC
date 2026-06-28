@@ -67,10 +67,15 @@ from behaviors.cfp.tier_b_chiller import ChillerCOPBaseline
 from behaviors.cfp.tier_b_vibration import PumpVibrationBaseline
 from behaviors.aerospace import (
     EGTPhysicsResidual,
+    SurgeStallResidual,
     EGTDeviationBaseline,
     ShaftSpeedBaseline,
     HydraulicPressureLowRule,
     AvionicsBayOverTempRule,
+    EGTRedlineRule,
+    OilTempOverTempRule,
+    OilPressureLowRule,
+    VibrationHighRule,
 )
 from feed.simulate import simulate_temperature, FindingsLoop
 from behaviors.diagnosis import DiagnosisEngine
@@ -82,6 +87,8 @@ from server.twins_routes import router as twins_router
 from server.agent_routes import router as agent_router
 from server.bim_routes import router as bim_router
 from server.integration_routes import router as integration_router
+from server.ingest_routes import router as ingest_router
+from server.scenario_routes import router as scenario_router
 
 # ── App setup ───────────────────────────────────────────────────────
 
@@ -106,6 +113,8 @@ app.include_router(twins_router)
 app.include_router(agent_router)
 app.include_router(bim_router)
 app.include_router(integration_router)
+app.include_router(ingest_router)
+app.include_router(scenario_router)
 
 
 # ── Global DB-down handler ──────────────────────────────────────────
@@ -310,10 +319,16 @@ def _build_registry() -> BehaviorRegistry:
     registry.register(PumpVibrationBaseline())
     # Aerospace MRO behaviors
     registry.register(EGTPhysicsResidual())
+    registry.register(SurgeStallResidual())
     registry.register(EGTDeviationBaseline())
     registry.register(ShaftSpeedBaseline())
     registry.register(HydraulicPressureLowRule())
     registry.register(AvionicsBayOverTempRule())
+    # Turbine threshold monitors (Tier C)
+    registry.register(EGTRedlineRule())
+    registry.register(OilTempOverTempRule())
+    registry.register(OilPressureLowRule())
+    registry.register(VibrationHighRule())
 
     # Published bundle rules + authored behavior_models — instantiate as live
     # Behaviors via the data-driven monitoring archetypes (all 6 kinds). This is

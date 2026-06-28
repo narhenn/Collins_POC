@@ -25,6 +25,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from graph.writer import Rel
+
 CORE = "https://ontology.nextxr.io/v3/core#"
 
 
@@ -83,7 +85,7 @@ class DiagnosisEngine:
             },
             relationships=[
                 # Incident affects the flagged entity
-                {"predicate": "nxr:affects", "target_id": affected_entity_id},
+                Rel(predicate="nxr:affects", target_id=affected_entity_id),
             ],
         )
         if not incident.ok:

@@ -50,6 +50,7 @@ PREFIXES = {
     "nxr": NXR,
     "cfp": "https://ontology.nextxr.io/v3/cfp#",
     "hvac": "https://ontology.nextxr.io/v3/hvac#",
+    "aero": "https://ontology.nextxr.io/v3/aero#",
     "office": "https://ontology.nextxr.io/v3/office#",
     "sosa": "http://www.w3.org/ns/sosa/",
 }

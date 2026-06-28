@@ -9,7 +9,7 @@ Uses MRO techniques from catalog/mro_techniques.py — no cyber techniques.
 """
 from __future__ import annotations
 
-from app.engine.environment import AssetEntry, ControlEntry, EnvironmentSpec
+from app.engine.environment import AssetSpec, ControlSpec, EnvironmentSpec
 from app.engine.scenario import Objectives, PlaybookStep, Scenario, TargetSelector
 
 
@@ -41,35 +41,35 @@ def build() -> Scenario:
         ],
         recommended_topology=EnvironmentSpec(
             assets=[
-                AssetEntry(
+                AssetSpec(
                     id="chiller-01", type="ot_plc",
                     name="Chiller-01 (Collins MRO)", role="primary_asset",
                     zone="ot", criticality=5,
                 ),
-                AssetEntry(
+                AssetSpec(
                     id="ahu-av01", type="ot_plc",
                     name="AHU-AV01 (Avionics Bay 1)", role="plc",
                     zone="ot", criticality=4,
                 ),
-                AssetEntry(
+                AssetSpec(
                     id="ahu-av02", type="ot_plc",
                     name="AHU-AV02 (Avionics Bay 2)", role="plc",
                     zone="ot", criticality=4,
                 ),
-                AssetEntry(
+                AssetSpec(
                     id="bms-controller", type="mes",
                     name="BMS Controller", role="it_ot_bridge",
                     zone="ot_dmz", criticality=3,
                 ),
-                AssetEntry(
+                AssetSpec(
                     id="nextxr-twin", type="digital_twin",
                     name="NextXR Digital Twin", role="scada_hmi",
                     zone="ot_dmz", criticality=3,
                 ),
             ],
             controls=[
-                ControlEntry(id="c-siem", type="siem", enabled=True),
-                ControlEntry(id="c-seg", type="segmentation", enabled=True),
+                ControlSpec(id="c-siem", type="siem", enabled=True),
+                ControlSpec(id="c-seg", type="segmentation", enabled=True),
             ],
         ),
         playbook=[

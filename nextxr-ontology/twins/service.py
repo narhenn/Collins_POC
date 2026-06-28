@@ -59,6 +59,16 @@ TEMPLATES = {
         "primary_signal": "aero:exhaustGasTemp",
         "seeds_feed": True,
     },
+    "turbine-engine": {
+        "label": "Gas Turbine Engine",
+        "description": "A single gas-turbine engine on an MRO test rig, modelled "
+                       "down to its compressor / combustor / turbine modules with "
+                       "a full sensor suite (EGT, N1, N2, fuel flow, vibration, "
+                       "oil temp/pressure). Fed by real sensor data from the 3D "
+                       "layer via /api/v1/ingest.",
+        "primary_signal": "aero:exhaustGasTemp",
+        "seeds_feed": False,
+    },
     "blank": {
         "label": "Blank Twin",
         "description": "An empty twin with just a root site. Build it by hand "
@@ -222,6 +232,9 @@ class TwinRegistry:
 
         if twin.domain == "aerospace-mro":
             return self._seed_mro_facility(twin, writer, actor)
+
+        if twin.domain == "turbine-engine":
+            return self._seed_turbine_engine(twin, writer, actor)
 
         # hvac template: Site, Space, AirHandler (servesSpace).
         writer.create(
@@ -507,3 +520,75 @@ class TwinRegistry:
         )
 
         return chiller.node_id if chiller.ok else None
+
+    def _seed_turbine_engine(self, twin: Twin, writer, actor: str) -> Optional[str]:
+        """Seed a single gas-turbine engine on a test rig: the engine, its
+        internal modules (compressor / combustor / turbine), and a full sensor
+        suite — each sensor wired with nxr:monitors -> engine and
+        sosa:observes -> its observable property. Returns the engine node id
+        (the asset the ingestion layer and 3D hotspots target)."""
+        from graph.writer import Rel
+        t = twin.tenant_id
+
+        # Test cell (a TurbineTestRig must test within one — SHACL minCount 1).
+        cell = writer.create(
+            tenant_id=t, canonical_type=AERO + "TurbineTestCell", actor=actor,
+            properties={"displayName": "Turbine Test Cell 1",
+                        "testCellClass": "turbofan", "areaM2": 220},
+        )
+
+        # Internal engine modules.
+        comp = writer.create(
+            tenant_id=t, canonical_type=AERO + "CompressorModule", actor=actor,
+            properties={"displayName": "Compressor Module", "status": "running"})
+        comb = writer.create(
+            tenant_id=t, canonical_type=AERO + "CombustorModule", actor=actor,
+            properties={"displayName": "Combustor Module", "status": "running"})
+        turb = writer.create(
+            tenant_id=t, canonical_type=AERO + "TurbineModule", actor=actor,
+            properties={"displayName": "Turbine Module", "status": "running"})
+
+        # The engine under test.
+        eng_rels = []
+        if cell.ok:
+            eng_rels.append(Rel("aero:testsMRO", cell.node_id))
+        for m in (comp, comb, turb):
+            if m.ok:
+                eng_rels.append(Rel("aero:hasComponent", m.node_id))
+        engine = writer.create(
+            tenant_id=t, canonical_type=AERO + "TurbineTestRig", actor=actor,
+            properties={
+                "displayName": twin.name or "Turbine Engine TR-01",
+                "status": "running",
+                "thrustRatingKN": 120.0,
+                "nominalEGT": 650.0, "maxEGT": 780.0,
+                "nominalN1": 5200.0, "fuelFlowKgH": 800.0,
+                "conditionIndex": 1.0,
+            },
+            relationships=eng_rels or None,
+        )
+        if not engine.ok:
+            raise RuntimeError(f"turbine engine seed failed: {engine.error}")
+        eid = engine.node_id
+
+        # Sensor suite. Each: monitors the engine + observes one property.
+        sensors = [
+            (AERO + "EGTSensor", "EGT Sensor", "aero:exhaustGasTemp"),
+            (AERO + "ShaftSpeedSensor", "N1 Speed Sensor", "aero:shaftSpeedN1"),
+            (AERO + "ShaftSpeedSensor", "N2 Speed Sensor", "aero:shaftSpeedN2"),
+            (AERO + "FuelFlowSensor", "Fuel Flow Sensor", "aero:fuelFlow"),
+            (AERO + "VibrationProbe", "Vibration Probe", "aero:vibrationG"),
+            (AERO + "OilTempSensor", "Oil Temp Sensor", "aero:oilTemperature"),
+            (AERO + "OilPressureSensor", "Oil Pressure Sensor", "aero:oilPressure"),
+        ]
+        for ctype, name, obs in sensors:
+            writer.create(
+                tenant_id=t, canonical_type=ctype, actor=actor,
+                properties={"displayName": name, "status": "running"},
+                relationships=[
+                    Rel("nxr:monitors", eid),
+                    Rel("sosa:observes", obs, ontology_ref=True),
+                ],
+            )
+
+        return eid
