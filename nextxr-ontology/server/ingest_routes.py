@@ -120,6 +120,15 @@ def ingest_diagnostics(tenant: str):
     return twin.diagnostics()
 
 
+@router.get("/{tenant}/history")
+def ingest_history(tenant: str, signal: str | None = None, points: int = 120):
+    """Time-series sensor history for sparklines and trend charts."""
+    twin = get_service().twin(tenant)
+    if twin is None:
+        raise HTTPException(404, "No turbine entity for this tenant.")
+    return twin.get_history(signal=signal, points=points)
+
+
 @router.get("/{tenant}/predict")
 def ingest_predict(tenant: str, horizon_min: float = 120.0, points: int = 120):
     """Project the live twin's present trajectory forward (prediction engine)."""

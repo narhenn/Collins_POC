@@ -81,7 +81,7 @@ cd nextxr-ontology
 pip install -q -r ../requirements.txt 2>/dev/null || echo "       (install deps manually: pip install -r requirements.txt)"
 
 # Step 3: Start NextXR server
-echo -e "${YELLOW}[4/4]${NC} Starting NextXR server on port 8000..."
+echo -e "${YELLOW}[4/5]${NC} Starting NextXR server on port 8000..."
 python -m server.main &
 SERVER_PID=$!
 
@@ -93,6 +93,10 @@ else
     echo -e "       ${YELLOW}Server starting (may take a few more seconds)...${NC}"
     sleep 5
 fi
+
+# Step 5: Auto-seed Melbourne HQ for cross-tenant intelligence
+echo -e "${YELLOW}[5/5]${NC} Seeding Melbourne HQ (cross-tenant demo)..."
+python -m scripts.seed_melbourne_hq 2>/dev/null && echo -e "       ${GREEN}Melbourne HQ seeded.${NC}" || echo -e "       ${YELLOW}Already seeded or Neo4j starting.${NC}"
 
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════════════════${NC}"

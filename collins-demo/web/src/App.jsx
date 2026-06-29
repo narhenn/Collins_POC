@@ -209,7 +209,7 @@ function Dashboard({ ctx }) {
       {/* 3D hero — live model when generated, else placeholder */}
       <div className="section-gap">
         {modelUrl
-          ? <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} />
+          ? <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} health={twin?.health} />
           : <div className="hero3d">
               <div className="v-chip"><Icon n="ti-cube" /> <b>3D Twin</b> · {machineName}</div>
               <div className="lbl">
@@ -230,8 +230,9 @@ function Dashboard({ ctx }) {
         <>
           {/* KPIs */}
           <div className="grid-4 section-gap">
-            <div className="card kpi"><div className="card-label">Twin Health</div>
-              <div className="card-value" style={{ color: h > .7 ? 'var(--accent-green)' : h > .4 ? 'var(--accent-amber)' : 'var(--accent-red)' }}>{pct(h)}</div>
+            <div className="card kpi" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div className="card-label">Twin Health</div>
+              <HealthDonut value={h} size={72} />
               <div className="card-change">physics health index</div></div>
             <div className="card kpi"><div className="card-label">Risk</div>
               <div className="card-value">{risk == null ? '—' : risk}</div>
@@ -269,18 +270,26 @@ function Dashboard({ ctx }) {
                 </div>}
           </div>
 
-          {/* Live telemetry */}
+          {/* Live telemetry with sparklines */}
           <div className="card section-gap">
             <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
-              <span className="pill pill-green">● streaming</span></div>
+              <span className="pill pill-green">● streaming</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--hint)', fontFamily: 'var(--mono)' }}>
+                {twin?.frames || 0} frames
+              </span>
+            </div>
             <div className="sensor-grid">
-              {TILE_ORDER.filter(s => live[s] != null).map(s => (
-                <div key={s} className={`sensor-card ${sevClass(s, live[s])}`}>
-                  <span className="live-indicator" />
-                  <div className="sensor-label">{SIG[s].label}</div>
-                  <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s].unit}</span></div>
-                </div>
-              ))}
+              {TILE_ORDER.filter(s => live[s] != null).map(s => {
+                const sparkData = (twin?.sparklines || {})[s] || []
+                return (
+                  <div key={s} className={`sensor-card ${sevClass(s, live[s])}`}>
+                    <span className="live-indicator" />
+                    <div className="sensor-label">{SIG[s].label}</div>
+                    <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s].unit}</span></div>
+                    {sparkData.length > 3 && <Sparkline data={sparkData} signal={s} />}
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -355,5 +364,50 @@ function Dashboard({ ctx }) {
         </>
       )}
     </div>
+  )
+}
+
+/** Inline SVG sparkline for sensor cards */
+function Sparkline({ data, signal }) {
+  if (!data || data.length < 3) return null
+  const vals = data.map(d => d.v)
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  const range = max - min || 1
+  const w = 100, h = 24
+  const pts = vals.map((v, i) =>
+    `${(i / (vals.length - 1)) * w},${h - ((v - min) / range) * h}`
+  ).join(' ')
+  const color = sevClass(signal, vals[vals.length - 1]).includes('crit') ? '#e2564e'
+    : sevClass(signal, vals[vals.length - 1]).includes('warn') ? '#e0962f'
+    : '#22cc77'
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
+         style={{ marginTop: 4, opacity: 0.7 }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
+/** SVG health donut ring */
+function HealthDonut({ value, size = 64 }) {
+  const pct = Math.max(0, Math.min(1, value || 0))
+  const r = (size - 8) / 2
+  const circ = 2 * Math.PI * r
+  const offset = circ * (1 - pct)
+  const color = pct > 0.7 ? '#22cc77' : pct > 0.4 ? '#e0962f' : '#e2564e'
+  return (
+    <svg width={size} height={size} style={{ display: 'block' }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="5"
+              strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+              transform={`rotate(-90 ${size/2} ${size/2})`}
+              style={{ transition: 'stroke-dashoffset 0.5s ease' }} />
+      <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
+            fill="var(--text)" fontSize="14" fontWeight="700" fontFamily="var(--mono)">
+        {Math.round(pct * 100)}%
+      </text>
+    </svg>
   )
 }

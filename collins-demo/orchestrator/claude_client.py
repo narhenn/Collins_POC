@@ -496,19 +496,27 @@ def analysis_agent(diagnostics: dict, prediction: dict, machine: str,
 
 # ── Real-time narration (the AI co-pilot watching the live sensor stream) ──
 
-def narrate_sensors(state: dict, machine: str) -> str:
+def narrate_sensors(state: dict, machine: str, prediction: dict | None = None) -> str:
     """Claude watches the current sensor snapshot and issues a 1-2 sentence
-    observation in real-time. Sounds like an experienced test cell engineer."""
+    observation in real-time. Includes prediction context for forward-looking
+    narration like 'EGT redline projected in ~18 minutes'."""
     signals = state.get("latest", state.get("signals", {}))
     findings = state.get("findings", [])
     health = state.get("health", {})
+    residuals = state.get("residuals", {})
+    rul = (prediction or {}).get("rul", [])
+    crossings = [r for r in rul if r.get("within_horizon")]
 
     def _stub() -> str:
         egt = signals.get("aero:exhaustGasTemp")
         vib = signals.get("aero:vibrationG")
         n1 = signals.get("aero:shaftSpeedN1")
+        if crossings:
+            c = crossings[0]
+            return f"Heads up — {c['mode']} projected in ~{c.get('time_to_limit_min', '?'):.0f} minutes at current degradation rate. Recommend reducing thrust."
         if egt and egt > 720:
-            return f"EGT climbing through {egt:.0f}C — watching the trend closely. Hot section may be degrading."
+            res = residuals.get("aero:exhaustGasTemp", 0)
+            return f"EGT climbing through {egt:.0f}C (physics residual: +{res:.0f}C). Hot section may be degrading."
         if vib and vib > 1.0:
             return f"Vibration at {vib:.2f}g — above the baseline. Could be early bearing wear."
         if findings:
@@ -523,17 +531,21 @@ def narrate_sensors(state: dict, machine: str) -> str:
         import json as _json
         system = (
             "You are a turbine test cell engineer watching a live ground run on "
-            "the monitoring console. Given the current sensor readings, issue ONE "
-            "concise observation (1-2 sentences, present tense). Flag anomalies, "
-            "trends, or quiet-but-concerning patterns. Sound experienced and calm — "
-            "not alarmed unless readings are truly critical. No preamble, no labels.")
+            "the monitoring console. Given the current sensor readings and physics "
+            "residuals (measured minus expected), issue ONE concise observation "
+            "(1-2 sentences, present tense). If a RUL crossing is projected, mention "
+            "the estimated time. Sound experienced and calm — not alarmed unless "
+            "readings are truly critical. No preamble, no labels.")
         user = (
             f"Machine: {machine}\n"
             f"Sensors: {_json.dumps(signals, default=str)}\n"
+            f"Residuals (measured - expected): {_json.dumps(residuals, default=str)}\n"
             f"Health: {_json.dumps(health, default=str)}\n"
             f"Active findings: {len(findings)}")
         if findings:
             user += f"\nLatest finding: {findings[0].get('message', '')[:120]}"
+        if crossings:
+            user += f"\nPREDICTION: {_json.dumps(crossings[:2], default=str)}"
         resp = _anthropic().messages.create(
             model=config.CLAUDE_MODEL, max_tokens=200,
             system=[{"type": "text", "text": system,
@@ -693,6 +705,203 @@ def cascade_analysis(diagnostics: dict, prediction: dict, machine: str) -> str:
         return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
     except Exception as e:
         logger.warning("cascade_analysis failed (%s); stub", e)
+        return _stub()
+
+
+# ── Multi-turn troubleshooting chatbot (AI Mechanic) ──
+
+class TroubleshootReply(BaseModel):
+    reply: str = Field(description="The mechanic's conversational response")
+    hypothesis: str = Field(default="", description="Current leading fault hypothesis")
+    confidence: float = Field(default=0.0, description="Confidence in the hypothesis 0-1")
+    resolved: bool = Field(default=False, description="True when diagnosis is conclusive")
+
+
+def troubleshoot_chat(history: list[dict], message: str,
+                      diagnostics: dict, machine: str) -> TroubleshootReply:
+    """Multi-turn diagnostic chatbot — asks clarifying questions like an
+    experienced mechanic, narrows fault hypothesis with each answer."""
+    def _stub() -> TroubleshootReply:
+        turn = len([h for h in history if h.get("role") == "user"]) + 1
+        if turn <= 1:
+            return TroubleshootReply(
+                reply="I see you've got some readings to discuss. Let me pull up "
+                      "the sensor data. What's the primary symptom you're seeing — "
+                      "is it a temperature issue, vibration, oil pressure, or something else?",
+                hypothesis="", confidence=0.0, resolved=False)
+        if turn == 2:
+            return TroubleshootReply(
+                reply="Got it. When did this start — was it sudden or a gradual trend? "
+                      "And did you change throttle settings recently?",
+                hypothesis="Possible hot-section degradation", confidence=0.3, resolved=False)
+        return TroubleshootReply(
+            reply="Based on the EGT trend and your answers, I'm fairly confident "
+                  "this is early-stage blade erosion. The physics residual confirms "
+                  "the measured EGT is higher than what fuel flow and N1 can explain. "
+                  "Recommend a borescope inspection of the HP turbine.",
+            hypothesis="Blade erosion (HP turbine)", confidence=0.85, resolved=True)
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        msgs = [{"role": h["role"], "content": h["content"]} for h in history[-10:]]
+        msgs.append({"role": "user", "content": message})
+        system = (
+            "You are an experienced gas turbine MRO mechanic helping a technician "
+            "troubleshoot a live engine on a test rig. You have access to the current "
+            "sensor readings and physics residuals. Ask pointed diagnostic questions "
+            "(1-2 per turn) to narrow down the fault. Be conversational but technical. "
+            "When you have enough information, declare your hypothesis with confidence. "
+            "Reference specific sensor values and ATA chapter numbers. "
+            f"Current diagnostics: {_json.dumps(diagnostics, default=str)[:3000]}")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=500,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=msgs, output_format=TroubleshootReply)
+        return resp.parsed_output or _stub()
+    except Exception as e:
+        logger.warning("troubleshoot_chat failed (%s); stub", e)
+        return _stub()
+
+
+# ── Parts procurement agent ──
+
+class PartEntry(BaseModel):
+    part_number: str = Field(description="Part number / catalog reference")
+    description: str = Field(description="What the part is")
+    quantity: int = Field(default=1, description="How many needed")
+    estimated_cost_usd: float = Field(default=0, description="Estimated unit cost")
+    lead_time: str = Field(default="", description="Expected lead time")
+    source: str = Field(default="", description="Supplier or stock location")
+
+class ProcurementList(BaseModel):
+    work_order_ref: str = Field(description="Reference work order number")
+    total_estimated_cost: float = Field(description="Total estimated parts cost USD")
+    aog_available: bool = Field(description="Whether all critical parts are AOG-stocked")
+    parts: list[PartEntry] = Field(description="Parts needed for the repair")
+    notes: str = Field(default="", description="Procurement notes or warnings")
+
+
+def parts_procurement_agent(work_order: dict, machine: str) -> ProcurementList:
+    """From a work order, identify specific part numbers, quantities, lead times,
+    and estimated costs for the repair."""
+    def _stub() -> ProcurementList:
+        return ProcurementList(
+            work_order_ref=work_order.get("wo_number", "WO-2026-001"),
+            total_estimated_cost=18500.0,
+            aog_available=True,
+            parts=[
+                PartEntry(part_number="CFM56-5B-72-001", description="HP Turbine blade set (Stage 1)",
+                          quantity=1, estimated_cost_usd=12000, lead_time="AOG stock — 24h",
+                          source="Collins MRO Singapore hub"),
+                PartEntry(part_number="CFM56-5B-72-045", description="Combustor nozzle seal ring",
+                          quantity=2, estimated_cost_usd=850, lead_time="3-5 days",
+                          source="Safran Aircraft Engines"),
+                PartEntry(part_number="GE-BSK-420-A", description="Borescope probe tip (8mm flex)",
+                          quantity=1, estimated_cost_usd=320, lead_time="In-house tooling",
+                          source="Tool crib"),
+                PartEntry(part_number="CHEM-CLEAN-NT200", description="Chemical cleaning solution (20L)",
+                          quantity=1, estimated_cost_usd=180, lead_time="In stock",
+                          source="Consumables store"),
+                PartEntry(part_number="R410A-12KG", description="R-410A refrigerant (chiller)",
+                          quantity=1, estimated_cost_usd=95, lead_time="In stock",
+                          source="HVAC stores"),
+            ],
+            notes="Critical path: HP turbine blade set. Collins Singapore hub confirms AOG "
+                  "availability. Recommend pre-positioning before engine shutdown to minimize "
+                  "downtime. Estimated total repair: 4.5 hours once parts are on hand.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are an aerospace MRO parts procurement specialist. Given a maintenance "
+            "work order, identify the specific parts needed: part numbers (use realistic "
+            "manufacturer catalog references for CFM56/LEAP-class engines), quantities, "
+            "estimated costs in USD, lead times, and likely sources. Mark whether all "
+            "AOG-critical parts are available within 24 hours. Be specific and realistic.")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=1500,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nWork Order: {_json.dumps(work_order, default=str)[:4000]}"}],
+            output_format=ProcurementList)
+        return resp.parsed_output or _stub()
+    except Exception as e:
+        logger.warning("parts_procurement failed (%s); stub", e)
+        return _stub()
+
+
+# ── Incident report generator ──
+
+class IncidentReport(BaseModel):
+    report_id: str = Field(description="Incident report number")
+    classification: str = Field(description="ATA chapter + fault classification")
+    aircraft_engine: str = Field(description="Engine type and serial/rig ID")
+    timestamp: str = Field(description="When the incident was detected")
+    symptoms: list[str] = Field(description="Observed symptoms with values")
+    physics_evidence: str = Field(description="Physics residual analysis")
+    probable_cause: str = Field(description="Most likely root cause")
+    corrective_action: str = Field(description="Action taken or recommended")
+    regulatory_closure: str = Field(description="EASA/FAA regulatory references")
+    return_to_service: str = Field(description="Criteria for return to service")
+
+
+def generate_incident_report(diagnostics: dict, findings: list,
+                             machine: str) -> IncidentReport:
+    """Generate a formal MRO incident report with regulatory closure references."""
+    def _stub() -> IncidentReport:
+        return IncidentReport(
+            report_id="IR-2026-0627-001",
+            classification="ATA 72-50 — Turbine Section, Hot-Section Degradation",
+            aircraft_engine=f"{machine} — MRO Test Rig",
+            timestamp="2026-06-27T14:32:00Z",
+            symptoms=["EGT deviation +3.7σ above baseline (652°C vs 642°C mean)",
+                      "Physics residual: measured EGT exceeds model prediction by 23°C",
+                      "N1 droop: shaft speed 40 RPM below nominal at same throttle"],
+            physics_evidence="The Brayton-cycle residual model indicates the measured EGT "
+                           "cannot be explained by current fuel flow and N1 alone. The "
+                           "+23°C excess is consistent with 0.3mm blade tip erosion or "
+                           "15% nozzle area blockage from coking.",
+            probable_cause="Turbine blade erosion (HP Stage 1) with possible secondary "
+                          "nozzle coking. Degradation rate: approximately 2°C/hour at "
+                          "cruise throttle.",
+            corrective_action="1. Borescope HP turbine per CMM 72-00-00\n"
+                             "2. If blade tip loss >0.5mm: replace blade set\n"
+                             "3. If nozzle blockage >20%: chemical clean\n"
+                             "4. Ground run verification: EGT within limits",
+            regulatory_closure="EASA Part 145.A.45(b) — maintenance data requirements. "
+                             "AS9100D Clause 8.5.1 — production and service provision. "
+                             "FAA AC 43-218 — engine borescope inspection guidance.",
+            return_to_service="EGT within ±15°C of baseline at stabilized ground run "
+                            "(85% N1, 10 min). Vibration <1.0g. Oil temp/press nominal. "
+                            "Level II inspector sign-off required.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are an aerospace MRO documentation specialist generating a formal "
+            "incident report. Include ATA chapter classification, observed symptoms with "
+            "specific sensor values, physics-based evidence, probable cause, corrective "
+            "action steps, EASA/FAA regulatory closure references, and return-to-service "
+            "acceptance criteria. Be precise enough for regulatory submission.")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=1500,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nDiagnostics: {_json.dumps(diagnostics, default=str)[:4000]}\n"
+                f"Findings: {_json.dumps(findings[:5], default=str)[:2000]}"}],
+            output_format=IncidentReport)
+        return resp.parsed_output or _stub()
+    except Exception as e:
+        logger.warning("incident_report failed (%s); stub", e)
         return _stub()
 
 

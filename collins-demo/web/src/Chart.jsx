@@ -1,4 +1,6 @@
-// Chart.jsx — lightweight multi-series SVG line chart (light theme).
+// Chart.jsx — lightweight multi-series SVG line chart with animated line draw.
+import { useEffect, useRef, useState } from 'react'
+
 export default function Chart({ data, series, height = 190, redline }) {
   if (!data || data.length === 0) {
     return <div className="empty">No trajectory yet.</div>
@@ -33,8 +35,13 @@ export default function Chart({ data, series, height = 190, redline }) {
         {redline != null && (
           <line x1={padL} x2={W - padR} y1={sy(redline)} y2={sy(redline)} stroke="#e11d48" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
         )}
+        {redline != null && (
+          <text x={W - padR - 4} y={sy(redline) - 4} fill="#e11d48" fontSize="9" textAnchor="end"
+                fontFamily="JetBrains Mono" opacity="0.8">{redline}</text>
+        )}
         {series.map(s => (
-          <path key={s.key} d={path(s.key)} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" />
+          <path key={s.key} d={path(s.key)} fill="none" stroke={s.color} strokeWidth="2"
+                strokeLinejoin="round" className="chart-line-anim" />
         ))}
         <text x={padL} y={H - 6} fill="#9aa1ad" fontSize="9" fontFamily="JetBrains Mono">0</text>
         <text x={W - padR} y={H - 6} fill="#9aa1ad" fontSize="9" textAnchor="end" fontFamily="JetBrains Mono">{xLabel(xMax)}</text>

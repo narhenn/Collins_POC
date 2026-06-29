@@ -1,6 +1,7 @@
 import React, { Suspense, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html, Bounds, ContactShadows } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, Bounds, ContactShadows, Environment } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SIG, sevClass, fmt } from './lib.jsx'
 
@@ -16,8 +17,9 @@ const HOTSPOTS = [
   ['aero:fuelFlow', [0.4, 0.3, 1.0]],
 ]
 
-function Model({ url }) {
+function Model({ url, health }) {
   const { scene } = useGLTF(url)
+  const ref = React.useRef()
   // center + scale to a ~3-unit box
   const cloned = useMemo(() => {
     const s = scene.clone(true)
@@ -30,7 +32,23 @@ function Model({ url }) {
     s.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
     return s
   }, [scene])
-  return <primitive object={cloned} />
+
+  // Pulse emissive color based on health: green → amber → red
+  useFrame(() => {
+    if (!ref.current || health == null) return
+    const h = Math.max(0, Math.min(1, health))
+    const emissive = h > 0.7 ? new THREE.Color(0, 0, 0)       // healthy — no glow
+      : h > 0.4 ? new THREE.Color(0.15, 0.08, 0)              // amber glow
+      : new THREE.Color(0.2, 0.02, 0.02)                       // red glow
+    ref.current.traverse(o => {
+      if (o.isMesh && o.material) {
+        const mat = o.material
+        if (mat.emissive) mat.emissive.lerp(emissive, 0.05)
+      }
+    })
+  })
+
+  return <primitive ref={ref} object={cloned} />
 }
 
 function Hotspot({ pos, sig, value }) {
@@ -61,17 +79,18 @@ function Fallback({ label }) {
   return <Html center><div style={{ color: '#aab0e0', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{label}</div></Html>
 }
 
-export default function TurbineModel({ url, latest = {}, height = 300 }) {
+export default function TurbineModel({ url, latest = {}, height = 300, health = null }) {
   return (
     <div style={{ height, borderRadius: 18, overflow: 'hidden', background: '#0b0d18', position: 'relative' }}>
       <Canvas shadows camera={{ position: [4, 2.5, 4.5], fov: 48 }} dpr={[1, 2]}>
         <color attach="background" args={['#0b0d18']} />
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[5, 8, 5]} intensity={1.4} castShadow />
-        <directionalLight position={[-5, 3, -4]} intensity={0.5} color="#9ec9ff" />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
+        <directionalLight position={[-5, 3, -4]} intensity={0.4} color="#9ec9ff" />
+        <Environment preset="city" background={false} />
         <Suspense fallback={<Fallback label="Loading 3D model…" />}>
           <Bounds fit clip observe margin={1.2}>
-            <Model url={url} />
+            <Model url={url} health={health} />
           </Bounds>
           {HOTSPOTS.filter(([s]) => latest[s] != null).map(([s, pos]) => (
             <Hotspot key={s} pos={pos} sig={s} value={latest[s]} />
