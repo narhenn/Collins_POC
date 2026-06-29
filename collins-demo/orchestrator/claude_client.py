@@ -366,7 +366,9 @@ def analyze_outcome(scenario: dict, projection: dict, machine: str) -> str:
             "time-to-action, and the precautions/maintenance to be ready. Be specific "
             "and grounded in the numbers; no preamble.")
         resp = _anthropic().messages.create(
-            model=config.CLAUDE_MODEL, max_tokens=600, system=system,
+            model=config.CLAUDE_MODEL, max_tokens=600,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content":
                 f"Machine: {machine}\nScenario: {_json.dumps(scenario)}\n"
                 f"Outcome: {_json.dumps(o)}\nEvents: {_json.dumps(events)}"}])
@@ -417,7 +419,9 @@ def diagnosis_agent(diagnostics: dict, machine: str) -> str:
             "band, (4) the most likely root cause, (5) recommended actions. Be "
             "specific and grounded in the numbers. Use short sections, no preamble.")
         resp = _anthropic().messages.create(
-            model=config.CLAUDE_MODEL, max_tokens=1000, system=system,
+            model=config.CLAUDE_MODEL, max_tokens=1000,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content":
                 f"Machine: {machine}\nSnapshot: {_json.dumps(diagnostics, default=str)[:6000]}"}])
         return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
@@ -479,12 +483,216 @@ def analysis_agent(diagnostics: dict, prediction: dict, machine: str,
             "rul": rul, "events": ev,
             "component_health_now": ch_now, "component_health_horizon": ch_fut}}
         resp = _anthropic().messages.create(
-            model=config.CLAUDE_MODEL, max_tokens=1100, system=system,
+            model=config.CLAUDE_MODEL, max_tokens=1100,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content":
                 f"Machine: {machine}\n{_json.dumps(payload, default=str)[:7000]}"}])
         return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
     except Exception as e:  # noqa: BLE001
         logger.warning("analysis_agent failed (%s); stub", e)
+        return _stub()
+
+
+# ── Real-time narration (the AI co-pilot watching the live sensor stream) ──
+
+def narrate_sensors(state: dict, machine: str) -> str:
+    """Claude watches the current sensor snapshot and issues a 1-2 sentence
+    observation in real-time. Sounds like an experienced test cell engineer."""
+    signals = state.get("latest", state.get("signals", {}))
+    findings = state.get("findings", [])
+    health = state.get("health", {})
+
+    def _stub() -> str:
+        egt = signals.get("aero:exhaustGasTemp")
+        vib = signals.get("aero:vibrationG")
+        n1 = signals.get("aero:shaftSpeedN1")
+        if egt and egt > 720:
+            return f"EGT climbing through {egt:.0f}C — watching the trend closely. Hot section may be degrading."
+        if vib and vib > 1.0:
+            return f"Vibration at {vib:.2f}g — above the baseline. Could be early bearing wear."
+        if findings:
+            return f"Active finding: {findings[0].get('message', 'anomaly detected')[:80]}."
+        if egt:
+            return f"All readings nominal. EGT {egt:.0f}C, N1 {n1:.0f} RPM. Engine running clean."
+        return "Waiting for sensor data..."
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are a turbine test cell engineer watching a live ground run on "
+            "the monitoring console. Given the current sensor readings, issue ONE "
+            "concise observation (1-2 sentences, present tense). Flag anomalies, "
+            "trends, or quiet-but-concerning patterns. Sound experienced and calm — "
+            "not alarmed unless readings are truly critical. No preamble, no labels.")
+        user = (
+            f"Machine: {machine}\n"
+            f"Sensors: {_json.dumps(signals, default=str)}\n"
+            f"Health: {_json.dumps(health, default=str)}\n"
+            f"Active findings: {len(findings)}")
+        if findings:
+            user += f"\nLatest finding: {findings[0].get('message', '')[:120]}"
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=200,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:
+        logger.warning("narrate_sensors failed (%s); stub", e)
+        return _stub()
+
+
+# ── Work order generation (AS9100-compliant MRO documentation) ──
+
+class WorkOrderStep(BaseModel):
+    step: int = Field(description="Step number")
+    action: str = Field(description="What the technician does")
+    criteria: str = Field(description="Acceptance/inspection criteria")
+    safety: str = Field(default="", description="Safety warning if applicable")
+
+class WorkOrder(BaseModel):
+    wo_number: str = Field(description="Work order number, e.g. WO-2026-001")
+    ata_chapter: str = Field(description="ATA chapter reference, e.g. ATA 72 - Engine")
+    priority: str = Field(description="AOG, Critical, Routine, or Scheduled")
+    compliance_ref: str = Field(description="Regulatory reference, e.g. AS9100D Clause 8.5.1")
+    fault_description: str = Field(description="Clear description of the fault")
+    root_cause: str = Field(description="Identified or suspected root cause")
+    steps: list[WorkOrderStep] = Field(description="Ordered repair/verification steps")
+    estimated_hours: float = Field(description="Estimated labour hours")
+    parts_required: list[str] = Field(default_factory=list)
+    sign_off: str = Field(default="Level II Inspector", description="Required sign-off authority")
+
+
+def generate_work_order(diagnostics: dict, machine: str) -> WorkOrder:
+    """Generate an AS9100-compliant maintenance work order from diagnosis results."""
+    comps = diagnostics.get("components", [])
+    findings = diagnostics.get("findings", [])
+    sensors = diagnostics.get("sensors", [])
+
+    def _stub() -> WorkOrder:
+        return WorkOrder(
+            wo_number="WO-2026-001",
+            ata_chapter="ATA 72 - Engine",
+            priority="AOG" if any(f.get("severity") == "critical" for f in findings) else "Routine",
+            compliance_ref="AS9100D Clause 8.5.1 / EASA Part 145.A.45",
+            fault_description="Turbine hot-section degradation detected by 3-tier behavior engine",
+            root_cause="Suspected blade erosion or nozzle coking based on EGT deviation pattern",
+            steps=[
+                WorkOrderStep(step=1, action="Apply LOTO to test rig", criteria="Zero energy state verified", safety="Confirm fuel isolation before approach"),
+                WorkOrderStep(step=2, action="Borescope hot section per CMM 72-00-00", criteria="No blade tip loss >0.5mm, no nozzle blockage >20%"),
+                WorkOrderStep(step=3, action="If fouled: chemical clean combustor nozzles", criteria="Spray pattern uniform across all nozzles"),
+                WorkOrderStep(step=4, action="If eroded: replace affected turbine blades", criteria="New blades within tip clearance spec per AMM"),
+                WorkOrderStep(step=5, action="Reassemble and ground run", criteria="EGT within limits, N1 stable, vibration <1.0g"),
+                WorkOrderStep(step=6, action="Digital twin resync and sign-off", criteria="All sensor readings nominal, fault code cleared"),
+            ],
+            estimated_hours=4.5,
+            parts_required=["Turbine blade set (if eroded)", "Combustor nozzle cleaning kit", "Borescope probe tip"],
+            sign_off="Level II Inspector per EASA Part 145",
+        )
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are an aerospace MRO documentation system. Generate an AS9100-compliant "
+            "maintenance work order from this fault diagnosis. Use correct ATA chapter "
+            "references. Each step must include acceptance criteria and safety warnings "
+            "where applicable. Include EASA Part 145 and FAA 14 CFR 145 references. "
+            "Language must be precise enough for a Level II-certified technician. "
+            "Estimate realistic labour hours and list specific parts/tools needed.")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=2000,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nDiagnostics: {_json.dumps(diagnostics, default=str)[:6000]}"}],
+            output_format=WorkOrder)
+        return resp.parsed_output or _stub()
+    except Exception as e:
+        logger.warning("generate_work_order failed (%s); stub", e)
+        return _stub()
+
+
+# ── Predictive alert (proactive time-to-event warning) ──
+
+def predictive_alert(prediction: dict, machine: str) -> str | None:
+    """If any RUL entry is within the horizon, generate a specific actionable alert."""
+    rul = prediction.get("rul", [])
+    crossings = [r for r in rul if r.get("within_horizon")]
+    if not crossings:
+        return None
+
+    r = crossings[0]  # most urgent
+
+    def _stub() -> str:
+        return (f"PREDICTIVE ALERT: {r['mode']} projected to be reached in "
+                f"~{r['time_to_limit_min']:.0f} minutes at current degradation rate. "
+                f"Recommend reducing thrust and scheduling inspection.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are a predictive maintenance alert system for a turbine test rig. "
+            "Generate a single ACTIONABLE alert (2-3 sentences). Name the parameter, "
+            "the projected time to limit crossing, and the immediate action required. "
+            "Be specific and urgent but professional. No preamble.")
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=200,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\n"
+                f"Limit crossing: {_json.dumps(r)}\n"
+                f"Full prediction: {_json.dumps(prediction, default=str)[:3000]}"}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:
+        logger.warning("predictive_alert failed (%s); stub", e)
+        return _stub()
+
+
+# ── Cascade reasoning (cross-system failure propagation) ──
+
+def cascade_analysis(diagnostics: dict, prediction: dict, machine: str) -> str:
+    """Reason about multi-system failure cascades — how degradation in one
+    subsystem propagates to others."""
+    def _stub() -> str:
+        comps = diagnostics.get("components", [])
+        bad = [c for c in comps if (c.get("health") or 1) < 0.7]
+        if not bad:
+            return "No cascade risks identified. All subsystems operating within margins."
+        names = [c["name"] for c in bad]
+        return (f"Degradation detected in {', '.join(names)}. "
+                f"If uncorrected, bearing wear can propagate to oil system stress "
+                f"(elevated oil temp → reduced lubrication → accelerated wear cycle). "
+                f"Monitor oil pressure closely and consider preemptive shutdown if oil temp exceeds 85C.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            "You are an aerospace systems engineer specializing in failure mode cascade "
+            "analysis. Given live turbine telemetry and a forward prediction, identify "
+            "if any degradation in one subsystem is likely to propagate to another. "
+            "Format each cascade as: [System A] degradation -> [System B] impact in ~N "
+            "minutes because [physics reason]. Be specific and grounded in the data. "
+            "If no cascades are likely, say so clearly. Max 4-5 sentences.")
+        payload = {"diagnostics": diagnostics, "prediction": prediction}
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=600,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\n{_json.dumps(payload, default=str)[:6000]}"}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:
+        logger.warning("cascade_analysis failed (%s); stub", e)
         return _stub()
 
 

@@ -18,6 +18,8 @@ import tripo
 from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
     diagnosis_agent, analysis_agent, build_twin_reply,
+    narrate_sensors, generate_work_order, predictive_alert,
+    cascade_analysis,
 )
 from config import config
 
@@ -219,6 +221,59 @@ def feed_start(req: FeedRequest):
 @router.post("/twin/feed/stop")
 def feed_stop():
     return nextxr.stop_feed()
+
+
+# ── AI Co-Pilot: real-time narration, work orders, alerts, cascades ──
+
+@router.get("/agents/narrate/{tenant}")
+def narrate(tenant: str, machine: str = "Turbine Engine"):
+    """Real-time AI narration — Claude watches the live sensor stream and
+    issues a 1-2 sentence observation like an experienced test cell engineer."""
+    state = nextxr.ingest_state(tenant)
+    text = narrate_sensors(state, machine)
+    return {"narration": text, "tenant": tenant}
+
+
+class WorkOrderRequest(BaseModel):
+    tenant: str
+    machine: str = "Turbine Engine"
+
+
+@router.post("/agents/work-order")
+def work_order(req: WorkOrderRequest):
+    """Generate an AS9100-compliant maintenance work order from the live twin's
+    diagnosis. Printable, with ATA chapter refs, safety warnings, and parts list."""
+    diag = nextxr.diagnostics(req.tenant)
+    wo = generate_work_order(diag, req.machine)
+    return {"work_order": wo.model_dump(), "diagnostics": diag}
+
+
+@router.post("/agents/predict-alert")
+def predict_alert(req: AgentRunRequest):
+    """Run the prediction engine and generate a proactive alert if any operating
+    limit is projected to be crossed within the forecast horizon."""
+    horizon_min = HORIZONS.get(req.horizon_label, 120)
+    prediction = nextxr.predict(req.tenant, horizon_min=horizon_min)
+    alert = predictive_alert(prediction, req.machine)
+    return {
+        "alert": alert,
+        "prediction_summary": {
+            "horizon_min": horizon_min,
+            "rul": prediction.get("rul", []),
+            "severity": prediction.get("severity", "nominal"),
+        },
+    }
+
+
+@router.post("/agents/cascade")
+def cascade(req: AgentRunRequest):
+    """Cross-system cascade reasoning — how degradation in one subsystem
+    propagates to others."""
+    horizon_min = HORIZONS.get(req.horizon_label, 120)
+    diag = nextxr.diagnostics(req.tenant)
+    prediction = nextxr.predict(req.tenant, horizon_min=horizon_min)
+    analysis = cascade_analysis(diag, prediction, req.machine)
+    return {"cascade_analysis": analysis, "diagnostics": diag}
 
 
 # ── 5. AUTOMIND agents on top ────────────────────────────────────────

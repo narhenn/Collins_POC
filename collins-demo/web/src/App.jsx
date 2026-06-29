@@ -135,13 +135,59 @@ function NeedTwin({ onBuild, building }) {
 }
 
 function Dashboard({ ctx }) {
-  const { tenant, machineName, twin, stepLive, building, buildTwin, modelUrl, goBuild } = ctx
+  const { tenant, machineName, twin, stepLive, building, buildTwin, modelUrl, goBuild, claudeOn } = ctx
   const live = twin?.latest || {}
   const h = twin?.health
   const findings = twin?.findings || []
   const incidents = twin?.incidents || []
   const egt = live['aero:exhaustGasTemp']
   const risk = h == null ? null : Math.round((1 - h) * 100)
+
+  // AI narration ticker — polls every 8 seconds
+  const [narration, setNarration] = useState([])
+  const [narrating, setNarrating] = useState(false)
+  const narrationTimer = useRef(null)
+  useEffect(() => {
+    if (!tenant) return
+    const tick = async () => {
+      setNarrating(true)
+      try {
+        const r = await api.narrate(tenant, machineName)
+        if (r?.narration) setNarration(prev => [{ text: r.narration, ts: new Date().toLocaleTimeString() }, ...prev].slice(0, 12))
+      } catch {}
+      setNarrating(false)
+    }
+    tick()
+    narrationTimer.current = setInterval(tick, 8000)
+    return () => clearInterval(narrationTimer.current)
+  }, [tenant, machineName])
+
+  // Predictive alert — check every 30 seconds
+  const [alert, setAlert] = useState(null)
+  useEffect(() => {
+    if (!tenant) return
+    const check = async () => {
+      try {
+        const r = await api.predictAlert({ tenant, machine: machineName, horizon_label: '2 hours' })
+        setAlert(r?.alert || null)
+      } catch {}
+    }
+    check()
+    const t = setInterval(check, 30000)
+    return () => clearInterval(t)
+  }, [tenant, machineName])
+
+  // Work order generation
+  const [wo, setWo] = useState(null)
+  const [woLoading, setWoLoading] = useState(false)
+  const generateWO = async () => {
+    setWoLoading(true)
+    try {
+      const r = await api.workOrder({ tenant, machine: machineName })
+      setWo(r?.work_order || null)
+    } catch {}
+    setWoLoading(false)
+  }
 
   return (
     <div className="panel">
@@ -198,6 +244,31 @@ function Dashboard({ ctx }) {
               <div className="card-change">redline 780 °C</div></div>
           </div>
 
+          {/* Predictive alert banner */}
+          {alert && (
+            <div className="card section-gap" style={{ borderColor: 'rgba(225,29,72,.4)', background: 'rgba(225,29,72,.06)' }}>
+              <div className="card-title" style={{ color: 'var(--accent-red)' }}><Icon n="ti-alert-octagon" /> Predictive Alert</div>
+              <div style={{ fontSize: 13, lineHeight: 1.7 }}>{alert}</div>
+            </div>
+          )}
+
+          {/* AI narration ticker */}
+          <div className="card section-gap">
+            <div className="card-title"><Icon n="ti-message-chatbot" /> AI Co-Pilot {narrating && <span className="spinner" style={{ marginLeft: 8 }} />}
+              <span className="pill pill-green" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
+            </div>
+            {narration.length === 0
+              ? <div className="empty">Waiting for sensor data to narrate...</div>
+              : <div style={{ maxHeight: 140, overflowY: 'auto', fontSize: 12, lineHeight: 1.8 }}>
+                  {narration.map((n, i) => (
+                    <div key={i} style={{ padding: '3px 0', borderBottom: '1px solid var(--border)', opacity: i === 0 ? 1 : 0.5 + (0.5 / (i + 1)) }}>
+                      <span style={{ color: 'var(--hint)', fontFamily: 'var(--mono)', fontSize: 10, marginRight: 8 }}>{n.ts}</span>
+                      {n.text}
+                    </div>
+                  ))}
+                </div>}
+          </div>
+
           {/* Live telemetry */}
           <div className="card section-gap">
             <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
@@ -240,6 +311,47 @@ function Dashboard({ ctx }) {
                     </div>))}</div>}
             </div>
           </div>
+
+          {/* Work Order generation */}
+          {findings.length > 0 && (
+            <div className="card section-gap">
+              <div className="card-title"><Icon n="ti-file-certificate" /> AS9100 Work Order
+                <span className="pill pill-surface" style={{ fontSize: 9 }}>EASA Part 145</span>
+              </div>
+              {!wo ? (
+                <div>
+                  <div className="empty" style={{ marginBottom: 12 }}>Generate an AS9100-compliant maintenance work order from the current diagnosis.</div>
+                  <button className="btn btn-primary" onClick={generateWO} disabled={woLoading} style={{ width: '100%' }}>
+                    {woLoading ? <><span className="spinner" /> Generating...</> : <><Icon n="ti-file-certificate" /> Generate Work Order</>}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, lineHeight: 1.8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                    <div><span style={{ color: 'var(--hint)' }}>WO#:</span> <b>{wo.wo_number}</b></div>
+                    <div><span style={{ color: 'var(--hint)' }}>ATA:</span> {wo.ata_chapter}</div>
+                    <div><span style={{ color: 'var(--hint)' }}>Priority:</span> <span className={`pill ${wo.priority === 'AOG' ? 'pill-red' : 'pill-surface'}`}>{wo.priority}</span></div>
+                    <div><span style={{ color: 'var(--hint)' }}>Est. Hours:</span> {wo.estimated_hours}h</div>
+                    <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--hint)' }}>Compliance:</span> {wo.compliance_ref}</div>
+                  </div>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Fault: {wo.fault_description}</div>
+                  <div style={{ color: 'var(--hint)', marginBottom: 10 }}>Root Cause: {wo.root_cause}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Repair Steps:</div>
+                  {(wo.steps || []).map((s, i) => (
+                    <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div><b>Step {s.step}:</b> {s.action}</div>
+                      <div style={{ color: 'var(--hint)', fontSize: 11 }}>Criteria: {s.criteria}</div>
+                      {s.safety && <div style={{ color: 'var(--accent-amber)', fontSize: 11 }}><Icon n="ti-alert-triangle" /> {s.safety}</div>}
+                    </div>
+                  ))}
+                  {wo.parts_required?.length > 0 && (
+                    <div style={{ marginTop: 10 }}><span style={{ color: 'var(--hint)' }}>Parts:</span> {wo.parts_required.join(', ')}</div>
+                  )}
+                  <div style={{ marginTop: 8, color: 'var(--hint)' }}>Sign-off: {wo.sign_off}</div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
