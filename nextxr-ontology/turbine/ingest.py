@@ -73,6 +73,7 @@ class _TenantTwin:
         self.findings_emitted = 0
         self.frames = 0
         self.last_diag = 0.0
+        self.live = True          # auto-advance every tick (live sensor stream)
         self.lock = threading.Lock()
 
     def simulate(self, throttle: float | None = None, fault: str | None = None,
@@ -277,6 +278,23 @@ class IngestService:
     def __init__(self):
         self._twins: dict[str, _TenantTwin] = {}
         self._lock = threading.Lock()
+        # Live ticker: advance every live twin once a second so the dashboard
+        # receives a continuous sensor stream (the twin standing in for a real
+        # engine). dt>1 sim-second per real second gives visible drift.
+        self._ticker = threading.Thread(target=self._tick_loop, daemon=True)
+        self._ticker.start()
+
+    def _tick_loop(self):
+        while True:
+            time.sleep(1.0)
+            with self._lock:
+                twins = list(self._twins.values())
+            for t in twins:
+                if getattr(t, "live", False):
+                    try:
+                        t.simulate(dt=2.0)   # keeps current throttle/fault
+                    except Exception:  # noqa: BLE001 — never kill the ticker
+                        pass
 
     def _resolve_entity(self, tenant: str, entity_id: str | None) -> str | None:
         if entity_id:

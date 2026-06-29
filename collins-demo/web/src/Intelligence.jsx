@@ -1,158 +1,147 @@
 import React, { useEffect, useState } from 'react'
 import api from './api'
 import Chart from './Chart.jsx'
-
-const pct = (h) => (h == null ? '—' : `${Math.round(h * 100)}%`)
-const hColor = (h) => (h == null ? 'var(--hint)' : h >= 0.8 ? 'var(--accent-green)'
-  : h >= 0.6 ? 'var(--accent-teal)' : h >= 0.4 ? 'var(--accent-amber)' : 'var(--accent-red)')
-const sColor = (s) => ({ ok: 'var(--accent-green)', warning: 'var(--accent-amber)',
-  critical: 'var(--accent-red)' }[s] || 'var(--hint)')
+import { Icon, pct, hColor, statusColor, fmt } from './lib.jsx'
 
 function HealthBar({ name, type, health, status }) {
   return (
-    <div style={{ marginBottom: 9 }}>
+    <div style={{ marginBottom: 10 }}>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12 }}>{name}
-          {type === 'subsystem' && <span className="hint" style={{ fontSize: 10 }}> · subsystem</span>}</span>
-        <span className="mono" style={{ fontSize: 11, color: hColor(health) }}>{pct(health)} · {status}</span>
+        <span style={{ fontSize: 12.5 }}>{name}{type === 'subsystem' && <span className="hint" style={{ fontSize: 10 }}> · subsystem</span>}</span>
+        <span className="mono" style={{ fontSize: 11.5, color: hColor(health) }}>{pct(health)} · {status}</span>
       </div>
-      <div style={{ height: 6, borderRadius: 4, background: 'var(--surface2)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: pct(health), background: hColor(health), transition: 'width .4s' }} />
-      </div>
+      <div className="bar-track"><div className="bar-fill" style={{ width: pct(health), background: hColor(health) }} /></div>
     </div>
   )
 }
 
-export default function Intelligence({ tenant, machine }) {
+export default function Intelligence({ tenant, machineName }) {
   const [horizons, setHorizons] = useState([])
   const [horizon, setHorizon] = useState('2 hours')
   const [diag, setDiag] = useState(null)
   const [analysis, setAnalysis] = useState(null)
-  const [busy, setBusy] = useState(null)   // 'diag' | 'analysis'
+  const [busy, setBusy] = useState(null)
   const [err, setErr] = useState(null)
 
   useEffect(() => { api.horizons().then(d => setHorizons(d.horizons || [])).catch(() => {}) }, [])
 
   async function runDiag() {
     setBusy('diag'); setErr(null)
-    try { setDiag(await api.runDiagnosis({ tenant, machine })) }
+    try { setDiag(await api.runDiagnosis({ tenant, machine: machineName })) }   // string, not object
     catch (e) { setErr(String(e.message || e)) }
     setBusy(null)
   }
   async function runAnalysis() {
     setBusy('analysis'); setErr(null)
-    try { setAnalysis(await api.runAnalysis({ tenant, machine, horizon_label: horizon })) }
+    try { setAnalysis(await api.runAnalysis({ tenant, machine: machineName, horizon_label: horizon })) }
     catch (e) { setErr(String(e.message || e)) }
     setBusy(null)
   }
 
   const d = diag?.diagnostics
-  const a = analysis
-  const pred = a?.prediction
-  const rul = pred?.rul || []
+  const a = analysis, pred = a?.prediction, rul = pred?.rul || []
 
   return (
-    <div className="card" style={{ marginTop: 16 }}>
-      <div className="card-h">Twin Intelligence
-        <span className="pill" style={{ background: 'rgba(139,109,240,.14)', color: 'var(--accent-purple)' }}>agents</span>
+    <div className="panel">
+      <div className="panel-header">
+        <div><div className="panel-title">Twin Intelligence</div>
+          <div className="panel-subtitle">On-demand agents over {machineName}: a present-state diagnosis and a predictive analysis (present + future).</div></div>
       </div>
-      <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <button className="btn primary" onClick={runDiag} disabled={!tenant || busy}>
-          {busy === 'diag' ? <><span className="spinner" />&nbsp; Diagnosing…</> : '🩺 Run Diagnosis (now)'}
-        </button>
-        <div className="row" style={{ gap: 6 }}>
-          <button className="btn teal" onClick={runAnalysis} disabled={!tenant || busy}>
-            {busy === 'analysis' ? <><span className="spinner" />&nbsp; Analyzing…</> : '🔮 Run Analysis'}
-          </button>
-          <span className="hint">horizon</span>
-          <select className="input" style={{ width: 'auto', padding: '7px 9px' }}
-            value={horizon} onChange={e => setHorizon(e.target.value)}>
-            {horizons.map(h => <option key={h.label} value={h.label}>{h.label}</option>)}
-          </select>
-        </div>
-        {!tenant && <span className="hint">Build the twin first.</span>}
-      </div>
-      {err && <div style={{ marginTop: 10, color: 'var(--accent-red)', fontSize: 12 }}>{err}</div>}
 
-      {/* Diagnosis report */}
-      {d && (
-        <div className="grid cols-2" style={{ marginTop: 14 }}>
-          <div>
-            <div className="card-h" style={{ fontSize: 12 }}>Component Health
-              <span className={`pill ${d.overall_health >= 0.6 ? 'green' : d.overall_health >= 0.4 ? 'amber' : 'red'}`}>
-                overall {pct(d.overall_health)}</span>
+      {/* Agent launchers */}
+      <div className="grid-2 section-gap">
+        <div className="agent-row">
+          <div className="agent-icon"><Icon n="ti-stethoscope" /></div>
+          <div style={{ flex: 1 }}><div className="agent-name">Diagnosis Agent</div>
+            <div className="agent-desc">Detailed per-component & per-sensor health report of the live twin.</div></div>
+          <button className="btn btn-primary" onClick={runDiag} disabled={busy}>
+            {busy === 'diag' ? <><span className="spinner" />&nbsp; Running…</> : 'Run Diagnosis'}</button>
+        </div>
+        <div className="agent-row">
+          <div className="agent-icon"><Icon n="ti-trending-up" /></div>
+          <div style={{ flex: 1 }}><div className="agent-name">Analysis Agent + Prediction</div>
+            <div className="agent-desc">Present state plus a forecast over the chosen horizon.</div>
+            <div className="row" style={{ marginTop: 6 }}>
+              <select className="select" style={{ width: 'auto', padding: '6px 9px' }} value={horizon} onChange={e => setHorizon(e.target.value)}>
+                {horizons.map(h => <option key={h.label} value={h.label}>{h.label}</option>)}
+              </select>
             </div>
-            {(d.components || []).map((c, i) => <HealthBar key={i} {...c} />)}
           </div>
-          <div>
-            <div className="card-h" style={{ fontSize: 12 }}>Sensors</div>
-            <table style={{ width: '100%', fontSize: 11.5, borderCollapse: 'collapse' }}>
-              <tbody>
+          <button className="btn btn-teal" onClick={runAnalysis} disabled={busy}>
+            {busy === 'analysis' ? <><span className="spinner" />&nbsp; Running…</> : 'Run Analysis'}</button>
+        </div>
+      </div>
+      {err && <div className="card" style={{ borderColor: 'rgba(225,29,72,.4)', color: 'var(--accent-red)', marginBottom: 16 }}>{err}</div>}
+
+      {/* Diagnosis */}
+      {d && (
+        <div className="card section-gap">
+          <div className="card-title"><Icon n="ti-stethoscope" /> Diagnosis Report
+            <span className={`pill ${d.overall_health >= 0.6 ? 'pill-green' : d.overall_health >= 0.4 ? 'pill-amber' : 'pill-red'}`}>overall {pct(d.overall_health)}</span></div>
+          <div className="grid-2">
+            <div>
+              <div className="card-label">Component Health</div>
+              <div style={{ marginTop: 8 }}>{(d.components || []).map((c, i) => <HealthBar key={i} {...c} />)}</div>
+            </div>
+            <div>
+              <div className="card-label">Sensors</div>
+              <table className="tbl" style={{ marginTop: 8 }}><tbody>
                 {(d.sensors || []).map((s, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '5px 0', color: 'var(--muted)' }}>{s.name}</td>
-                    <td className="mono" style={{ textAlign: 'right' }}>{s.value == null ? '—' : (Math.abs(s.value) >= 100 ? Math.round(s.value) : s.value.toFixed(2))}</td>
-                    <td style={{ textAlign: 'right', width: 64 }}>
-                      <span style={{ color: sColor(s.status), fontWeight: 600 }}>{s.status}</span></td>
-                  </tr>
+                  <tr key={i}><td style={{ color: 'var(--muted)' }}>{s.name}</td>
+                    <td className="mono" style={{ textAlign: 'right' }}>{fmt(s.value)}</td>
+                    <td style={{ textAlign: 'right', width: 70 }}><span style={{ color: statusColor(s.status), fontWeight: 600 }}>{s.status}</span></td></tr>
                 ))}
-              </tbody>
-            </table>
+              </tbody></table>
+            </div>
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <div className="analysis" style={{ borderLeftColor: 'var(--accent-blue)', whiteSpace: 'pre-wrap' }}>{diag.report}</div>
-          </div>
+          <div className="analysis" style={{ marginTop: 14, borderLeftColor: 'var(--accent-blue)' }}>{diag.report}</div>
         </div>
       )}
 
       {/* Analysis (present + future) */}
       {a && (
-        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-          <div className="card-h" style={{ fontSize: 12 }}>Predictive Analysis — next {a.horizon_label}
-            <span className={`pill ${pred?.severity === 'critical' ? 'red' : pred?.severity === 'warning' ? 'amber' : 'green'}`}>{pred?.severity}</span>
-          </div>
-          <div className="grid cols-2">
+        <div className="card">
+          <div className="card-title"><Icon n="ti-trending-up" /> Predictive Analysis — next {a.horizon_label}
+            <span className={`pill ${pred?.severity === 'critical' ? 'pill-red' : pred?.severity === 'warning' ? 'pill-amber' : 'pill-green'}`}>{pred?.severity}</span></div>
+          <div className="grid-2">
             <div>
               <Chart data={pred?.trajectory || []} height={170} redline={780}
-                series={[{ key: 'egt', label: 'EGT forecast', color: '#e2564e' }]} />
+                series={[{ key: 'egt', label: 'EGT forecast', color: '#e11d48' }]} />
               <div style={{ marginTop: 10 }}>
-                <Chart data={pred?.trajectory || []} height={150}
-                  series={[
-                    { key: 'health', label: 'Overall', color: '#18a999' },
-                    { key: 'turbine_h', label: 'Turbine', color: '#e2564e' },
-                    { key: 'bearings_h', label: 'Bearings', color: '#e0962f' },
-                    { key: 'lubrication_h', label: 'Lubrication', color: '#4b8bf5' },
-                  ]} />
+                <Chart data={pred?.trajectory || []} height={150} series={[
+                  { key: 'health', label: 'Overall', color: '#0d9488' },
+                  { key: 'turbine_h', label: 'Turbine', color: '#e11d48' },
+                  { key: 'bearings_h', label: 'Bearings', color: '#d97706' },
+                  { key: 'lubrication_h', label: 'Lubrication', color: '#2563eb' }]} />
               </div>
             </div>
             <div>
-              <div className="card-h" style={{ fontSize: 12 }}>Remaining Useful Life / Time-to-Limit</div>
-              {rul.map((r, i) => (
-                <div key={i} className="row" style={{ justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 12 }}>{r.mode}</span>
-                  <span className="mono" style={{ fontSize: 12, color: r.within_horizon ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                    {r.within_horizon ? `~${Math.round(r.time_to_limit_min)} min` : `> ${a.horizon_label}`}
-                  </span>
-                </div>
-              ))}
-              <div className="card-h" style={{ fontSize: 12, marginTop: 12 }}>Component health: now → +{a.horizon_label}</div>
-              {['compressor', 'turbine', 'bearings', 'lubrication'].map(k => {
-                const now = pred?.component_health_now?.[k]?.health
-                const fut = pred?.component_health_horizon?.[k]?.health
-                return (
-                  <div key={k} className="row" style={{ justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
-                    <span style={{ textTransform: 'capitalize' }}>{k}</span>
-                    <span className="mono">
-                      <span style={{ color: hColor(now) }}>{pct(now)}</span>
-                      <span className="hint"> → </span>
-                      <span style={{ color: hColor(fut) }}>{pct(fut)}</span>
-                    </span>
+              <div className="card-label">Remaining Useful Life / Time-to-Limit</div>
+              <div style={{ marginTop: 8 }}>
+                {rul.map((r, i) => (
+                  <div key={i} className="row" style={{ justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: 12.5 }}>{r.mode}</span>
+                    <span className="mono" style={{ fontSize: 12, color: r.within_horizon ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                      {r.within_horizon ? `~${Math.round(r.time_to_limit_min)} min` : `> ${a.horizon_label}`}</span>
                   </div>
-                )
-              })}
+                ))}
+              </div>
+              <div className="card-label" style={{ marginTop: 14 }}>Component health: now → +{a.horizon_label}</div>
+              <div style={{ marginTop: 6 }}>
+                {['compressor', 'turbine', 'bearings', 'lubrication'].map(k => {
+                  const now = pred?.component_health_now?.[k]?.health, fut = pred?.component_health_horizon?.[k]?.health
+                  return (
+                    <div key={k} className="row" style={{ justifyContent: 'space-between', padding: '5px 0', fontSize: 12.5 }}>
+                      <span style={{ textTransform: 'capitalize' }}>{k}</span>
+                      <span className="mono"><span style={{ color: hColor(now) }}>{pct(now)}</span>
+                        <span className="hint"> → </span><span style={{ color: hColor(fut) }}>{pct(fut)}</span></span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
-          <div className="analysis" style={{ marginTop: 12, whiteSpace: 'pre-wrap' }}>{a.report}</div>
+          <div className="analysis" style={{ marginTop: 14 }}>{a.report}</div>
         </div>
       )}
     </div>

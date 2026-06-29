@@ -15,8 +15,10 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot           # repo root
 $demo = $PSScriptRoot
 $venvPy = Join-Path $root ".venv\Scripts\python.exe"
+# NB: avoid a local named $web — PowerShell variables are case-insensitive, so
+# it would collide with the [switch]$Web parameter.
 $orch = Join-Path $demo "orchestrator"
-$web  = Join-Path $demo "web"
+$webDir = Join-Path $demo "web"
 
 function Step($m) { Write-Host "`n=== $m ===" -ForegroundColor Cyan }
 
@@ -37,10 +39,10 @@ if (-not (Test-Path (Join-Path $orch ".env"))) {
 
 if ($Web) {
     Step "Starting web app (Vite) on :5174 in a new window"
-    if (-not (Test-Path (Join-Path $web "node_modules"))) {
-        Push-Location $web; npm install; Pop-Location
+    if (-not (Test-Path (Join-Path $webDir "node_modules"))) {
+        Push-Location $webDir; npm install; Pop-Location
     }
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$web'; npm run dev"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$webDir'; npm run dev"
 }
 
 Step "Starting orchestrator on http://localhost:8090"

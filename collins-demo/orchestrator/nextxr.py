@@ -73,6 +73,32 @@ def build_twin(spec: TwinSpec) -> dict:
         return {"tenant": tenant, "twin": twin, "machine": machine, "assets": assets}
 
 
+def build_turbine(name: str) -> dict:
+    """Create the turbine-engine twin with a given name; return tenant + machine + assets."""
+    with _client() as c:
+        r = c.post("/twins", json={"name": name or "Turbine Engine",
+                                   "domain": "turbine-engine"})
+        r.raise_for_status()
+        twin = r.json().get("twin", {})
+        tenant = twin.get("tenant_id")
+        seed_id = twin.get("seed_asset_id")
+        machine = {"id": seed_id, "name": name or "Turbine Engine"}
+        assets = []
+        try:
+            er = c.get("/entities", params={"tenant": tenant,
+                                            "label": "PhysicalAsset", "limit": 100})
+            nodes = (er.json() or {}).get("nodes", []) if er.status_code == 200 else []
+            assets = [{"id": n.get("id"), "name": n.get("displayName"),
+                       "type": (n.get("canonicalType") or "").split("#")[-1]} for n in nodes]
+            for n in nodes:
+                if n.get("id") == seed_id:
+                    machine = {"id": seed_id, "name": n.get("displayName")}
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.warning("entity lookup failed: %s", e)
+    return {"tenant": tenant, "twin": twin, "machine": machine, "assets": assets}
+
+
 def start_feed(tenant: str, mode: str = "dynamics", speed: float = 60.0) -> dict:
     with _client() as c:
         r = c.post("/feed/start", params={"tenant": tenant, "mode": mode, "speed": speed})

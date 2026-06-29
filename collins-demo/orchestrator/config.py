@@ -32,12 +32,20 @@ class Config:
     AUTOMIND_EMAIL: str = os.environ.get("AUTOMIND_EMAIL", "prem@goalcert.com")
     AUTOMIND_PASSWORD: str = os.environ.get("AUTOMIND_PASSWORD", "demo1234")
 
+    # ── Tripo (2D -> 3D generation) ──
+    TRIPO_API_KEY: str = os.environ.get("TRIPO_API_KEY", "")
+    TRIPO_BASE: str = os.environ.get("TRIPO_BASE", "https://api.tripo3d.ai/v2/openapi")
+
     # ── Server ──
     PORT: int = int(os.environ.get("ORCHESTRATOR_PORT", "8090"))
 
     @property
     def claude_enabled(self) -> bool:
         return bool(self.ANTHROPIC_API_KEY)
+
+    @property
+    def tripo_enabled(self) -> bool:
+        return bool(self.TRIPO_API_KEY)
 
 
 config = Config()

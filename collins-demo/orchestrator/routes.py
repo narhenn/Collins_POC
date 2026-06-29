@@ -7,13 +7,17 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+
 import nextxr
 import goalcert
 import automind
 import scenarios
+import tripo
 from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
-    diagnosis_agent, analysis_agent,
+    diagnosis_agent, analysis_agent, build_twin_reply,
 )
 from config import config
 
@@ -27,12 +31,82 @@ HORIZONS = {
 router = APIRouter(prefix="/api")
 
 
+# ── Build a Twin: conversational agent + Tripo image->3D ─────────────
+
+class TwinChatRequest(BaseModel):
+    history: list[dict] = []
+    message: str = ""
+
+
+@router.post("/build-twin/message")
+def build_twin_message(req: TwinChatRequest):
+    r = build_twin_reply(req.history, req.message)
+    return r.model_dump()
+
+
+class TwinGenerateRequest(BaseModel):
+    machine: str = "Turbine Engine"
+    image_b64: str | None = None      # required — image-to-3D only
+    filename: str = "machine.png"
+
+
+@router.post("/build-twin/generate")
+def build_twin_generate(req: TwinGenerateRequest):
+    """Build the live turbine twin now, and kick off the Tripo image->3D job.
+    Returns immediately with the tenant + a Tripo task_id to poll."""
+    built = nextxr.build_turbine(req.machine)
+    tenant = built.get("tenant")
+    # start the live twin streaming
+    try:
+        nextxr.simulate_step(tenant, throttle=0.9)
+    except Exception:  # noqa: BLE001
+        pass
+
+    task_id, tripo_status = None, "disabled"
+    if config.tripo_enabled and req.image_b64:
+        tripo.log_balance("before generation")
+        task_id, terr = tripo.start_image_task(tripo.b64_to_bytes(req.image_b64), req.filename)
+        if task_id:
+            tripo.register_job(task_id, tenant)
+            tripo_status = "running"
+        else:
+            tripo_status = f"error: {terr or 'unknown'}"
+    elif not config.tripo_enabled:
+        tripo_status = "no_key"
+    elif not req.image_b64:
+        tripo_status = "no_image"
+
+    return {"tenant": tenant, "machine": built.get("machine"),
+            "assets": built.get("assets", []),
+            "task_id": task_id, "tripo": tripo_status}
+
+
+@router.get("/tripo/balance")
+def tripo_balance():
+    """Credits readout (also printed to the orchestrator terminal)."""
+    return tripo.log_balance("on request")
+
+
+@router.get("/build-twin/status/{task_id}")
+def build_twin_status(task_id: str):
+    return tripo.job_status(task_id)
+
+
+@router.get("/model/{tenant}.glb")
+def serve_model(tenant: str):
+    p = tripo.model_path(tenant)
+    if not p.exists():
+        raise HTTPException(404, "model not generated yet")
+    return FileResponse(p, media_type="model/gltf-binary")
+
+
 @router.get("/health")
 def health():
     """Reachability of all three platforms + whether Claude is wired."""
     return {
         "orchestrator": "ok",
         "claude": {"enabled": config.claude_enabled, "model": config.CLAUDE_MODEL},
+        "tripo": {"enabled": config.tripo_enabled},
         "nextxr": nextxr.health(),
         "goalcert": goalcert.health(),
         "automind": automind.status(),

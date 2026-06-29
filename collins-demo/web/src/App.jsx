@@ -1,65 +1,38 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import api from './api'
-import Chart from './Chart.jsx'
+import { Logo, Icon, SIG, TILE_ORDER, sevClass, fmt, pct } from './lib.jsx'
+import Scenario from './Scenario.jsx'
 import Intelligence from './Intelligence.jsx'
+import BuildTwin from './BuildTwin.jsx'
+import TurbineModel from './TurbineModel.jsx'
 
-// Signal display metadata + redlines (mirror turbine/physics.py).
-const SIG = {
-  'aero:exhaustGasTemp': { label: 'EGT', unit: '°C', warn: 700, crit: 780 },
-  'aero:shaftSpeedN1': { label: 'N1', unit: 'RPM', warn: 5450, crit: 5500 },
-  'aero:shaftSpeedN2': { label: 'N2', unit: 'RPM', warn: 10700, crit: 10800 },
-  'aero:fuelFlow': { label: 'Fuel', unit: 'kg/h' },
-  'aero:vibrationG': { label: 'Vibration', unit: 'g', warn: 1.5, crit: 2.0 },
-  'aero:oilTemperature': { label: 'Oil Temp', unit: '°C', warn: 80, crit: 85 },
-  'aero:oilPressure': { label: 'Oil Press', unit: 'PSI', warnLow: 45, critLow: 40 },
-  'aero:enginePressureRatio': { label: 'EPR', unit: '' },
-}
-const TILE_ORDER = ['aero:exhaustGasTemp', 'aero:shaftSpeedN1', 'aero:vibrationG',
-  'aero:oilTemperature', 'aero:oilPressure', 'aero:fuelFlow', 'aero:shaftSpeedN2',
-  'aero:enginePressureRatio']
-const ICONS = { Thermal: '🔥', Lubrication: '🛢️', Mechanical: '⚙️', Aerodynamic: '🌀',
-  Combustion: '⛽', Instrumentation: '📟', Authored: '✨' }
-
-function sevClass(sig, v) {
-  const m = SIG[sig]; if (!m || v == null) return ''
-  if (m.crit != null && v >= m.crit) return 'crit'
-  if (m.critLow != null && v <= m.critLow) return 'crit'
-  if (m.warn != null && v >= m.warn) return 'warn'
-  if (m.warnLow != null && v <= m.warnLow) return 'warn'
-  return ''
-}
-const fmt = (v) => (v == null ? '—' : (Math.abs(v) >= 100 ? Math.round(v) : v.toFixed(Math.abs(v) < 10 ? 2 : 1)))
+const NAV = [
+  { id: 'dashboard', label: 'Live Dashboard', icon: 'ti-layout-dashboard' },
+  { id: 'build', label: 'Build a Twin', icon: 'ti-sparkles' },
+  { id: 'scenario', label: 'Scenario Builder', icon: 'ti-urgent' },
+  { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
+]
 
 export default function App() {
+  const [route, setRoute] = useState('dashboard')
   const [health, setHealth] = useState(null)
   const [tenant, setTenant] = useState(null)
   const [machine, setMachine] = useState(null)
-  const [twin, setTwin] = useState(null)        // live turbine state
+  const [twin, setTwin] = useState(null)        // live state (polled 1s)
+  const [modelUrl, setModelUrl] = useState(null)  // Tripo-generated GLB
   const [building, setBuilding] = useState(false)
-  const [running, setRunning] = useState(false)
-  const [authoring, setAuthoring] = useState(false)
-
-  const [lib, setLib] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [prompt, setPrompt] = useState('')
-  const [result, setResult] = useState(null)      // projection result
   const [err, setErr] = useState(null)
   const pollRef = useRef(null)
 
-  // ── boot ──
-  useEffect(() => {
-    api.health().then(setHealth).catch(() => {})
-    api.scenarioLibrary().then(d => setLib(d.scenarios || [])).catch(() => {})
-  }, [])
+  useEffect(() => { api.health().then(setHealth).catch(() => {}) }, [])
 
-  // ── poll live twin ──
   const poll = useCallback(async (tid) => {
     try { setTwin(await api.twinState(tid)) } catch { /* not ready */ }
   }, [])
   useEffect(() => {
     if (!tenant) return
     poll(tenant)
-    pollRef.current = setInterval(() => poll(tenant), 2000)
+    pollRef.current = setInterval(() => poll(tenant), 1000)  // live, every second
     return () => clearInterval(pollRef.current)
   }, [tenant, poll])
 
@@ -67,219 +40,208 @@ export default function App() {
     setBuilding(true); setErr(null)
     try {
       const r = await api.build({ description: 'Gas turbine engine on MRO test rig', start_feed: false })
-      setTenant(r.tenant); setMachine(r.machine)
-      // prime the real-time twin with a few healthy steps
-      for (let i = 0; i < 3; i++) await api.step({ tenant: r.tenant, throttle: 0.9 })
+      setTenant(r.tenant); setMachine(r.machine); setModelUrl(null)
       poll(r.tenant)
     } catch (e) { setErr(String(e.message || e)) }
     setBuilding(false)
   }
-
+  function onBuilt(t, m) { setTenant(t); setMachine(m); setModelUrl(null); poll(t) }
   async function stepLive(throttle) {
     if (!tenant) return
-    for (let i = 0; i < 2; i++) await api.step({ tenant, throttle })
+    try { await api.step({ tenant, throttle }) } catch {}
     poll(tenant)
   }
 
-  async function authored() {
-    if (!prompt.trim()) return
-    setAuthoring(true); setErr(null)
-    try {
-      const r = await api.authorScenario({ prompt, machine: machine?.name || 'Turbine Engine',
-        sensors: Object.keys(SIG) })
-      setLib(l => [r.scenario, ...l])
-      setSelected(r.scenario.id)
-      setPrompt('')
-    } catch (e) { setErr(String(e.message || e)) }
-    setAuthoring(false)
-  }
-
-  async function run() {
-    if (!tenant || !selected) return
-    setRunning(true); setErr(null); setResult(null)
-    try {
-      setResult(await api.runScenario({ tenant, scenario_id: selected,
-        machine: machine?.name || 'Turbine Engine', analyze: true }))
-    } catch (e) { setErr(String(e.message || e)) }
-    setRunning(false)
-  }
-
-  const live = twin?.latest || {}
   const liveHealth = twin?.health
   const claudeOn = health?.claude?.enabled
-  const o = result?.projection?.outcome
-  const traj = result?.projection?.trajectory || []
-  const events = result?.projection?.events || []
-  const selScn = lib.find(s => s.id === selected)
+  const machineName = machine?.name || 'Turbine Engine'
+  const nFindings = (twin?.findings || []).length
+  const nIncidents = (twin?.incidents || []).length
+
+  const ctx = { tenant, machine, machineName, twin, claudeOn, stepLive, building, buildTwin, modelUrl, goBuild: () => setRoute('build') }
 
   return (
-    <div className="app">
+    <div className="app-root">
       {/* Topbar */}
       <div className="topbar">
-        <div className="logo">NEXT<span>XR</span></div>
-        <div className="crumb">Collins MRO · <b>Scenario Builder</b></div>
-        <div className="spacer" />
-        <div className="topstat"><span className={`dot ${claudeOn ? 'blue' : ''}`} />
-          Agent: <b>{claudeOn ? (health?.claude?.model || 'Claude') : 'stub'}</b></div>
-        <div className="topstat">
-          <span className={`dot ${liveHealth == null ? '' : liveHealth > 0.7 ? 'green' : liveHealth > 0.4 ? 'amber' : 'red'}`} />
-          Twin Health: <b>{liveHealth == null ? '—' : `${Math.round(liveHealth * 100)}%`}</b>
-        </div>
+        <span className="brand"><Logo size={32} />
+          <span className="brand-word">
+            <span className="brand-name">Goalcert</span>
+            <span className="brand-tag">Turbine Digital Twin</span>
+          </span>
+        </span>
+        <div className="crumb">{tenant
+          ? <><b>{machineName}</b> · live aerospace MRO twin</>
+          : 'No twin yet — build one to begin'}</div>
+        <div className="topstat"><span className={`status-dot ${claudeOn ? 'live' : ''}`} style={{ background: claudeOn ? 'var(--brand)' : 'var(--hint)' }} />
+          Agent <b>{claudeOn ? (health?.claude?.model || 'Claude') : 'stub'}</b></div>
+        {tenant && <div className="topstat">
+          <span className={`status-dot ${liveHealth == null ? '' : liveHealth > 0.7 ? 'green' : liveHealth > 0.4 ? 'amber' : 'red'}`} />
+          Health <b>{liveHealth == null ? '—' : pct(liveHealth)}</b></div>}
+        <div className="topstat"><span className="status-dot live" /> LIVE</div>
+        <div className="acct"><span className="av">C</span>Collins MRO</div>
       </div>
 
-      <div className="content">
-        {err && <div className="card" style={{ borderColor: 'rgba(226,86,78,.4)', color: 'var(--accent-red)', marginBottom: 16 }}>{err}</div>}
-
-        <div className="grid cols-2">
-          {/* LEFT: 3D + live twin */}
-          <div className="grid" style={{ gridTemplateColumns: '1fr', alignContent: 'start' }}>
-            <div className="card">
-              <div className="card-h">Live Digital Twin
-                <span className="pill teal">real-time</span>
-              </div>
-              {/* 3D layer goes here (next step) */}
-              <div className="viz">
-                <div className="viz-label">
-                  <div className="big">⬡ 3D Turbine Visualization</div>
-                  <div>Reserved for the 3D model + sensor hotspots (next step).</div>
-                  {machine && <div style={{ marginTop: 6 }} className="mono hint">{machine.name}</div>}
-                </div>
-              </div>
-
-              {!tenant ? (
-                <div className="row" style={{ marginTop: 14, justifyContent: 'center' }}>
-                  <button className="btn primary" onClick={buildTwin} disabled={building}>
-                    {building ? <><span className="spinner" /> &nbsp;Building twin…</> : 'Build Turbine Twin'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="sensors">
-                    {TILE_ORDER.filter(s => live[s] != null).map(s => (
-                      <div key={s} className={`sensor ${sevClass(s, live[s])}`}>
-                        <span className="live-dot" />
-                        <div className="lbl">{SIG[s].label}</div>
-                        <div className="val">{fmt(live[s])}<span className="u">{SIG[s].unit}</span></div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="row" style={{ marginTop: 12 }}>
-                    <span className="hint">Drive the live engine (3D stand-in):</span>
-                    <button className="btn" onClick={() => stepLive(0.6)}>Idle</button>
-                    <button className="btn" onClick={() => stepLive(0.9)}>Cruise</button>
-                    <button className="btn" onClick={() => stepLive(1.0)}>Full</button>
-                  </div>
-                </>
-              )}
-            </div>
+      <div className="body">
+        {/* Sidebar */}
+        <div className="sidebar">
+          <div className="sidebar-nav">
+            <div className="sidebar-section">Operations</div>
+            {NAV.map(it => (
+              <a key={it.id} className={`nav-item ${route === it.id ? 'active' : ''}`} onClick={() => setRoute(it.id)}>
+                <Icon n={it.icon} />{it.label}
+                {it.id === 'dashboard' && nIncidents > 0 && <span className="nav-badge badge-red">{nIncidents}</span>}
+                {it.id === 'agents' && <span className="nav-badge badge-blue">2</span>}
+              </a>
+            ))}
           </div>
-
-          {/* RIGHT: scenario builder */}
-          <div className="grid" style={{ gridTemplateColumns: '1fr', alignContent: 'start' }}>
-            <div className="card">
-              <div className="card-h">Scenario Builder <span className="pill purple" style={{ background: 'rgba(139,109,240,.14)', color: 'var(--accent-purple)' }}>agent</span></div>
-              <textarea className="input" rows={2} value={prompt} onChange={e => setPrompt(e.target.value)}
-                placeholder="Describe a what-if… e.g. 'oil starts leaking at full throttle' or 'EGT sensor fails during a hot run'" />
-              <div className="row" style={{ marginTop: 8 }}>
-                <button className="btn teal" onClick={authored} disabled={authoring || !prompt.trim()}>
-                  {authoring ? <><span className="spinner" />&nbsp; Authoring…</> : '✨ Author scenario'}
-                </button>
-                <span className="hint">or pick a built scenario below</span>
-              </div>
-
-              <div style={{ marginTop: 14, maxHeight: 260, overflowY: 'auto' }}>
-                {lib.map(s => (
-                  <div key={s.id} className={`scn ${selected === s.id ? 'sel' : ''}`} onClick={() => setSelected(s.id)}>
-                    <div className="ic">{ICONS[s.category] || '⚠️'}</div>
-                    <div style={{ flex: 1 }}>
-                      <div className="nm">{s.name} {s.authored && <span className="pill purple" style={{ background: 'rgba(139,109,240,.14)', color: 'var(--accent-purple)' }}>authored</span>}</div>
-                      <div className="ds">{s.description}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="row" style={{ marginTop: 12 }}>
-                <button className="btn primary" onClick={run} disabled={running || !tenant || !selected} style={{ flex: 1 }}>
-                  {running ? <><span className="spinner" />&nbsp; Simulating…</>
-                    : `▶ Run simulation${selScn ? ` — ${selScn.name}` : ''}`}
-                </button>
-              </div>
-              {!tenant && <div className="hint" style={{ marginTop: 8 }}>Build the twin first to run a simulation from its present state.</div>}
-            </div>
+          <div className="sidebar-foot">
+            <div className="sidebar-help" onClick={() => setRoute('build')}>
+              <Icon n="ti-sparkles" /> Build a Twin</div>
+            <div className="sidebar-ver">Goalcert · NextXR core · demo</div>
           </div>
         </div>
 
-        {/* Twin intelligence: analysis + diagnosis agents + prediction */}
-        {tenant && <Intelligence tenant={tenant} machine={machine} />}
+        {/* Content */}
+        <div className="content">
+          {err && <div className="card" style={{ borderColor: 'rgba(225,29,72,.4)', color: 'var(--accent-red)', marginBottom: 16 }}>{err}</div>}
+          {route === 'dashboard' && <Dashboard ctx={ctx} />}
+          {route === 'build' && <BuildTwin tenant={tenant} machine={machine} twin={twin}
+            modelUrl={modelUrl} onBuilt={onBuilt} setModelUrl={setModelUrl} />}
+          {route === 'scenario' && (tenant ? <Scenario tenant={tenant} machineName={machineName} twin={twin} />
+            : <NeedTwin onBuild={() => setRoute('build')} building={building} />)}
+          {route === 'agents' && (tenant ? <Intelligence tenant={tenant} machineName={machineName} />
+            : <NeedTwin onBuild={() => setRoute('build')} building={building} />)}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-        {/* Results: real-time vs simulated, side by side */}
-        {result && (
-          <div className="grid cols-2" style={{ marginTop: 16 }}>
-            <div className="card">
-              <div className="card-h">Projected Trajectory
-                <span className={`pill ${o?.severity === 'critical' ? 'red' : o?.severity === 'warning' ? 'amber' : 'green'}`}>{o?.severity}</span>
-              </div>
-              <Chart data={traj} redline={780}
-                series={[
-                  { key: 'egt', label: 'EGT (true)', color: '#e2564e' },
-                  { key: 'egt_reported', label: 'EGT (reported)', color: '#4b8bf5' },
-                ]} />
-              <div style={{ marginTop: 12 }}>
-                <Chart data={traj} height={140}
-                  series={[
-                    { key: 'vib', label: 'Vibration (g)', color: '#e0962f' },
-                    { key: 'health', label: 'Health', color: '#18a999' },
-                  ]} />
-              </div>
-            </div>
+function NeedTwin({ onBuild, building }) {
+  return (
+    <div className="panel">
+      <div className="empty" style={{ padding: '60px 20px' }}>
+        <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>No turbine twin yet</div>
+        Build the digital twin first, then run scenarios and agents on it.
+        <div style={{ marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={onBuild} disabled={building}>
+            {building ? <><span className="spinner" />&nbsp; Building…</> : <><Icon n="ti-sparkles" /> Build Turbine Twin</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-            <div className="grid" style={{ gridTemplateColumns: '1fr', alignContent: 'start' }}>
-              <div className="card">
-                <div className="card-h">Predicted Outcome</div>
-                <div className="kpis">
-                  <div className="kpi"><div className="lbl">Time to redline</div>
-                    <div className="val" style={{ color: o?.time_to_redline_min != null ? 'var(--accent-red)' : 'var(--text)' }}>
-                      {o?.time_to_redline_min != null ? `${o.time_to_redline_min} min` : '—'}</div></div>
-                  <div className="kpi"><div className="lbl">Peak EGT</div><div className="val">{fmt(o?.peak_egt)}°C</div></div>
-                  <div className="kpi"><div className="lbl">Peak vibration</div><div className="val">{fmt(o?.peak_vibration)} g</div></div>
-                  <div className="kpi"><div className="lbl">Min oil pressure</div><div className="val">{fmt(o?.min_oil_pressure)} PSI</div></div>
-                  <div className="kpi"><div className="lbl">Min health</div>
-                    <div className="val" style={{ color: o?.min_health < 0.4 ? 'var(--accent-red)' : 'var(--text)' }}>{o?.min_health != null ? `${Math.round(o.min_health * 100)}%` : '—'}</div></div>
-                  <div className="kpi"><div className="lbl">Detections</div><div className="val">{o?.events_predicted ?? 0}</div></div>
+function Dashboard({ ctx }) {
+  const { tenant, machineName, twin, stepLive, building, buildTwin, modelUrl, goBuild } = ctx
+  const live = twin?.latest || {}
+  const h = twin?.health
+  const findings = twin?.findings || []
+  const incidents = twin?.incidents || []
+  const egt = live['aero:exhaustGasTemp']
+  const risk = h == null ? null : Math.round((1 - h) * 100)
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <div>
+          <div className="panel-title">Live Operations</div>
+          <div className="panel-subtitle">{tenant ? `${machineName} · streaming sensor telemetry in real time` : 'Build a turbine twin to start the live stream'}</div>
+        </div>
+        <div className="panel-actions">
+          {tenant && <>
+            <span className="hint" style={{ alignSelf: 'center' }}>Throttle:</span>
+            <button className="btn" onClick={() => stepLive(0.55)}>Idle</button>
+            <button className="btn" onClick={() => stepLive(0.9)}>Cruise</button>
+            <button className="btn btn-primary" onClick={() => stepLive(1.0)}>Full</button>
+          </>}
+        </div>
+      </div>
+
+      {/* 3D hero — live model when generated, else placeholder */}
+      <div className="section-gap">
+        {modelUrl
+          ? <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} />
+          : <div className="hero3d">
+              <div className="v-chip"><Icon n="ti-cube" /> <b>3D Twin</b> · {machineName}</div>
+              <div className="lbl">
+                <div className="big">⬡ 3D Turbine Visualization</div>
+                {tenant ? <>Build the 3D model from a 2D image — <a style={{ color: '#c4b5fd', cursor: 'pointer' }} onClick={goBuild}>open Build a Twin</a>.</>
+                  : 'Build a twin to start the live stream and 3D model.'}
+              </div>
+            </div>}
+      </div>
+
+      {!tenant ? (
+        <div className="empty" style={{ padding: '40px' }}>
+          <button className="btn btn-primary" onClick={buildTwin} disabled={building}>
+            {building ? <><span className="spinner" />&nbsp; Building…</> : <><Icon n="ti-sparkles" /> Build Turbine Twin</>}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid-4 section-gap">
+            <div className="card kpi"><div className="card-label">Twin Health</div>
+              <div className="card-value" style={{ color: h > .7 ? 'var(--accent-green)' : h > .4 ? 'var(--accent-amber)' : 'var(--accent-red)' }}>{pct(h)}</div>
+              <div className="card-change">physics health index</div></div>
+            <div className="card kpi"><div className="card-label">Risk</div>
+              <div className="card-value">{risk == null ? '—' : risk}</div>
+              <div className="card-change">{risk >= 60 ? 'HIGH' : risk >= 30 ? 'ELEVATED' : 'LOW'}</div></div>
+            <div className="card kpi"><div className="card-label">Active Findings</div>
+              <div className="card-value" style={{ color: 'var(--accent-amber)' }}>{findings.length}</div>
+              <div className="card-change">{incidents.length} incident(s)</div></div>
+            <div className="card kpi"><div className="card-label">EGT</div>
+              <div className="card-value" style={{ color: egt >= 780 ? 'var(--accent-red)' : 'var(--text)' }}>{fmt(egt)}<span style={{ fontSize: 14 }}>°C</span></div>
+              <div className="card-change">redline 780 °C</div></div>
+          </div>
+
+          {/* Live telemetry */}
+          <div className="card section-gap">
+            <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
+              <span className="pill pill-green">● streaming</span></div>
+            <div className="sensor-grid">
+              {TILE_ORDER.filter(s => live[s] != null).map(s => (
+                <div key={s} className={`sensor-card ${sevClass(s, live[s])}`}>
+                  <span className="live-indicator" />
+                  <div className="sensor-label">{SIG[s].label}</div>
+                  <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s].unit}</span></div>
                 </div>
-                {o?.blind_spot && (
-                  <div style={{ marginTop: 10, padding: '8px 11px', borderRadius: 8, fontSize: 11.5,
-                    background: 'rgba(226,86,78,.07)', border: '1px solid rgba(226,86,78,.3)', color: 'var(--accent-red)' }}>
-                    ⚠ Blind spot — the EGT reading freezes while the engine truly overheats; only the physics residual catches it.
-                  </div>
-                )}
-              </div>
-
-              <div className="card">
-                <div className="card-h">Predicted Event Timeline</div>
-                {events.length === 0 ? <div className="empty">No detections in this horizon — the engine stays within limits.</div> :
-                  events.map((e, i) => (
-                    <div key={i} className="evt">
-                      <div className="t">{e.t_min}m</div>
-                      <span className={`sev ${e.severity}`}>{e.severity}</span>
-                      <div className="m">{e.message}</div>
-                    </div>
-                  ))}
-              </div>
-
-              {result.analysis && (
-                <div className="card">
-                  <div className="card-h">Agent Analysis & Precautions
-                    <span className="pill" style={{ background: 'rgba(139,109,240,.14)', color: 'var(--accent-purple)' }}>{claudeOn ? 'Claude' : 'rule-based'}</span>
-                  </div>
-                  <div className="analysis">{result.analysis}</div>
-                </div>
-              )}
+              ))}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Findings + incidents */}
+          <div className="grid-2">
+            <div className="card">
+              <div className="card-title"><Icon n="ti-alert-triangle" /> Active Findings
+                <span className="pill pill-surface">{findings.length}</span></div>
+              {findings.length === 0
+                ? <div className="empty">No findings — engine within limits.</div>
+                : <div className="event-list">{findings.slice(0, 6).map((f, i) => (
+                    <div key={i} className="event-item">
+                      <div className={`event-icon ${f.severity === 'critical' ? 'ev-crit' : 'ev-warn'}`}><Icon n="ti-alert-triangle" /></div>
+                      <div className="event-body"><div className="event-title">{f.behaviorId || 'finding'}</div>
+                        <div className="event-meta">{f.message}</div></div>
+                    </div>))}</div>}
+            </div>
+            <div className="card">
+              <div className="card-title"><Icon n="ti-git-merge" /> Incidents
+                <span className="pill pill-surface">{incidents.length}</span></div>
+              {incidents.length === 0
+                ? <div className="empty">No incidents grouped yet.</div>
+                : <div className="event-list">{incidents.map((inc, i) => (
+                    <div key={i} className="event-item" style={{ borderColor: 'rgba(225,29,72,.25)' }}>
+                      <div className="event-icon ev-crit"><Icon n="ti-urgent" /></div>
+                      <div className="event-body"><div className="event-title">{inc.displayName || 'Incident'}</div>
+                        <div className="event-meta">{inc.severity} · {inc.status}</div></div>
+                    </div>))}</div>}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

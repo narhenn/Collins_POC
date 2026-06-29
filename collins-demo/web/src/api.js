@@ -31,6 +31,12 @@ export const api = {
   diagnostics: (tenant) => req(`/twin/${tenant}/diagnostics`),
   runDiagnosis: (body) => req('/agents/diagnosis', { method: 'POST', body: JSON.stringify(body) }),
   runAnalysis: (body) => req('/agents/analysis', { method: 'POST', body: JSON.stringify(body) }),
+
+  // build a twin: conversational agent + Tripo image->3D
+  buildTwinMessage: (body) => req('/build-twin/message', { method: 'POST', body: JSON.stringify(body) }),
+  buildTwinGenerate: (body) => req('/build-twin/generate', { method: 'POST', body: JSON.stringify(body) }),
+  buildTwinStatus: (taskId) => req(`/build-twin/status/${taskId}`),
+  modelUrl: (tenant) => `/api/model/${tenant}.glb`,
 }
 
 export default api

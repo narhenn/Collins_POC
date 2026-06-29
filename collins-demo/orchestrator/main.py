@@ -31,6 +31,15 @@ app.add_middleware(
 app.include_router(router)
 
 
+@app.on_event("startup")
+def _startup():
+    import tripo
+    logging.getLogger("orchestrator").info(
+        "Tripo: %s", "enabled" if config.tripo_enabled else "no key set")
+    if config.tripo_enabled:
+        tripo.log_balance("startup")
+
+
 @app.get("/")
 def root():
     return {"service": "collins-orchestrator",

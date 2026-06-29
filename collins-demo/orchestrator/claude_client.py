@@ -196,6 +196,59 @@ def _scenario_stub(prompt: str) -> ScenarioBrief:
     )
 
 
+# ── Build-a-Twin conversational agent ────────────────────────────────
+
+class TwinBuilderReply(BaseModel):
+    reply: str = Field(description="The agent's conversational reply to the user.")
+    ready: bool = Field(description="True once the user has described the machine "
+                                    "and is ready to generate/build the twin.")
+    machine_name: str = Field(default="", description="A short asset name if known.")
+
+
+def build_twin_reply(history: list[dict], message: str) -> TwinBuilderReply:
+    """Twin Builder agent: converse to gather what to twin, then signal readiness.
+    history is [{role:'user'|'assistant', content:str}]."""
+    user_turns = len([h for h in history if h.get("role") == "user"]) + 1
+
+    def _stub() -> TwinBuilderReply:
+        m = (message or "").strip()
+        if user_turns <= 1:
+            return TwinBuilderReply(reply=(
+                "Hi! I'm the Twin Builder. I turn a real machine into a live digital "
+                "twin. What machine are we twinning — and a few words about it? "
+                "(e.g. 'a GE turbofan engine on our MRO test rig')"), ready=False)
+        if user_turns == 2:
+            return TwinBuilderReply(reply=(
+                f"Got it — “{m}”. Now drop a 2D image of the machine below and I'll "
+                "reconstruct it in 3D, then build the live twin with its sensors."),
+                ready=True, machine_name=(m[:40] or "Turbine Engine"))
+        return TwinBuilderReply(reply=(
+            "Great — upload the image and hit Build. I'll reconstruct the 3D model "
+            "and wire up the live sensors and physics."),
+            ready=True, machine_name=(m[:40] or "Turbine Engine"))
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        msgs = [{"role": h["role"], "content": h["content"]} for h in history[-8:]]
+        msgs.append({"role": "user", "content": message})
+        system = (
+            "You are the Twin Builder agent for an aerospace MRO digital-twin "
+            "platform. Converse warmly and briefly to learn what machine the user "
+            "wants to twin (a gas turbine / jet engine for this demo). Once they've "
+            "named/described it, set ready=true and tell them to upload a 2D IMAGE of "
+            "the machine, then hit Build — you'll reconstruct the 3D model from the "
+            "image and wire up live sensors + physics. Image only (no text prompt). "
+            "Keep replies to 1-3 sentences.")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=400, system=system,
+            messages=msgs, output_format=TwinBuilderReply)
+        return resp.parsed_output or _stub()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("build_twin_reply failed (%s); stub", e)
+        return _stub()
+
+
 # ── Turbine scenario builder (agent authors a runnable what-if) ───────
 
 # The fault catalogue the projection engine understands.
