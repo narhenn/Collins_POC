@@ -183,34 +183,83 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
                 <div className="card">
                   <div className="card-title"><Icon n="ti-alert-triangle" /> Signals projected out of band</div>
                   {(result.atRisk || []).length === 0 ? <div className="empty">All signals stay within limits across this horizon.</div>
-                    : (result.atRisk || []).map((r, i) => (
-                      <div key={i} className="row" style={{ justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 12.5 }}>{r.meta?.label || r.key}</span>
-                        <span className="mono" style={{ fontSize: 12, color: r.sev === 'crit' ? 'var(--accent-red)' : 'var(--accent-amber)' }}>
-                          {fmt(r.value)}{r.meta?.unit ? ' ' + r.meta.unit : ''} · {r.sev === 'crit' ? 'critical' : 'warning'}</span>
-                      </div>))}
+                    : (result.atRisk || []).map((r, i) => {
+                      const isCrit = r.sev === 'crit'
+                      const color = isCrit ? 'var(--accent-red)' : 'var(--accent-amber)'
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0,
+                            boxShadow: `0 0 8px ${color}`, animation: isCrit ? 'pulse 1.5s infinite' : 'none' }} />
+                          <span style={{ fontSize: 12.5, flex: 1 }}>{r.meta?.label || r.key}</span>
+                          <span className="mono" style={{ fontSize: 12, fontWeight: 600, color }}>
+                            {fmt(r.value)}{r.meta?.unit ? ' ' + r.meta.unit : ''}</span>
+                          <span className={`pill ${isCrit ? 'pill-red' : 'pill-amber'}`}>{isCrit ? 'CRITICAL' : 'WARNING'}</span>
+                        </div>
+                      )
+                    })}
                 </div>
               ) : (
                 <>
+                  {/* RUL with visual bars */}
                   <div className="card">
-                    <div className="card-title"><Icon n="ti-clock-bolt" /> Time-to-limit (RUL)</div>
-                    {rul.map((r, i) => (
-                      <div key={i} className="row" style={{ justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 12.5 }}>{r.mode}</span>
-                        <span className="mono" style={{ fontSize: 12, color: r.within_horizon ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                          {r.within_horizon ? `~${Math.round(r.time_to_limit_min)} min` : 'beyond horizon'}</span>
-                      </div>
-                    ))}
+                    <div className="card-title"><Icon n="ti-clock-bolt" /> Time-to-Limit (RUL)</div>
+                    {rul.length === 0 ? <div className="empty">No limit projections available.</div>
+                      : rul.map((r, i) => {
+                        const horizonMin = spec?.horizon_min || 120
+                        const pctVal = r.within_horizon ? Math.min(100, Math.round((r.time_to_limit_min / horizonMin) * 100)) : 100
+                        const color = r.within_horizon ? (pctVal < 30 ? 'var(--accent-red)' : 'var(--accent-amber)') : 'var(--accent-green)'
+                        return (
+                          <div key={i} style={{ marginBottom: 12 }}>
+                            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ fontSize: 12.5 }}>{r.mode}</span>
+                              <span className="mono" style={{ fontSize: 11.5, fontWeight: 600, color }}>
+                                {r.within_horizon ? `~${Math.round(r.time_to_limit_min)} min` : `> ${Math.round(horizonMin)} min`}
+                              </span>
+                            </div>
+                            <div style={{ height: 8, borderRadius: 99, background: 'var(--surface2)', overflow: 'hidden', position: 'relative' }}>
+                              <div style={{ width: pctVal + '%', height: '100%', borderRadius: 99, background: color,
+                                transition: 'width .6s ease', position: 'relative' }}>
+                                {r.within_horizon && <div style={{ position: 'absolute', right: 0, top: -2, width: 3, height: 12,
+                                  background: color, borderRadius: 2, boxShadow: `0 0 6px ${color}` }} />}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
                   </div>
+
+                  {/* Detection timeline — visual vertical flow */}
                   <div className="card">
-                    <div className="card-title"><Icon n="ti-timeline" /> Predicted detection timeline</div>
-                    {events.length === 0 ? <div className="empty">No detections within this horizon.</div>
-                      : events.map((e, i) => (
-                        <div key={i} className="row" style={{ alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-                          <span className="mono" style={{ color: 'var(--hint)', minWidth: 48 }}>t+{Math.round(e.t_min)}m</span>
-                          <span className={`pill ${e.severity === 'critical' ? 'pill-red' : 'pill-amber'}`} style={{ flexShrink: 0 }}>{e.severity}</span>
-                          <span style={{ fontSize: 12 }}>{e.message || e.behavior_id}</span>
-                        </div>))}
+                    <div className="card-title"><Icon n="ti-timeline" /> Detection Timeline</div>
+                    {events.length === 0 ? <div className="empty">No detections predicted within this horizon.</div>
+                      : <div style={{ position: 'relative', paddingLeft: 24 }}>
+                          {/* vertical connector */}
+                          <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6, width: 2,
+                            background: 'linear-gradient(to bottom, var(--accent-amber), var(--accent-red))', borderRadius: 2, opacity: 0.4 }} />
+                          {events.map((e, i) => {
+                            const isCrit = e.severity === 'critical'
+                            const color = isCrit ? 'var(--accent-red)' : 'var(--accent-amber)'
+                            return (
+                              <div key={i} style={{ position: 'relative', paddingBottom: i < events.length - 1 ? 14 : 0 }}>
+                                {/* dot on the timeline */}
+                                <div style={{ position: 'absolute', left: -24, top: 4, width: 18, height: 18, borderRadius: '50%',
+                                  background: color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  boxShadow: `0 0 8px ${color}44`, zIndex: 2 }}>
+                                  <Icon n={isCrit ? 'ti-alert-octagon' : 'ti-alert-triangle'} />
+                                </div>
+                                <div style={{ background: isCrit ? 'rgba(225,29,72,.04)' : 'rgba(217,119,6,.04)',
+                                  border: `1px solid ${isCrit ? 'rgba(225,29,72,.15)' : 'rgba(217,119,6,.15)'}`,
+                                  borderRadius: 10, padding: '10px 12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <span className="mono" style={{ fontSize: 11, fontWeight: 700, color }}>t+{Math.round(e.t_min)}m</span>
+                                    <span className={`pill ${isCrit ? 'pill-red' : 'pill-amber'}`} style={{ fontSize: 9 }}>{e.severity}</span>
+                                  </div>
+                                  <div style={{ fontSize: 12, lineHeight: 1.5 }}>{e.message || e.behavior_id}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>}
                   </div>
                 </>
               )}

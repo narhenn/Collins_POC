@@ -36,6 +36,10 @@ class Config:
     TRIPO_API_KEY: str = os.environ.get("TRIPO_API_KEY", "")
     TRIPO_BASE: str = os.environ.get("TRIPO_BASE", "https://api.tripo3d.ai/v2/openapi")
 
+    # ── RunPod (self-hosted image-to-3D, alternative to Tripo) ──
+    RUNPOD_API_KEY: str = os.environ.get("RUNPOD_API_KEY", "")
+    RUNPOD_ENDPOINT_ID: str = os.environ.get("RUNPOD_ENDPOINT_ID", "")
+
     # ── Server ──
     PORT: int = int(os.environ.get("ORCHESTRATOR_PORT", "8090"))
 
@@ -46,6 +50,19 @@ class Config:
     @property
     def tripo_enabled(self) -> bool:
         return bool(self.TRIPO_API_KEY)
+
+    @property
+    def runpod_enabled(self) -> bool:
+        return bool(self.RUNPOD_API_KEY) and bool(self.RUNPOD_ENDPOINT_ID)
+
+    @property
+    def model_3d_provider(self) -> str:
+        """Which image-to-3D backend to use. RunPod takes priority if configured."""
+        if self.runpod_enabled:
+            return "runpod"
+        if self.tripo_enabled:
+            return "tripo"
+        return "none"
 
 
 config = Config()

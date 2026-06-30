@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import api from './api'
 import { Logo, Icon, SIG, sevClass, fmt, pct, hColor, statusColor,
-  DOMAINS, domainMeta, tilesFor, simTwin } from './lib.jsx'
+  DOMAINS, domainMeta, tilesFor, simTwin,
+  useCountUp, HealthRing, Sparkline } from './lib.jsx'
 import Scenario from './Scenario.jsx'
 import Intelligence, { StepFlow } from './Intelligence.jsx'
 import Prediction from './Prediction.jsx'
@@ -11,6 +12,10 @@ import Scene3D from './Scene3D.jsx'
 import Chat from './Chat.jsx'
 import Markdown from './Markdown.jsx'
 import Maintenance from './Maintenance.jsx'
+import CascadeGraph from './CascadeGraph.jsx'
+import Heatmap from './Heatmap.jsx'
+import CommandPalette from './CommandPalette.jsx'
+import AuditLog from './AuditLog.jsx'
 
 const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
@@ -19,6 +24,7 @@ const NAV = [
   { id: 'scenario', label: 'Scenario & Faults', icon: 'ti-urgent' },
   { id: 'predict', label: 'Prediction', icon: 'ti-chart-histogram' },
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
+  { id: 'audit', label: 'Audit Trail', icon: 'ti-history' },
 ]
 
 export default function App() {
@@ -34,12 +40,26 @@ export default function App() {
   const [err, setErr] = useState(null)
   const [simFault, setSimFault] = useState(null)      // active fault on a simulated twin
   const [maint, setMaint] = useState(false)          // AI Maintenance Director overlay
+  const [cmdPalette, setCmdPalette] = useState(false)
+  const [auditEntries, setAuditEntries] = useState([])
+  const addAudit = (type, summary, detail, agent) => setAuditEntries(prev => [...prev,
+    { id: Date.now() + '-' + Math.random().toString(36).slice(2, 6), timestamp: Date.now(),
+      type, summary, detail: typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2),
+      agent, domain, machine: machine?.name || '' }])
   const pollRef = useRef(null)
   const simPhase = useRef(0)
   const simFaultRef = useRef(null); simFaultRef.current = simFault
   const faultMag = useRef(0)
 
   useEffect(() => { api.health().then(setHealth).catch(() => {}) }, [])
+  // restore theme on mount
+  useEffect(() => { const t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t) }, [])
+  // Cmd+K command palette
+  useEffect(() => {
+    const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdPalette(p => !p) } }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const poll = useCallback(async (tid) => {
     try { setTwin(await api.twinState(tid)) } catch { /* not ready */ }
@@ -126,6 +146,15 @@ export default function App() {
           <span className={`status-dot ${liveHealth == null ? '' : liveHealth > 0.7 ? 'green' : liveHealth > 0.4 ? 'amber' : 'red'}`} />
           Health <b>{liveHealth == null ? '—' : pct(liveHealth)}</b></div>}
         <div className="topstat"><span className="status-dot live" /> LIVE</div>
+        <button className="btn btn-ghost" style={{ padding: '5px 8px', fontSize: 14 }} title="Toggle dark mode"
+          onClick={() => { const t = document.documentElement.getAttribute('data-theme') === 'dark' ? '' : 'dark';
+            document.documentElement.setAttribute('data-theme', t); localStorage.setItem('theme', t) }}>
+          <Icon n={typeof window !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark' ? 'ti-sun' : 'ti-moon'} />
+        </button>
+        <button className="btn btn-ghost" style={{ padding: '5px 8px', fontSize: 14 }} title="Command palette (Cmd+K)"
+          onClick={() => setCmdPalette(true)}>
+          <Icon n="ti-command" />
+        </button>
         <div className="acct"><span className="av">C</span>Collins MRO</div>
       </div>
 
@@ -163,6 +192,7 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'agents' && (source ? <Intelligence tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
+          {route === 'audit' && <AuditLog entries={auditEntries} />}
         </div>
       </div>
 
@@ -170,6 +200,21 @@ export default function App() {
         <Maintenance domain={domain} machineName={machineName} twin={twin}
           claudeOn={claudeOn} onExit={() => setMaint(false)} />
       )}
+
+      {cmdPalette && <CommandPalette onClose={() => setCmdPalette(false)} commands={[
+        { label: 'Twins Library', icon: 'ti-stack-2', group: 'Navigate', action: () => setRoute('twins') },
+        { label: 'Live Dashboard', icon: 'ti-layout-dashboard', group: 'Navigate', action: () => setRoute('dashboard'), shortcut: 'D' },
+        { label: 'Build a Twin', icon: 'ti-sparkles', group: 'Navigate', action: () => setRoute('build') },
+        { label: 'Scenario & Faults', icon: 'ti-urgent', group: 'Navigate', action: () => setRoute('scenario') },
+        { label: 'Prediction', icon: 'ti-chart-histogram', group: 'Navigate', action: () => setRoute('predict') },
+        { label: 'Twin Intelligence', icon: 'ti-robot', group: 'Navigate', action: () => setRoute('agents') },
+        { label: 'Audit Trail', icon: 'ti-history', group: 'Navigate', action: () => setRoute('audit') },
+        { label: 'AI Maintenance Director', icon: 'ti-tool', group: 'Action', action: () => { setMaint(true); setCmdPalette(false) }, hint: 'Cinematic guided repair' },
+        ...Object.keys(DOMAINS).filter(k => DOMAINS[k].library !== false).map(k => ({
+          label: `Open ${DOMAINS[k].label}`, icon: DOMAINS[k].icon || 'ti-cube', group: 'Twin',
+          action: () => { setRoute('twins') }, hint: DOMAINS[k].tag,
+        })),
+      ]} />}
     </div>
   )
 }
@@ -177,12 +222,15 @@ export default function App() {
 function NeedTwin({ onPick }) {
   return (
     <div className="panel">
-      <div className="empty" style={{ padding: '60px 20px' }}>
-        <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>No twin selected</div>
-        Open the Twins library and pick a machine or facility to bring its live dashboard up.
-        <div style={{ marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={onPick}><Icon n="ti-stack-2" /> Open Twins library</button>
-        </div>
+      <div style={{ padding: '60px 30px', textAlign: 'center' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--brand-soft)', margin: '0 auto 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: 'var(--brand)' }}>
+          <Icon n="ti-stack-2" /></div>
+        <div style={{ fontSize: 17, color: 'var(--text)', fontWeight: 700, marginBottom: 8 }}>Select a Digital Twin</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 360, margin: '0 auto 20px', lineHeight: 1.6 }}>
+          Pick a machine or facility from the Twins library to bring its live dashboard, AI agents, and physics engine online.</div>
+        <button className="btn btn-primary" onClick={onPick} style={{ padding: '10px 24px' }}>
+          <Icon n="ti-stack-2" /> Open Twins Library</button>
       </div>
     </div>
   )
@@ -223,21 +271,30 @@ function TwinsLibrary({ building, active, onLive, onSim, goBuild }) {
           const live = d.source === 'live'
           const busy = building === k
           return (
-            <div key={k} className="card twin-card" style={{ position: 'relative', borderColor: active === k ? 'var(--brand)' : undefined }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div className="agent-icon" style={{ color: d.accent }}><Icon n={d.icon} /></div>
+            <div key={k} className="card twin-card" style={{ position: 'relative',
+              borderColor: active === k ? d.accent || 'var(--brand)' : undefined,
+              boxShadow: active === k ? `0 0 0 2px ${d.accent || 'var(--brand)'}22, 0 8px 24px ${d.accent || '#7c3aed'}18` : undefined }}>
+              {/* accent stripe top */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, borderRadius: '16px 16px 0 0',
+                background: `linear-gradient(90deg, ${d.accent || '#7c3aed'}, ${d.accent || '#2563eb'}88)` }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 4 }}>
+                <div className="agent-icon" style={{ background: `${d.accent || '#7c3aed'}18`, color: d.accent || 'var(--brand)' }}>
+                  <Icon n={d.icon} /></div>
                 <div>
-                  <div className="twin-name">{d.label}</div>
-                  <div className="twin-domain">{d.tag}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--display)' }}>{d.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{d.tag}</div>
                 </div>
+                {active === k && <span className="pill pill-green" style={{ marginLeft: 'auto', fontSize: 9 }}>ACTIVE</span>}
               </div>
-              <div className="twin-desc">{d.blurb}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12, minHeight: 44 }}>{d.blurb}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
                 <span className="pill pill-green">● live</span>
                 {d.detailed && <span className="pill pill-blue">full physics</span>}
                 <span className="pill pill-surface">{d.tiles.length} signals</span>
+                {d.assets && <span className="pill pill-surface">{d.assets.length} assets</span>}
               </div>
-              <button className="btn btn-primary" style={{ width: '100%' }}
+              <button className="btn btn-primary" style={{ width: '100%', background: d.accent || undefined,
+                borderColor: 'transparent', boxShadow: `0 4px 14px ${d.accent || '#7c3aed'}33` }}
                 disabled={!!building}
                 onClick={() => live ? onLive(k, d.label) : onSim(k)}>
                 {busy ? <><span className="spinner" /> Opening twin…</>
@@ -319,6 +376,23 @@ function Dashboard({ ctx }) {
   const headlineSig = tiles[0]
   const headline = SIG[headlineSig]
   const risk = h == null ? null : Math.round((1 - h) * 100)
+
+  // animated count-up for KPI values
+  const animRisk = useCountUp(risk ?? 0)
+  const animFindings = useCountUp(findings.length)
+
+  // sensor history buffer for sparklines (last 30 readings per signal)
+  const historyRef = useRef({})
+  useEffect(() => {
+    if (!live || Object.keys(live).length === 0) return
+    const hist = historyRef.current
+    for (const [k, v] of Object.entries(live)) {
+      if (v == null) continue
+      if (!hist[k]) hist[k] = []
+      hist[k].push(v)
+      if (hist[k].length > 30) hist[k].shift()
+    }
+  }, [live])
 
   // ── AI co-pilot (every twin, grounded in its own live telemetry) ──
   const twinRef = useRef(twin); twinRef.current = twin
@@ -423,13 +497,17 @@ function Dashboard({ ctx }) {
       {/* KPIs — the dashboard summary, on top */}
       <div className="grid-4 section-gap">
         <div className="card kpi"><div className="card-label">Twin Health</div>
-          <div className="card-value" style={{ color: hColor(h) }}>{pct(h)}</div>
-          <div className="card-change">physics health index</div></div>
-        <div className="card kpi"><div className="card-label">Risk</div>
-          <div className="card-value">{risk == null ? '—' : risk}</div>
-          <div className="card-change">{risk >= 60 ? 'HIGH' : risk >= 30 ? 'ELEVATED' : 'LOW'}</div></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <HealthRing value={h} size={56} stroke={5} />
+            <div><div className="card-value" style={{ color: hColor(h), fontSize: 22 }}>{pct(h)}</div>
+              <div className="card-change">physics index</div></div>
+          </div></div>
+        <div className="card kpi"><div className="card-label">Risk Score</div>
+          <div className="card-value">{risk == null ? '—' : Math.round(animRisk)}</div>
+          <div className="card-change" style={{ color: risk >= 60 ? 'var(--accent-red)' : risk >= 30 ? 'var(--accent-amber)' : 'var(--accent-green)', fontWeight: 600 }}>
+            {risk >= 60 ? 'HIGH' : risk >= 30 ? 'ELEVATED' : 'LOW'}</div></div>
         <div className="card kpi"><div className="card-label">Active Findings</div>
-          <div className="card-value" style={{ color: 'var(--accent-amber)' }}>{findings.length}</div>
+          <div className="card-value" style={{ color: findings.length > 0 ? 'var(--accent-red)' : 'var(--accent-amber)' }}>{Math.round(animFindings)}</div>
           <div className="card-change">{incidents.length} incident(s)</div></div>
         {headline && <div className="card kpi"><div className="card-label">{headline.label}</div>
           <div className="card-value" style={{ color: sevClass(headlineSig, live[headlineSig]) === 'crit' ? 'var(--accent-red)' : 'var(--text)' }}>
@@ -499,15 +577,28 @@ function Dashboard({ ctx }) {
         <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
           <span className="pill pill-green">● streaming</span></div>
         <div className="sensor-grid">
-          {tiles.filter(s => live[s] != null).map(s => (
-            <div key={s} className={`sensor-card ${sevClass(s, live[s])}`}>
-              <span className="live-indicator" />
-              <div className="sensor-label">{SIG[s]?.label || s}</div>
-              <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s]?.unit}</span></div>
-            </div>
-          ))}
+          {tiles.filter(s => live[s] != null).map(s => {
+            const sev = sevClass(s, live[s])
+            const sparkColor = sev === 'crit' ? '#e11d48' : sev === 'warn' ? '#d97706' : '#7c3aed'
+            return (
+              <div key={s} className={`sensor-card ${sev}`} style={{ position: 'relative' }}>
+                <span className="live-indicator" />
+                <div className="sensor-label">{SIG[s]?.label || s}</div>
+                <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s]?.unit}</span></div>
+                <Sparkline data={historyRef.current[s]} color={sparkColor} />
+              </div>
+            )
+          })}
         </div>
       </div>
+
+      {/* Signal anomaly heatmap */}
+      {source && Object.keys(live).length > 0 && (
+        <div className="card section-gap">
+          <div className="card-title"><Icon n="ti-grid-dots" /> Signal Heatmap <span className="pill pill-surface">last 60s</span></div>
+          <Heatmap signals={tiles.filter(s => live[s] != null)} live={live} />
+        </div>
+      )}
 
       {/* Findings + incidents */}
       <div className="grid-2">
@@ -517,7 +608,7 @@ function Dashboard({ ctx }) {
           {findings.length === 0
             ? <div className="empty">No findings — within limits.</div>
             : <div className="event-list">{findings.slice(0, 6).map((f, i) => (
-                <div key={i} className="event-item">
+                <div key={i} className="event-item" style={{ '--i': i }}>
                   <div className={`event-icon ${f.severity === 'critical' ? 'ev-crit' : 'ev-warn'}`}><Icon n="ti-alert-triangle" /></div>
                   <div className="event-body"><div className="event-title">{f.displayName || f.behaviorId || 'finding'}</div>
                     <div className="event-meta">{f.message}</div></div>
@@ -529,7 +620,7 @@ function Dashboard({ ctx }) {
           {incidents.length === 0
             ? <div className="empty">No incidents grouped yet.</div>
             : <div className="event-list">{incidents.map((inc, i) => (
-                <div key={i} className="event-item" style={{ borderColor: 'rgba(225,29,72,.25)' }}>
+                <div key={i} className="event-item" style={{ borderColor: 'rgba(225,29,72,.25)', '--i': i }}>
                   <div className="event-icon ev-crit"><Icon n="ti-urgent" /></div>
                   <div className="event-body"><div className="event-title">{inc.displayName || 'Incident'}</div>
                     <div className="event-meta">{inc.severity || 'critical'}{inc.status ? ' · ' + inc.status : ''}</div></div>
@@ -623,11 +714,7 @@ function Dashboard({ ctx }) {
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: 13, lineHeight: 1.8,
-                borderLeft: '3px solid var(--brand-2)', padding: '14px 16px',
-                background: 'var(--brand-softer)', borderRadius: '0 12px 12px 0' }}>
-                <Markdown text={cascade} />
-              </div>
+              <CascadeGraph text={cascade} findings={findings} />
               <button className="btn" onClick={runCascade} disabled={cascadeLoading} style={{ marginTop: 12 }}>
                 {cascadeLoading ? <><span className="spinner" /> Analyzing…</> : <><Icon n="ti-refresh" /> Re-run</>}
               </button>

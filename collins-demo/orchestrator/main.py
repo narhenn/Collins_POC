@@ -57,10 +57,15 @@ app.include_router(router)
 @app.on_event("startup")
 def _startup():
     import tripo
-    logging.getLogger("orchestrator").info(
-        "Tripo: %s", "enabled" if config.tripo_enabled else "no key set")
-    if config.tripo_enabled:
+    import runpod_3d
+    log = logging.getLogger("orchestrator")
+    provider = config.model_3d_provider
+    log.info("3D provider: %s (tripo=%s, runpod=%s)",
+             provider, config.tripo_enabled, config.runpod_enabled)
+    if provider == "tripo":
         tripo.log_balance("startup")
+    elif provider == "runpod":
+        runpod_3d.log_balance("startup")
 
 
 @app.get("/")

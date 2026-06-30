@@ -15,6 +15,7 @@ import goalcert
 import automind
 import scenarios
 import tripo
+import runpod_3d
 from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
     diagnosis_agent, analysis_agent, build_twin_reply,
@@ -52,39 +53,59 @@ def build_twin_message(req: TwinChatRequest):
 
 class TwinGenerateRequest(BaseModel):
     machine: str = "Turbine Engine"
-    image_b64: str | None = None      # required — image-to-3D only
+    domain: str = "turbine-engine"     # which twin type to create
+    image_b64: str | None = None       # required — image-to-3D only
     filename: str = "machine.png"
+    quality: str = "fast"              # "fast" (256) or "high" (512)
 
 
 @router.post("/build-twin/generate")
 def build_twin_generate(req: TwinGenerateRequest):
-    """Build the live turbine twin now, and kick off the Tripo image->3D job.
-    Returns immediately with the tenant + a Tripo task_id to poll."""
-    built = nextxr.build_turbine(req.machine)
+    """Build a live twin of any domain, and kick off image->3D generation.
+    Uses RunPod if configured, otherwise falls back to Tripo."""
+    # Create a domain-aware twin (not just turbine)
+    if req.domain == "turbine-engine":
+        built = nextxr.build_turbine(req.machine)
+    else:
+        built = nextxr.build_domain(req.machine, req.domain)
     tenant = built.get("tenant")
-    # start the live twin streaming
     try:
         nextxr.simulate_step(tenant, throttle=0.9)
     except Exception:  # noqa: BLE001
         pass
 
-    task_id, tripo_status = None, "disabled"
-    if config.tripo_enabled and req.image_b64:
+    task_id = None
+    provider = config.model_3d_provider  # "runpod", "tripo", or "none"
+    gen_status = "disabled"
+    mc_res = 512 if req.quality == "high" else 256
+
+    if provider == "runpod" and req.image_b64:
+        image_bytes = runpod_3d.b64_to_bytes(req.image_b64)
+        task_id, err = runpod_3d.start_image_task(
+            image_bytes, req.filename,
+            mc_resolution=mc_res, foreground_ratio=0.85)
+        if task_id:
+            runpod_3d.register_job(task_id, tenant)
+            gen_status = "running"
+        else:
+            gen_status = f"error: {err or 'unknown'}"
+    elif provider == "tripo" and req.image_b64:
         tripo.log_balance("before generation")
         task_id, terr = tripo.start_image_task(tripo.b64_to_bytes(req.image_b64), req.filename)
         if task_id:
             tripo.register_job(task_id, tenant)
-            tripo_status = "running"
+            gen_status = "running"
         else:
-            tripo_status = f"error: {terr or 'unknown'}"
-    elif not config.tripo_enabled:
-        tripo_status = "no_key"
+            gen_status = f"error: {terr or 'unknown'}"
+    elif provider == "none":
+        gen_status = "no_key"
     elif not req.image_b64:
-        tripo_status = "no_image"
+        gen_status = "no_image"
 
     return {"tenant": tenant, "machine": built.get("machine"),
-            "assets": built.get("assets", []),
-            "task_id": task_id, "tripo": tripo_status}
+            "domain": req.domain, "assets": built.get("assets", []),
+            "task_id": task_id, "tripo": gen_status,
+            "provider": provider, "quality": req.quality}
 
 
 @router.get("/tripo/balance")
@@ -95,6 +116,10 @@ def tripo_balance():
 
 @router.get("/build-twin/status/{task_id}")
 def build_twin_status(task_id: str):
+    """Poll generation job status — checks both RunPod and Tripo registries."""
+    rp = runpod_3d.job_status(task_id)
+    if rp.get("status") != "unknown":
+        return rp
     return tripo.job_status(task_id)
 
 
@@ -686,3 +711,30 @@ def incident_report(req: AgentRunRequest):
     findings = diag.get("findings", [])
     report = generate_incident_report(diag, findings, req.machine)
     return {"report": report.model_dump()}
+
+
+# ── GoalCert training simulation ────────────────────────────────────
+
+class GoalCertRunRequest(BaseModel):
+    machine: str = "Machine"
+    scenario_name: str = ""
+    fault_summary: str = ""
+    severity: str = "Medium"
+    steps: list[str] = []
+
+@router.post("/agents/goalcert/run")
+def goalcert_run(req: GoalCertRunRequest):
+    """Run a training scenario on the GoalCert simulation engine.
+    Takes a scenario brief (from Claude authoring or manual input), creates
+    the scenario on GoalCert, runs it, and returns the scored result."""
+    from claude_client import ScenarioBrief
+    brief = ScenarioBrief(
+        name=req.scenario_name or "Maintenance Training",
+        fault_summary=req.fault_summary or "Equipment fault requiring technician response",
+        primary_signal="",
+        severity=req.severity,
+        steps=req.steps if req.steps else ["Diagnose the fault", "Apply corrective action", "Verify restoration"],
+        expected_behavior="System returns to nominal operating parameters",
+    )
+    result = goalcert.create_and_run(brief, req.machine)
+    return result

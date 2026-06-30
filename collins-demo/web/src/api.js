@@ -60,7 +60,10 @@ export const api = {
   procurement: (body) => req('/agents/procurement', { method: 'POST', body: JSON.stringify(body) }),
   incidentReport: (body) => req('/agents/incident-report', { method: 'POST', body: JSON.stringify(body) }),
 
-  // build a twin: conversational agent + Tripo image->3D
+  // GoalCert training simulation
+  goalcertRun: (body) => req('/agents/goalcert/run', { method: 'POST', body: JSON.stringify(body) }),
+
+  // build a twin: conversational agent + Tripo/RunPod image->3D
   buildTwinMessage: (body) => req('/build-twin/message', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinGenerate: (body) => req('/build-twin/generate', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinStatus: (taskId) => req(`/build-twin/status/${taskId}`),

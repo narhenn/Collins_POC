@@ -13,31 +13,117 @@ import './Maintenance.css'
 
 const I = ({ n }) => <i className={`ti ${n}`} />
 
-// ── map a signal → the EDM subsystem (3-D asset) that owns it ─────────
-const SUB_META = {
-  'EDM-1':   { label: 'Wire EDM Machine',    icon: 'ti-grill' },
-  'GEN-1':   { label: 'Discharge Generator', icon: 'ti-bolt' },
-  'DIE-1':   { label: 'Dielectric & Flushing', icon: 'ti-droplet' },
-  'WIRE-1':  { label: 'Wire Transport',      icon: 'ti-line-dashed' },
-  'GUIDE-1': { label: 'Guides & Axes',       icon: 'ti-square' },
+// ── per-domain subsystem metadata ─────────────────────────────────────
+const DOMAIN_SUBS = {
+  'edm-machine': {
+    meta: {
+      'EDM-1':   { label: 'Wire EDM Machine',    icon: 'ti-grill' },
+      'GEN-1':   { label: 'Discharge Generator', icon: 'ti-bolt' },
+      'DIE-1':   { label: 'Dielectric & Flushing', icon: 'ti-droplet' },
+      'WIRE-1':  { label: 'Wire Transport',      icon: 'ti-line-dashed' },
+      'GUIDE-1': { label: 'Guides & Axes',       icon: 'ti-square' },
+    },
+    order: ['GEN-1', 'DIE-1', 'WIRE-1', 'GUIDE-1'],
+    signalMap(sig) {
+      if (/dielectric|Flow|Pressure/i.test(sig)) return 'DIE-1'
+      if (/wireBreak|wireTension|wireFeed/i.test(sig)) return 'WIRE-1'
+      if (/short|gapVoltage|peakCurrent|Energy|pulse|spark(?!Gap)/i.test(sig)) return 'GEN-1'
+      if (/wireWear|surfaceRough|sparkGap/i.test(sig)) return 'GUIDE-1'
+      return 'EDM-1'
+    },
+    degraded: {
+      'edm:dielectricTemperature': 33, 'edm:dielectricConductivity': 24, 'edm:dielectricFlow': 2.4,
+      'edm:dielectricPressure': 2.6, 'edm:shortCircuitRate': 22, 'edm:cuttingSpeed': 96,
+      'edm:gapVoltage': 23, 'edm:peakCurrent': 27, 'edm:wireBreakRisk': 76, 'edm:wireTension': 5.4,
+      'edm:wireFeedRate': 5, 'edm:wireWear': 88, 'edm:surfaceRoughnessRa': 3.4,
+    },
+  },
+  'turbine-engine': {
+    meta: {
+      'TURBINE':    { label: 'Gas Turbine Engine',  icon: 'ti-engine' },
+      'COMPRESSOR': { label: 'Compressor Module',   icon: 'ti-rotate-clockwise' },
+      'COMBUSTOR':  { label: 'Combustor Module',    icon: 'ti-flame' },
+      'BEARING':    { label: 'Bearing & Lube',      icon: 'ti-settings' },
+    },
+    order: ['COMPRESSOR', 'COMBUSTOR', 'BEARING'],
+    signalMap(sig) {
+      if (/compressor|N1/i.test(sig)) return 'COMPRESSOR'
+      if (/fuel|EGT|combustor/i.test(sig)) return 'COMBUSTOR'
+      if (/oil|vibration|bearing/i.test(sig)) return 'BEARING'
+      return 'TURBINE'
+    },
+    degraded: {
+      'aero:exhaustGasTemp': 760, 'aero:shaftSpeedN1': 5460, 'aero:vibrationG': 1.8,
+      'aero:oilTemperature': 82, 'aero:oilPressure': 42, 'aero:fuelFlow': 0.48,
+    },
+  },
+  'datacenter': {
+    meta: {
+      'RACK-B2': { label: 'Server Rack B2',  icon: 'ti-server' },
+      'CRAC-1':  { label: 'CRAC Cooling',    icon: 'ti-snowflake' },
+      'UPS-1':   { label: 'UPS Power',       icon: 'ti-battery-charging' },
+    },
+    order: ['RACK-B2', 'CRAC-1', 'UPS-1'],
+    signalMap(sig) {
+      if (/rack|inlet|Load/i.test(sig)) return 'RACK-B2'
+      if (/cooling|COP/i.test(sig)) return 'CRAC-1'
+      if (/ups|Charge|pue/i.test(sig)) return 'UPS-1'
+      return 'RACK-B2'
+    },
+    degraded: {
+      'dc:rackLoad': 96, 'dc:inletTemp': 33, 'dc:coolingCOP': 2.4,
+      'dc:upsCharge': 38, 'dc:pue': 1.92,
+    },
+  },
+  'hospital': {
+    meta: {
+      'OR-LAF':  { label: 'OR Laminar Flow', icon: 'ti-wind' },
+      'OR-GAS':  { label: 'Medical Gas',     icon: 'ti-vaccine' },
+      'PHARM':   { label: 'Pharmacy Fridge',  icon: 'ti-temperature-snow' },
+      'ED-HVAC': { label: 'ED HVAC',         icon: 'ti-air-conditioning' },
+    },
+    order: ['OR-LAF', 'OR-GAS', 'PHARM', 'ED-HVAC'],
+    signalMap(sig) {
+      if (/orPressure|airChanges|laminar/i.test(sig)) return 'OR-LAF'
+      if (/o2|medgas/i.test(sig)) return 'OR-GAS'
+      if (/fridge|coldchain/i.test(sig)) return 'PHARM'
+      if (/nurseCalls|hvac/i.test(sig)) return 'ED-HVAC'
+      return 'OR-LAF'
+    },
+    degraded: {
+      'hosp:orPressure': 4, 'hosp:airChanges': 8, 'hosp:fridgeTemp': 9.2,
+      'hosp:o2Pressure': 3.1, 'hosp:nurseCalls': 11,
+    },
+  },
+  'manufacturing': {
+    meta: {
+      'CNC-7':   { label: 'CNC Machine 7',  icon: 'ti-settings' },
+      'ROBOT-3': { label: 'Robot Arm 3',     icon: 'ti-robot' },
+      'CONV-A':  { label: 'Conveyor A',      icon: 'ti-arrows-right' },
+      'COMP-1':  { label: 'Compressor',      icon: 'ti-engine' },
+    },
+    order: ['CNC-7', 'ROBOT-3', 'CONV-A', 'COMP-1'],
+    signalMap(sig) {
+      if (/spindle|Vib/i.test(sig)) return 'CNC-7'
+      if (/motor|robot/i.test(sig)) return 'ROBOT-3'
+      if (/throughput|conveyor/i.test(sig)) return 'CONV-A'
+      if (/oee|compressor|cycleTime/i.test(sig)) return 'COMP-1'
+      return 'CNC-7'
+    },
+    degraded: {
+      'mfg:spindleVib': 7.5, 'mfg:motorTemp': 88, 'mfg:oee': 55,
+      'mfg:throughput': 62, 'mfg:cycleTime': 58,
+    },
+  },
 }
-const SUB_ORDER = ['GEN-1', 'DIE-1', 'WIRE-1', 'GUIDE-1']
 
-function subForSignal(sig = '') {
-  if (/dielectric|Flow|Pressure/i.test(sig)) return 'DIE-1'
-  if (/wireBreak|wireTension|wireFeed/i.test(sig)) return 'WIRE-1'
-  if (/short|gapVoltage|peakCurrent|Energy|pulse|spark(?!Gap)/i.test(sig)) return 'GEN-1'
-  if (/wireWear|surfaceRough|sparkGap/i.test(sig)) return 'GUIDE-1'
-  return 'EDM-1'
+// backward compat: legacy code references these flat objects
+const SUB_META = DOMAIN_SUBS['edm-machine'].meta
+const SUB_ORDER = DOMAIN_SUBS['edm-machine'].order
+function subForSignal(sig = '', domain = 'edm-machine') {
+  return (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).signalMap(sig)
 }
-
-// Degraded fallbacks so the telemetry has a dramatic "before" even offline.
-const DEGRADED = {
-  'edm:dielectricTemperature': 33, 'edm:dielectricConductivity': 24, 'edm:dielectricFlow': 2.4,
-  'edm:dielectricPressure': 2.6, 'edm:shortCircuitRate': 22, 'edm:cuttingSpeed': 96,
-  'edm:gapVoltage': 23, 'edm:peakCurrent': 27, 'edm:wireBreakRisk': 76, 'edm:wireTension': 5.4,
-  'edm:wireFeedRate': 5, 'edm:wireWear': 88, 'edm:surfaceRoughnessRa': 3.4,
-}
+const DEGRADED = DOMAIN_SUBS['edm-machine'].degraded
 
 // Per-subsystem repair plans (root cause + telemetry targets + ordered steps).
 const PLANS = {
@@ -126,6 +212,205 @@ const PLANS = {
   },
 }
 
+// ── Turbine-specific repair plans ──
+const TURBINE_PLANS = {
+  'COMBUSTOR': {
+    title: 'Hot-Section Degradation — EGT Exceedance',
+    rootCause: [
+      { icon: 'ti-flame', text: '<b>EGT deviation above baseline</b> — hot-section efficiency loss' },
+      { icon: 'ti-blade', text: '<b>Blade erosion or nozzle coking</b> — reduced turbine area' },
+      { icon: 'ti-trending-up', text: '<b>Fuel flow compensates</b> — accelerates degradation' },
+      { icon: 'ti-alert-octagon', text: '<b>EGT redline risk</b> if unchecked' },
+      { icon: 'ti-player-stop', text: '<b>In-flight shutdown / AOG</b>' },
+    ],
+    signals: [['aero:exhaustGasTemp', 640], ['aero:fuelFlow', 0.35], ['aero:shaftSpeedN1', 5200]],
+    steps: [
+      { t: 'Review EGT trend data', d: 'Analyse the EGT deviation pattern over last 50 cycles.', f: 'COMBUSTOR', tool: 'ECAM / recorder', time: 15, diff: 'Low' },
+      { t: 'Apply LOTO to test rig', d: 'Isolate fuel, ignition, and starter before access.', f: 'TURBINE', tool: 'LOTO kit', time: 30, diff: 'Low', safety: true },
+      { t: 'Borescope hot section', d: 'Inspect HP turbine blades and nozzle guide vanes per CMM 72-00-00.', f: 'COMBUSTOR', tool: 'Borescope', time: 45, diff: 'Medium' },
+      { t: 'Chemical clean combustor nozzles', d: 'Remove carbon deposits from fuel nozzles; verify spray pattern.', f: 'COMBUSTOR', tool: 'Nozzle cleaning kit', time: 60, diff: 'Medium' },
+      { t: 'Replace eroded blades (if needed)', d: 'Swap HP blade set if tip loss exceeds 0.5mm limit.', f: 'COMBUSTOR', tool: 'Blade set · torque wrench', time: 120, diff: 'High' },
+      { t: 'Ground run & EGT verification', d: 'Run engine at 85% N1 for 10 min; confirm EGT within ±15C of baseline.', f: 'TURBINE', tool: 'Test cell', time: 90, diff: 'Medium' },
+      { t: 'Sign off & return to service', d: 'Level II inspector sign-off per EASA Part 145.', f: 'TURBINE', tool: '—', time: 20, diff: 'Low' },
+    ],
+  },
+  'BEARING': {
+    title: 'Bearing & Lubrication — Vibration / Oil Anomaly',
+    rootCause: [
+      { icon: 'ti-activity', text: '<b>Vibration elevated</b> — bearing surface degradation' },
+      { icon: 'ti-droplet', text: '<b>Oil temperature / pressure drift</b> — lubrication inadequate' },
+      { icon: 'ti-rotate-clockwise', text: '<b>Shaft alignment shifts</b> — secondary imbalance' },
+      { icon: 'ti-alert-triangle', text: '<b>Bearing seizure risk</b>' },
+      { icon: 'ti-player-stop', text: '<b>Catastrophic failure</b> if untreated' },
+    ],
+    signals: [['aero:vibrationG', 0.8], ['aero:oilTemperature', 65], ['aero:oilPressure', 55]],
+    steps: [
+      { t: 'Analyse vibration spectrum', d: 'FFT the vibration data to identify bearing defect frequencies.', f: 'BEARING', tool: 'Spectrum analyser', time: 20, diff: 'Medium' },
+      { t: 'Lockout & drain oil', d: 'LOTO the rig and drain the oil system.', f: 'TURBINE', tool: 'LOTO kit · drain pan', time: 40, diff: 'Low', safety: true },
+      { t: 'Inspect bearing race', d: 'Remove and inspect the main shaft bearings for spalling.', f: 'BEARING', tool: 'Puller · loupe', time: 60, diff: 'High' },
+      { t: 'Replace bearing & seals', d: 'Fit new bearing set and oil seals per CMM spec.', f: 'BEARING', tool: 'Bearing kit · press', time: 90, diff: 'High' },
+      { t: 'Refill oil & prime', d: 'Refill oil system, prime the pump, verify pressure.', f: 'BEARING', tool: 'Oil · gauge', time: 40, diff: 'Low' },
+      { t: 'Vibration acceptance run', d: 'Confirm vibration below 1.0g at stabilised N1.', f: 'TURBINE', tool: 'Test cell', time: 60, diff: 'Medium' },
+      { t: 'Sign off', d: 'Inspector sign-off; update maintenance log.', f: 'TURBINE', tool: '—', time: 15, diff: 'Low' },
+    ],
+  },
+  'COMPRESSOR': {
+    title: 'Compressor Fouling — Performance Loss',
+    rootCause: [
+      { icon: 'ti-rotate-clockwise', text: '<b>N1 droop at constant throttle</b> — airflow restricted' },
+      { icon: 'ti-flame', text: '<b>EGT rises to compensate</b> — fuel controller adds fuel' },
+      { icon: 'ti-trending-down', text: '<b>EPR margin shrinks</b> — reduced thrust available' },
+      { icon: 'ti-alert-triangle', text: '<b>Compressor surge risk</b> at high power' },
+      { icon: 'ti-player-stop', text: '<b>Engine rollback / flameout</b>' },
+    ],
+    signals: [['aero:shaftSpeedN1', 5200], ['aero:exhaustGasTemp', 640], ['aero:enginePressureRatio', 1.35]],
+    steps: [
+      { t: 'Diagnose compressor health', d: 'Compare N1/EPR trend against baseline.', f: 'COMPRESSOR', tool: 'Trend data', time: 15, diff: 'Low' },
+      { t: 'Lockout test rig', d: 'Isolate fuel, starter, and electrical before wash.', f: 'TURBINE', tool: 'LOTO kit', time: 30, diff: 'Low', safety: true },
+      { t: 'Compressor water wash', d: 'Run desalination wash cycle per AMM procedure.', f: 'COMPRESSOR', tool: 'Wash rig · fluid', time: 45, diff: 'Medium' },
+      { t: 'Borescope compressor stages', d: 'Check blade leading edges for FOD and erosion.', f: 'COMPRESSOR', tool: 'Borescope', time: 40, diff: 'Medium' },
+      { t: 'Blend minor blade damage', d: 'Dress small nicks per blend limits in CMM.', f: 'COMPRESSOR', tool: 'Blend tools', time: 50, diff: 'High' },
+      { t: 'Post-wash performance run', d: 'Verify N1/EPR recovery and EGT margin restored.', f: 'TURBINE', tool: 'Test cell', time: 60, diff: 'Medium' },
+      { t: 'Sign off', d: 'Inspector approval; log wash cycle count.', f: 'TURBINE', tool: '—', time: 15, diff: 'Low' },
+    ],
+  },
+}
+
+// ── Datacenter repair plans ──
+const DATACENTER_PLANS = {
+  'CRAC-1': {
+    title: 'CRAC Cooling Failure — Thermal Runaway Risk',
+    rootCause: [
+      { icon: 'ti-snowflake', text: '<b>CRAC supply temp rising</b> — compressor or fan failure' },
+      { icon: 'ti-temperature', text: '<b>Inlet temps climb</b> across server racks' },
+      { icon: 'ti-server', text: '<b>Thermal throttling begins</b> — compute capacity drops' },
+      { icon: 'ti-alert-octagon', text: '<b>Thermal shutdown risk</b> on dense racks' },
+      { icon: 'ti-player-stop', text: '<b>Service outage</b>' },
+    ],
+    signals: [['dc:inletTemp', 22], ['dc:coolingCOP', 3.8], ['dc:pue', 1.4]],
+    steps: [
+      { t: 'Confirm CRAC fault', d: 'Check CRAC display for fault codes; read supply/return delta.', f: 'CRAC-1', tool: 'BMS', time: 10, diff: 'Low' },
+      { t: 'Isolate CRAC electrically', d: 'Lock out CRAC breaker; verify zero energy.', f: 'CRAC-1', tool: 'LOTO kit', time: 20, diff: 'Low', safety: true },
+      { t: 'Inspect filters & coils', d: 'Check air filters for clogging; inspect evaporator coil.', f: 'CRAC-1', tool: 'Inspection', time: 30, diff: 'Low' },
+      { t: 'Replace filters / clean coils', d: 'Swap clogged filters; chemical clean the coil if fouled.', f: 'CRAC-1', tool: 'Filter set · coil cleaner', time: 45, diff: 'Medium' },
+      { t: 'Check refrigerant charge', d: 'Verify suction/discharge pressure and superheat.', f: 'CRAC-1', tool: 'Manifold gauge', time: 30, diff: 'Medium' },
+      { t: 'Restart & verify cooling', d: 'Power on CRAC; confirm supply temp and COP recover.', f: 'CRAC-1', tool: 'BMS', time: 40, diff: 'Low' },
+      { t: 'Monitor & sign off', d: 'Watch rack inlet temps return to target over 15 min.', f: 'RACK-B2', tool: '—', time: 30, diff: 'Low' },
+    ],
+  },
+  'UPS-1': {
+    title: 'UPS Battery Depletion — Power Continuity Risk',
+    rootCause: [
+      { icon: 'ti-battery-charging', text: '<b>UPS charge below threshold</b> — battery degradation' },
+      { icon: 'ti-bolt', text: '<b>Runtime insufficient</b> for generator switchover' },
+      { icon: 'ti-plug-connected-x', text: '<b>Load transfer risk</b> during power event' },
+      { icon: 'ti-alert-triangle', text: '<b>Data loss risk</b> on hard shutdown' },
+      { icon: 'ti-player-stop', text: '<b>Full hall outage</b>' },
+    ],
+    signals: [['dc:upsCharge', 96], ['dc:pue', 1.4]],
+    steps: [
+      { t: 'Read UPS battery status', d: 'Check individual cell voltages and impedance.', f: 'UPS-1', tool: 'Battery analyser', time: 20, diff: 'Low' },
+      { t: 'Transfer load to bypass', d: 'Switch UPS to static bypass; verify load on mains.', f: 'UPS-1', tool: 'UPS panel', time: 15, diff: 'Medium', safety: true },
+      { t: 'Replace weak battery strings', d: 'Swap degraded strings; verify polarity and torque.', f: 'UPS-1', tool: 'Battery set · torque wrench', time: 90, diff: 'High' },
+      { t: 'Equalise charge', d: 'Run equalisation charge cycle per manufacturer spec.', f: 'UPS-1', tool: 'UPS controller', time: 60, diff: 'Low' },
+      { t: 'Load bank test', d: 'Run at rated load for 10 min; verify runtime target.', f: 'UPS-1', tool: 'Load bank', time: 45, diff: 'Medium' },
+      { t: 'Return to online mode', d: 'Transfer load back to UPS from bypass.', f: 'UPS-1', tool: 'UPS panel', time: 10, diff: 'Low' },
+      { t: 'Sign off', d: 'Update battery replacement log and PM schedule.', f: 'UPS-1', tool: '—', time: 10, diff: 'Low' },
+    ],
+  },
+}
+
+// ── Hospital repair plans ──
+const HOSPITAL_PLANS = {
+  'OR-LAF': {
+    title: 'OR Laminar Flow Loss — Surgical Infection Risk',
+    rootCause: [
+      { icon: 'ti-wind', text: '<b>Laminar flow velocity dropped</b> — fan or filter failure' },
+      { icon: 'ti-temperature', text: '<b>OR pressure differential lost</b> — contamination path opens' },
+      { icon: 'ti-virus', text: '<b>Particulate count rises</b> — sterile field compromised' },
+      { icon: 'ti-alert-octagon', text: '<b>Surgical site infection risk</b>' },
+      { icon: 'ti-player-stop', text: '<b>OR must close</b> until restored' },
+    ],
+    signals: [['hosp:orPressure', 12], ['hosp:airChanges', 16]],
+    steps: [
+      { t: 'Confirm pressure/velocity loss', d: 'Read OR differential pressure and air velocity at the diffuser.', f: 'OR-LAF', tool: 'Manometer · anemometer', time: 10, diff: 'Low' },
+      { t: 'Close OR to procedures', d: 'Notify charge nurse; divert scheduled cases.', f: 'OR-LAF', tool: 'Protocol', time: 5, diff: 'Low', safety: true },
+      { t: 'Inspect HEPA filters', d: 'Check filter DP; visually inspect for damage or bypass.', f: 'OR-LAF', tool: 'Inspection', time: 25, diff: 'Low' },
+      { t: 'Replace HEPA bank', d: 'Swap the terminal HEPA filter bank; gel-seal test.', f: 'OR-LAF', tool: 'HEPA filter · gel frame', time: 60, diff: 'High' },
+      { t: 'Check fan belt / motor', d: 'Inspect AHU fan belt tension and motor current.', f: 'ED-HVAC', tool: 'Belt gauge · clamp meter', time: 30, diff: 'Medium' },
+      { t: 'Particle count validation', d: 'Run 0.5µm particle count at rest and in-operation.', f: 'OR-LAF', tool: 'Particle counter', time: 40, diff: 'Medium' },
+      { t: 'Release OR for use', d: 'Infection control sign-off; update compliance log.', f: 'OR-LAF', tool: '—', time: 10, diff: 'Low' },
+    ],
+  },
+  'PHARM': {
+    title: 'Pharmacy Cold-Chain Excursion — Medication Risk',
+    rootCause: [
+      { icon: 'ti-temperature-snow', text: '<b>Fridge temperature rising</b> — compressor or door seal issue' },
+      { icon: 'ti-pill', text: '<b>Medication efficacy at risk</b> — biologics, vaccines, insulin' },
+      { icon: 'ti-clock', text: '<b>Excursion clock running</b> — limited recovery window' },
+      { icon: 'ti-alert-triangle', text: '<b>Mandatory reporting</b> if threshold exceeded' },
+      { icon: 'ti-trash', text: '<b>Stock destruction</b> — financial and patient impact' },
+    ],
+    signals: [['hosp:fridgeTemp', 4.5]],
+    steps: [
+      { t: 'Confirm excursion', d: 'Read fridge probe vs backup thermometer; check duration.', f: 'PHARM', tool: 'Thermometer', time: 5, diff: 'Low' },
+      { t: 'Relocate critical stock', d: 'Move biologics/vaccines to backup cold storage immediately.', f: 'PHARM', tool: 'Cool box', time: 15, diff: 'Low', safety: true },
+      { t: 'Inspect compressor & seals', d: 'Check compressor run, condenser fan, and door gasket.', f: 'PHARM', tool: 'Inspection', time: 20, diff: 'Low' },
+      { t: 'Repair / replace component', d: 'Fix door seal, clean condenser, or swap compressor.', f: 'PHARM', tool: 'Seal kit / compressor', time: 60, diff: 'Medium' },
+      { t: 'Cool-down verification', d: 'Confirm temp recovers to 2-8°C within 30 min.', f: 'PHARM', tool: 'Logger', time: 45, diff: 'Low' },
+      { t: 'Assess affected stock', d: 'Pharmacist reviews excursion data vs stability profiles.', f: 'PHARM', tool: 'Stability data', time: 30, diff: 'Medium' },
+      { t: 'Report & sign off', d: 'File cold-chain incident report; update CMMS.', f: 'PHARM', tool: '—', time: 15, diff: 'Low' },
+    ],
+  },
+}
+
+// ── Manufacturing repair plans ──
+const MANUFACTURING_PLANS = {
+  'CNC-7': {
+    title: 'CNC Spindle Bearing Wear — Vibration & Quality',
+    rootCause: [
+      { icon: 'ti-activity', text: '<b>Spindle vibration elevated</b> — bearing degradation' },
+      { icon: 'ti-temperature', text: '<b>Motor temp climbing</b> — increased friction' },
+      { icon: 'ti-ruler-measure', text: '<b>Surface finish deteriorating</b> — tolerance drift' },
+      { icon: 'ti-alert-triangle', text: '<b>Scrap rate increasing</b>' },
+      { icon: 'ti-player-stop', text: '<b>Spindle seizure</b> risk' },
+    ],
+    signals: [['mfg:spindleVib', 2.0], ['mfg:motorTemp', 55], ['mfg:oee', 85]],
+    steps: [
+      { t: 'Capture vibration spectrum', d: 'Run FFT at multiple speeds to identify bearing defect frequency.', f: 'CNC-7', tool: 'Accelerometer', time: 20, diff: 'Medium' },
+      { t: 'Lockout CNC', d: 'E-stop and LOTO the machine; verify spindle stopped.', f: 'CNC-7', tool: 'LOTO kit', time: 15, diff: 'Low', safety: true },
+      { t: 'Remove spindle cartridge', d: 'Disconnect drawbar, coolant, and sensor leads.', f: 'CNC-7', tool: 'Spindle puller', time: 60, diff: 'High' },
+      { t: 'Replace bearing set', d: 'Press-fit new angular contact bearings; set preload.', f: 'CNC-7', tool: 'Bearing press · preload gauge', time: 90, diff: 'High' },
+      { t: 'Reinstall & align', d: 'Mount cartridge; verify runout < 0.003mm.', f: 'CNC-7', tool: 'Dial indicator', time: 45, diff: 'High' },
+      { t: 'Test cut', d: 'Run a test coupon; measure surface finish and dimensions.', f: 'CNC-7', tool: 'Profilometer', time: 30, diff: 'Medium' },
+      { t: 'Return to production', d: 'Update maintenance log; reset vibration baseline.', f: 'CNC-7', tool: '—', time: 10, diff: 'Low' },
+    ],
+  },
+  'ROBOT-3': {
+    title: 'Robot Joint Overload — Motor Thermal',
+    rootCause: [
+      { icon: 'ti-robot', text: '<b>Joint motor temperature high</b> — overloaded or stiff' },
+      { icon: 'ti-gauge', text: '<b>OEE declining</b> — cycle time extending' },
+      { icon: 'ti-settings', text: '<b>Gear reducer wear</b> — backlash increasing' },
+      { icon: 'ti-alert-triangle', text: '<b>Motor protection trip</b> imminent' },
+      { icon: 'ti-player-stop', text: '<b>Line stoppage</b>' },
+    ],
+    signals: [['mfg:motorTemp', 55], ['mfg:oee', 85], ['mfg:cycleTime', 42]],
+    steps: [
+      { t: 'Read motor thermals', d: 'Check J2-J4 motor temperatures and current draw.', f: 'ROBOT-3', tool: 'Teach pendant', time: 15, diff: 'Low' },
+      { t: 'Power down robot', d: 'Safe-stop; engage mechanical brake; LOTO cabinet.', f: 'ROBOT-3', tool: 'LOTO kit', time: 20, diff: 'Low', safety: true },
+      { t: 'Inspect gear reducer', d: 'Check backlash on overloaded axis; oil sample.', f: 'ROBOT-3', tool: 'Dial gauge · sample kit', time: 40, diff: 'Medium' },
+      { t: 'Grease / replace reducer', d: 'Re-grease or swap gear reducer on affected joint.', f: 'ROBOT-3', tool: 'Grease gun / reducer kit', time: 80, diff: 'High' },
+      { t: 'Recalibrate axis', d: 'Re-master the axis encoder; update tool center point.', f: 'ROBOT-3', tool: 'Mastering jig', time: 35, diff: 'Medium' },
+      { t: 'Cycle test', d: 'Run 50 production cycles; verify temp and cycle time.', f: 'ROBOT-3', tool: 'Production mode', time: 45, diff: 'Low' },
+      { t: 'Return to production', d: 'Update PM schedule; log reducer replacement.', f: 'ROBOT-3', tool: '—', time: 10, diff: 'Low' },
+    ],
+  },
+}
+
+// all domain plans merged into one lookup
+const ALL_PLANS = { ...PLANS, ...TURBINE_PLANS, ...DATACENTER_PLANS, ...HOSPITAL_PLANS, ...MANUFACTURING_PLANS }
+
 function healthyTarget(key) {
   const m = SIG[key] || {}
   if (m.warn != null) return +(m.warn * 0.62).toFixed(2)
@@ -135,23 +420,31 @@ function healthyTarget(key) {
   return 0
 }
 
-// Build the active plan from the live fault (EDM) or generic findings (others).
+// Build the active plan from the domain + live findings.
 function buildPlan(domain, twin) {
+  const ds = DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']
   const findings = (twin?.findings || []).slice()
     .sort((a, b) => (b.severity === 'critical') - (a.severity === 'critical'))
   const worst = findings[0]
   const faultSig = worst?.signal
-  if (domain === 'edm-machine') {
-    let sub = subForSignal(faultSig || '')
-    if (!PLANS[sub]) sub = 'DIE-1'           // EDM-1 / unknown → default to the dielectric plan
-    return { ...PLANS[sub], sub, focusSub: sub }
+
+  // try to find a domain-specific plan
+  const sub = ds.signalMap(faultSig || '')
+  if (ALL_PLANS[sub]) {
+    return { ...ALL_PLANS[sub], sub, focusSub: sub }
   }
-  // generic plan for the facility / turbine twins
+
+  // try any plan that matches a subsystem in this domain
+  for (const key of ds.order) {
+    if (ALL_PLANS[key]) return { ...ALL_PLANS[key], sub: key, focusSub: key }
+  }
+
+  // fallback: generic plan
   const sigs = findings.slice(0, 5).map(f => f.signal).filter(Boolean)
   const signals = (sigs.length ? sigs : Object.keys(twin?.latest || {}).slice(0, 4))
     .map(k => [k, healthyTarget(k)])
   return {
-    sub: 'EDM-1', focusSub: null,
+    sub: ds.order[0] || 'EDM-1', focusSub: null,
     title: worst?.displayName || 'Restore machine to nominal',
     rootCause: [
       { icon: 'ti-alert-triangle', text: `<b>${worst?.displayName || 'Out-of-band signal'}</b>` },
@@ -199,7 +492,8 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
 
   // before/after telemetry per signal
   const tele = useMemo(() => plan.signals.map(([key, after]) => {
-    const before = twin?.latest?.[key] ?? DEGRADED[key] ?? after
+    const domDegraded = (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).degraded
+    const before = twin?.latest?.[key] ?? domDegraded[key] ?? after
     return { key, after, before, meta: SIG[key] || { label: key, unit: '' } }
   }), [plan, twin])
 
@@ -240,7 +534,8 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const colorSubsystems = (allGood) => {
     const v = viewerRef.current; if (!v) return
     const up = {}
-    SUB_ORDER.forEach(id => { up[id] = { status: allGood ? 'ok' : (id === plan.focusSub ? 'crit' : 'ok') } })
+    const domOrder = (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).order
+    domOrder.forEach(id => { up[id] = { status: allGood ? 'ok' : (id === plan.focusSub ? 'crit' : 'ok') } })
     up['EDM-1'] = { status: allGood ? 'ok' : (plan.focusSub ? 'warn' : 'crit') }
     v.updateAssets(up)
   }
@@ -263,7 +558,8 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
       at(3000, () => { setScan(false); setStage('diagnose') })
     } else if (stage === 'diagnose') {
       if (plan.focusSub) focus(plan.focusSub)
-      const subLabel = SUB_META[plan.focusSub]?.label || 'the affected component'
+      const domMeta = (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).meta
+      const subLabel = domMeta[plan.focusSub]?.label || 'the affected component'
       say(`Fault isolated to ${subLabel}. Projecting the root-cause chain.`)
       plan.rootCause.forEach((_, i) => at(700 + i * 650, () => setRcLit(i + 1)))
       at(900 + plan.rootCause.length * 650 + 900, () => { setStep(0); setStage('repair') })
@@ -333,14 +629,16 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const speaking = stage !== 'complete'
 
   const goStep = (i) => { setStage('repair'); setPlaying(false); setStep(Math.max(0, Math.min(total - 1, i))) }
-  const subsysRows = SUB_ORDER.map(id => ({
-    id, label: SUB_META[id].label,
+  const domMeta = (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).meta
+  const domOrder = (DOMAIN_SUBS[domain] || DOMAIN_SUBS['edm-machine']).order
+  const subsysRows = domOrder.map(id => ({
+    id, label: (domMeta[id] || {}).label || id,
     status: stage === 'complete' ? 'ok' : (id === plan.focusSub ? (stage === 'repair' || stage === 'diagnose' ? 'crit' : 'crit') : 'ok'),
   }))
   const statusColor = (s) => s === 'crit' ? 'var(--mx-red)' : s === 'warn' ? 'var(--mx-amber)' : 'var(--mx-green)'
 
   // focused subsystem live metrics (for the glued callout)
-  const focusTele = tele.filter(x => subForSignal(x.key) === focusSub).slice(0, 2)
+  const focusTele = tele.filter(x => subForSignal(x.key, domain) === focusSub).slice(0, 2)
   const cur = (x) => lerp(x.before, x.after, frac)
 
   return (
@@ -409,7 +707,7 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
                             <div><span>Tool</span><br /><b>{s.tool}</b></div>
                             <div><span>Est. time</span><br /><b>{mmss(s.time)}</b></div>
                             <div><span>Difficulty</span><br /><b>{s.diff}</b></div>
-                            <div><span>Component</span><br /><b>{SUB_META[s.f || plan.focusSub || 'EDM-1']?.label || '—'}</b></div>
+                            <div><span>Component</span><br /><b>{domMeta[s.f || plan.focusSub || domOrder[0]]?.label || '—'}</b></div>
                           </div>
                         </div>
                       ) : <div className="fsub">{s.d}</div>}
@@ -428,7 +726,7 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
           {/* glued component callout */}
           <div ref={calloutRef} className={`mx-callout ${stage === 'repair' || stage === 'complete' ? 'repair' : ''}`} style={{ opacity: 0 }}>
             <div className="lab">
-              <div className="nm"><I n={SUB_META[focusSub]?.icon || 'ti-cube'} /> {SUB_META[focusSub]?.label || ''}</div>
+              <div className="nm"><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> {domMeta[focusSub]?.label || ''}</div>
               {focusTele.length > 0 && <div className="mm">
                 {focusTele.map(x => <span key={x.key}>{x.meta.label}<b>{fmt(cur(x))}{x.meta.unit ? ' ' + x.meta.unit : ''}</b></span>)}
               </div>}

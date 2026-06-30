@@ -19,6 +19,67 @@ export function Logo({ size = 32 }) {
 
 export const Icon = ({ n }) => <i className={`ti ${n}`} />
 
+// ── Animated count-up hook ──────────────────────────────────────────
+export function useCountUp(target, duration = 800) {
+  const [value, setValue] = React.useState(0)
+  const prevRef = React.useRef(0)
+  React.useEffect(() => {
+    if (target == null || isNaN(target)) { setValue(0); return }
+    const from = prevRef.current, to = target
+    const start = performance.now()
+    let raf
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / duration)
+      const ease = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
+      setValue(from + (to - from) * ease)
+      if (k < 1) raf = requestAnimationFrame(step)
+      else prevRef.current = to
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [target, duration])
+  return value
+}
+
+// ── SVG Health Ring ─────────────────────────────────────────────────
+export function HealthRing({ value, size = 72, stroke = 6, label }) {
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const v = Math.max(0, Math.min(1, value ?? 0))
+  const offset = circ * (1 - v)
+  const color = v >= 0.6 ? '#16a34a' : v >= 0.4 ? '#d97706' : '#e11d48'
+  return (
+    <div className="health-ring" style={{ width: size, height: size }}>
+      <svg width={size} height={size}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#ebe9f2" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset} className="health-ring-fg" />
+      </svg>
+      <div className="health-ring-label">
+        <span style={{ fontFamily: 'var(--display)', fontSize: size * 0.24, fontWeight: 700, color }}>{Math.round(v * 100)}</span>
+        {label && <span style={{ fontSize: 8, color: '#9aa1ad', textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ── Sparkline (inline SVG mini trend) ───────────────────────────────
+export function Sparkline({ data, width = 56, height = 22, color = '#7c3aed' }) {
+  if (!data || data.length < 2) return null
+  const min = Math.min(...data), max = Math.max(...data)
+  const range = max - min || 1
+  const pts = data.map((v, i) =>
+    `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * (height - 2) - 1}`
+  ).join(' ')
+  return (
+    <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx={width} cy={height - ((data[data.length-1] - min) / range) * (height - 2) - 1}
+        r="2" fill={color} />
+    </svg>
+  )
+}
+
 // ── Signal display metadata + thresholds ─────────────────────────────
 // One flat map across every domain. Keys are namespaced (aero:, edm:, dc:…)
 // so they never collide; sevClass() and the tiles look up by key alone.

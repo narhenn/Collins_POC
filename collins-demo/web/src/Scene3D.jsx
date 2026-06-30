@@ -1,18 +1,20 @@
 // Scene3D.jsx — React wrapper that mounts the procedural Three.js engine
 // (scene/engine.js), wires the inspector's "Ask AI" to the orchestrator, and
-// (for the live Wire-EDM twin) streams real telemetry onto the 3-D subsystems.
+// streams real telemetry onto all domain subsystems (not just EDM).
 import React, { useEffect, useRef } from 'react'
 import { createViewer } from './scene/engine.js'
 import { SIG, sevClass, fmt } from './lib.jsx'
 import api from './api'
 
-// Map the EDM twin's live signals onto the subsystem assets in the scene.
+// ── signal → metric helper ──────────────────────────────────────────
 function metric(sig, live) { const m = SIG[sig]; return [m?.label || sig, m?.unit || '', fmt(live[sig])] }
 function worst(sigs, live) {
   let s = 'ok'
   for (const sig of sigs) { const c = sevClass(sig, live[sig]); if (c === 'crit') return 'crit'; if (c === 'warn') s = 'warn' }
   return s
 }
+
+// ── EDM domain ──────────────────────────────────────────────────────
 function edmUpdates(live) {
   if (!live || live['edm:cuttingSpeed'] == null) return null
   return {
@@ -26,6 +28,80 @@ function edmUpdates(live) {
       metrics: [metric('edm:wireTension', live), metric('edm:wireBreakRisk', live), metric('edm:wireFeedRate', live)] },
     'GUIDE-1': { status: worst(['edm:wireWear', 'edm:surfaceRoughnessRa'], live),
       metrics: [metric('edm:wireWear', live), metric('edm:surfaceRoughnessRa', live)] },
+  }
+}
+
+// ── Datacenter domain ───────────────────────────────────────────────
+function datacenterUpdates(live) {
+  if (!live || live['dc:rackLoad'] == null) return null
+  const rackStatus = (id, loadKey) => ({
+    status: worst(['dc:rackLoad', 'dc:inletTemp'], live),
+    metrics: [metric('dc:rackLoad', live), metric('dc:inletTemp', live)]
+  })
+  return {
+    'RACK-A1': rackStatus(),
+    'RACK-A4': rackStatus(),
+    'RACK-B2': rackStatus(),
+    'CRAC-1': { status: worst(['dc:coolingCOP'], live),
+      metrics: [metric('dc:coolingCOP', live), metric('dc:inletTemp', live)] },
+    'UPS-1': { status: worst(['dc:upsCharge'], live),
+      metrics: [metric('dc:upsCharge', live), metric('dc:pue', live)] },
+    'NET-CORE': { status: 'ok',
+      metrics: [metric('dc:pue', live), metric('dc:rackLoad', live)] },
+  }
+}
+
+// ── Hospital domain ─────────────────────────────────────────────────
+function hospitalUpdates(live) {
+  if (!live || live['hosp:orPressure'] == null) return null
+  return {
+    'MRI-1': { status: 'ok', metrics: [['Status', '', 'Online'], ['Field', 'T', '3.0']] },
+    'ED-HVAC': { status: worst(['hosp:airChanges'], live),
+      metrics: [metric('hosp:airChanges', live), metric('hosp:orPressure', live)] },
+    'PHARM': { status: worst(['hosp:fridgeTemp'], live),
+      metrics: [metric('hosp:fridgeTemp', live)] },
+    'OR-GAS': { status: worst(['hosp:o2Pressure'], live),
+      metrics: [metric('hosp:o2Pressure', live)] },
+    'OR-LAF': { status: worst(['hosp:orPressure', 'hosp:airChanges'], live),
+      metrics: [metric('hosp:orPressure', live), metric('hosp:airChanges', live)] },
+    'ICU-NC': { status: worst(['hosp:nurseCalls'], live),
+      metrics: [metric('hosp:nurseCalls', live)] },
+  }
+}
+
+// ── Manufacturing domain ────────────────────────────────────────────
+function manufacturingUpdates(live) {
+  if (!live || live['mfg:oee'] == null) return null
+  return {
+    'PRESS-1': { status: worst(['mfg:cycleTime'], live),
+      metrics: [metric('mfg:cycleTime', live), metric('mfg:spindleVib', live)] },
+    'ROBOT-3': { status: worst(['mfg:motorTemp'], live),
+      metrics: [metric('mfg:motorTemp', live), metric('mfg:oee', live)] },
+    'CONV-A': { status: worst(['mfg:throughput'], live),
+      metrics: [metric('mfg:throughput', live)] },
+    'CNC-7': { status: worst(['mfg:spindleVib', 'mfg:motorTemp'], live),
+      metrics: [metric('mfg:spindleVib', live), metric('mfg:motorTemp', live)] },
+    'WELD-2': { status: 'ok', metrics: [metric('mfg:oee', live)] },
+    'COMP-1': { status: worst(['mfg:oee'], live),
+      metrics: [metric('mfg:oee', live), metric('mfg:cycleTime', live)] },
+  }
+}
+
+// ── Turbine domain (uses TurbineModel.jsx for GLB, but if Scene3D is used) ──
+function turbineUpdates(live) {
+  if (!live || live['aero:exhaustGasTemp'] == null) return null
+  return {}  // turbine uses TurbineModel.jsx, not Scene3D
+}
+
+// ── Domain dispatcher ───────────────────────────────────────────────
+function domainUpdates(domain, live) {
+  switch (domain) {
+    case 'edm-machine': return edmUpdates(live)
+    case 'datacenter': return datacenterUpdates(live)
+    case 'hospital': return hospitalUpdates(live)
+    case 'manufacturing': return manufacturingUpdates(live)
+    case 'turbine-engine': return turbineUpdates(live)
+    default: return null
   }
 }
 
@@ -45,11 +121,12 @@ export default function Scene3D({ domain, machine, live, height = 380 }) {
     return () => { try { viewer && viewer.dispose() } catch {} viewerRef.current = null }
   }, [domain, machine])
 
-  // Stream live telemetry onto the EDM subsystems (status pins + inspector).
+  // Stream live telemetry onto ALL domain subsystems
   useEffect(() => {
     const v = viewerRef.current
-    if (!v || !v.updateAssets || domain !== 'edm-machine') return
-    v.updateAssets(edmUpdates(live))
+    if (!v || !v.updateAssets) return
+    const updates = domainUpdates(domain, live)
+    if (updates) v.updateAssets(updates)
   }, [live, domain])
 
   return <div ref={hostRef} className="hero3d scene3d-host" style={{ height, position: 'relative', padding: 0, overflow: 'hidden' }} />

@@ -239,6 +239,105 @@ table.tbl td{padding:6px 0;border-bottom:1px solid var(--border)}
 .chart-line-anim{stroke-dasharray:2000;stroke-dashoffset:2000;animation:drawLine 1.2s ease forwards}
 @keyframes drawLine{to{stroke-dashoffset:0}}
 
-/* Sensor value flash on update */
-@keyframes sensorFlash{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
+/* Sensor value flash on threshold cross */
+@keyframes sensorFlash{0%,100%{background:transparent}50%{background:rgba(225,29,72,.08)}}
 .sensor-card .sensor-value{transition:color 0.3s ease}
+.sensor-card.flash{animation:sensorFlash .6s ease}
+
+/* ── micro-interactions: staggered entry ── */
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.event-item{animation:slideUp .3s ease both;animation-delay:calc(var(--i,0) * 60ms)}
+
+/* ── twin card hover lift + glow ── */
+.twin-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.twin-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(109,40,217,.14)}
+
+/* ── loading skeleton shimmer ── */
+@keyframes shimmer{to{background-position:-200% 0}}
+.skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface) 37%,var(--surface2) 63%);background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite;border-radius:8px;min-height:18px}
+
+/* ── agent icon hover glow ── */
+.agent-icon{transition:box-shadow .18s,transform .12s}
+.card:hover .agent-icon{box-shadow:0 0 0 4px var(--brand-ring);transform:scale(1.06)}
+
+/* ── health ring ── */
+.health-ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.health-ring svg{transform:rotate(-90deg)}
+.health-ring-fg{transition:stroke-dashoffset .8s ease;stroke-linecap:round}
+.health-ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+
+/* ── sparkline ── */
+.sparkline{position:absolute;bottom:6px;right:8px;opacity:.2;pointer-events:none}
+
+/* ── route transition ── */
+@keyframes routeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.content>*{animation:routeIn .22s ease}
+
+/* ── staggered card entry ── */
+@keyframes cardIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+.grid-4>.card,.grid-3>.card,.grid-2>.card{animation:cardIn .35s ease both}
+.grid-4>.card:nth-child(1){animation-delay:0ms}.grid-4>.card:nth-child(2){animation-delay:60ms}
+.grid-4>.card:nth-child(3){animation-delay:120ms}.grid-4>.card:nth-child(4){animation-delay:180ms}
+.grid-3>.card:nth-child(1){animation-delay:0ms}.grid-3>.card:nth-child(2){animation-delay:70ms}
+.grid-3>.card:nth-child(3){animation-delay:140ms}
+.grid-2>.card:nth-child(1){animation-delay:0ms}.grid-2>.card:nth-child(2){animation-delay:80ms}
+
+/* ── sensor card hover glow ── */
+.sensor-card{transition:border-color .2s,transform .14s,box-shadow .14s}
+.sensor-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(22,19,31,.08)}
+.sensor-card.warn:hover{box-shadow:0 4px 16px rgba(217,119,6,.12)}
+.sensor-card.crit:hover{box-shadow:0 4px 16px rgba(225,29,72,.12)}
+
+/* ── critical alert breathing glow ── */
+@keyframes alertGlow{0%,100%{box-shadow:0 0 0 0 rgba(225,29,72,0)}50%{box-shadow:0 0 20px 4px rgba(225,29,72,.15)}}
+.card.alert-glow{animation:alertGlow 2s ease-in-out infinite}
+
+/* ── button click feedback ── */
+.btn:active:not([disabled]){transform:scale(.97) translateY(.5px)}
+.btn-primary:active:not([disabled]){box-shadow:0 2px 8px rgba(109,40,217,.3)}
+
+/* ── findings cascade deeper stagger ── */
+.event-item:nth-child(1){animation-delay:0ms}.event-item:nth-child(2){animation-delay:60ms}
+.event-item:nth-child(3){animation-delay:120ms}.event-item:nth-child(4){animation-delay:180ms}
+.event-item:nth-child(5){animation-delay:240ms}.event-item:nth-child(6){animation-delay:300ms}
+
+/* ── KPI value entrance ── */
+@keyframes kpiPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+.kpi .card-value{animation:kpiPop .4s cubic-bezier(.34,1.56,.64,1) both}
+.grid-4 .kpi:nth-child(1) .card-value{animation-delay:0ms}
+.grid-4 .kpi:nth-child(2) .card-value{animation-delay:100ms}
+.grid-4 .kpi:nth-child(3) .card-value{animation-delay:200ms}
+.grid-4 .kpi:nth-child(4) .card-value{animation-delay:300ms}
+
+/* ── copilot narration active indicator ── */
+@keyframes narrateShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.card.narrating{background:linear-gradient(90deg,var(--surface) 0%,var(--brand-softer) 50%,var(--surface) 100%);background-size:200% 100%;animation:narrateShimmer 3s ease-in-out infinite}
+
+/* ── print stylesheet for work orders ── */
+/* ── dark mode (optional toggle) ── */
+[data-theme="dark"]{
+  --bg:#070912;--surface:#0f1325;--surface2:#151b33;--border:rgba(124,150,255,.14);--border2:rgba(124,150,255,.2);
+  --text:#e9edff;--muted:#9aa6d6;--hint:#6b7aad;--brand-soft:rgba(124,58,237,.14);--brand-softer:rgba(124,58,237,.06);
+  --brand-ring:rgba(124,58,237,.22);--shadow-sm:0 1px 3px rgba(0,0,0,.3);--shadow:0 4px 16px rgba(0,0,0,.25);
+  --shadow-lg:0 18px 48px rgba(0,0,0,.45);
+}
+[data-theme="dark"] .topbar{background:rgba(15,19,37,.9);border-color:rgba(124,150,255,.1)}
+[data-theme="dark"] .sidebar{background:#0b0f1e;border-color:rgba(124,150,255,.1)}
+[data-theme="dark"] .card{background:#0f1325;border-color:rgba(124,150,255,.12)}
+[data-theme="dark"] .sensor-card{background:#0f1325}
+[data-theme="dark"] .empty{background:#0f1325;border-color:rgba(124,150,255,.15)}
+[data-theme="dark"] .input,[data-theme="dark"] textarea.input,[data-theme="dark"] .select{background:#0b0f1e;border-color:rgba(124,150,255,.18);color:#e9edff}
+[data-theme="dark"] table.tbl td{border-color:rgba(124,150,255,.1)}
+[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#2a3058;border-color:#070912}
+
+@media print{
+  .app-root>.topbar,.sidebar,.panel-actions,.btn,.nav-item,.sidebar-foot,.v-top,.v-tools,.v-palette,.v-tip{display:none !important}
+  .body{display:block !important}.content{padding:0 !important;overflow:visible !important}
+  .card{break-inside:avoid;box-shadow:none !important;border:1px solid #ddd !important}
+  .panel{max-width:100% !important}
+  .hero3d,.scene3d-host{display:none !important}
+  @page{margin:1.5cm;size:A4}
+  body{font-size:11pt;color:#000;background:#fff}
+  .card-title{font-size:13pt}.card-label{font-size:9pt}
+  .kpibox{border:1px solid #ccc !important;background:#f8f8f8 !important}
+}
