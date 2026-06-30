@@ -23,6 +23,7 @@ from claude_client import (
     diagnose_snapshot, forecast_snapshot,
     troubleshoot_chat, parts_procurement_agent,
     generate_incident_report,
+    build_procedure, scenario_chat, dashboard_chat,
 )
 from config import config
 
@@ -398,6 +399,43 @@ def sim_run(req: SimRunReq):
                 "control": req.control, "horizon_min": req.horizon_min}
         narrative = analyze_projection(spec, projection, req.machine, req.domain)
     return {"projection": projection, "narrative": narrative}
+
+
+# ── Interactive maintenance training + chat agents ──────────────────
+
+class ProcedureReq(BaseModel):
+    machine: str = "Machine"
+    domain: str = ""
+    fault: str = "none"
+    title: str = ""
+    context: str = ""
+
+
+@router.post("/agents/procedure")
+def agent_procedure(req: ProcedureReq):
+    """A full ordered repair procedure (with per-step skip / wrong-order
+    consequences) that drives the interactive maintenance trainer."""
+    p = build_procedure(req.machine, req.domain, req.fault, req.title, req.context)
+    return {"procedure": p.model_dump()}
+
+
+class ChatReq(BaseModel):
+    machine: str = "Machine"
+    messages: list = []      # [{role: 'user'|'assistant', content: str}]
+    context: dict = {}       # scenario/procedure/progress (scenario chat)
+    snapshot: dict = {}      # live telemetry/findings (dashboard chat)
+
+
+@router.post("/agents/scenario-chat")
+def agent_scenario_chat(req: ChatReq):
+    """Training coach chat — explains the outcome of any decision the trainee explores."""
+    return {"reply": scenario_chat(req.messages, req.context, req.machine)}
+
+
+@router.post("/agents/dashboard-chat")
+def agent_dashboard_chat(req: ChatReq):
+    """Live status chat — answers questions about the machine's current state."""
+    return {"reply": dashboard_chat(req.messages, req.snapshot, req.machine)}
 
 
 # ── AI Co-Pilot: real-time narration, work orders, alerts, cascades ──

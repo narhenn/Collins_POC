@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import api from './api'
+import Markdown from './Markdown.jsx'
 import { Icon, pct, hColor, statusColor, fmt, sevClass, SIG, domainMeta } from './lib.jsx'
 
 function HealthBar({ name, type, health, status }) {
@@ -104,14 +105,14 @@ export default function Intelligence({ tenant, machineName, domain, isLive = tru
               </tbody></table>
             </div>
           </div>
-          <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', borderLeft: '3px solid var(--accent-blue)', paddingLeft: 12 }}>{diag.report}</div>
+          <div style={{ marginTop: 14, borderLeft: '3px solid var(--accent-blue)', paddingLeft: 12 }}><Markdown text={diag.report} /></div>
         </div>
       )}
 
       {analysis && (
         <div className="card">
           <div className="card-title"><Icon n="ti-trending-up" /> Analysis <span className="pill pill-purple">Claude</span></div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{analysis.report}</div>
+          <Markdown text={analysis.report} />
         </div>
       )}
     </div>

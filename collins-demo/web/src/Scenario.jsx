@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import api from './api'
 import Chart from './Chart.jsx'
+import Markdown from './Markdown.jsx'
+import Trainer from './Trainer.jsx'
 import { Icon, fmt, pct, hColor, predictCharts, simTrajectory, signalsAtRisk } from './lib.jsx'
 
 const HORIZONS = ['1 hour', '2 hours', '6 hours', '24 hours', '3 days', '1 week']
@@ -17,6 +19,7 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
   const [running, setRunning] = useState(false)
   const [injecting, setInjecting] = useState(false)
   const [result, setResult] = useState(null)
+  const [mode, setMode] = useState('outcome')          // 'outcome' | 'train'
   const [err, setErr] = useState(null)
 
   useEffect(() => {
@@ -140,15 +143,20 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
               {spec.rationale && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>{spec.rationale}</div>}
               {spec.expected_outcome && <div style={{ fontSize: 11.5, marginTop: 6 }}><span className="hint">Expected:</span> {spec.expected_outcome}</div>}
               <div className="row" style={{ marginTop: 12, gap: 8 }}>
-                <button className="btn btn-primary" onClick={simulate} disabled={running} style={{ flex: 1, justifyContent: 'center' }}>
-                  {running ? <><span className="spinner" /> Simulating…</> : <><Icon n="ti-player-play" /> Simulate</>}
+                <button className="btn btn-primary" onClick={() => { setMode('outcome'); simulate() }} disabled={running} style={{ flex: 1, justifyContent: 'center' }}>
+                  {running ? <><span className="spinner" /> Simulating…</> : <><Icon n="ti-chart-line" /> Outcome</>}
                 </button>
-                {isFault && spec.fault !== 'none' && (
-                  <button className="btn btn-danger" onClick={injectLive} disabled={injecting} title="Apply this fault to the running twin">
-                    {injecting ? <><span className="spinner" /> Injecting…</> : <><Icon n="ti-bolt" /> Inject live</>}
+                {spec.fault && spec.fault !== 'none' && (
+                  <button className="btn btn-teal" onClick={() => setMode('train')} style={{ flex: 1, justifyContent: 'center' }}>
+                    <Icon n="ti-school" /> Train
                   </button>
                 )}
               </div>
+              {isFault && spec.fault !== 'none' && (
+                <button className="btn btn-danger" onClick={injectLive} disabled={injecting} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} title="Apply this fault to the running twin">
+                  {injecting ? <><span className="spinner" /> Injecting…</> : <><Icon n="ti-bolt" /> Inject into live twin</>}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -210,13 +218,21 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
               {result.narrative && (
                 <div className="card">
                   <div className="card-title"><Icon n="ti-message-chatbot" /> Agent analysis & precautions <span className="pill pill-purple">Claude</span></div>
-                  <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{result.narrative}</div>
+                  <Markdown text={result.narrative} />
                 </div>
               )}
             </>
           )}
         </div>
       </div>
+
+      {/* Interactive maintenance trainer (full width) */}
+      {mode === 'train' && spec && spec.fault && spec.fault !== 'none' && (
+        <div className="section-gap" style={{ marginTop: 16 }}>
+          <Trainer machine={machineName} domain={domain} fault={spec.fault} title={spec.title}
+            context={[spec.rationale, spec.expected_outcome].filter(Boolean).join(' ')} />
+        </div>
+      )}
     </div>
   )
 }
