@@ -41,9 +41,10 @@ async def _platform_unreachable(request: Request, exc: httpx.HTTPError):
     return JSONResponse(
         status_code=503,
         content={
-            "detail": ("A platform service is unreachable. Bring the backend up "
-                       "first: run start.ps1 (Neo4j + NextXR on :8000), then "
-                       "demo.ps1 — the web app talks only to the orchestrator."),
+            "detail": ("A platform service is unreachable. Start infrastructure "
+                       "first (docker compose up -d neo4j), then the NextXR "
+                       "server on :8000. The web app talks only to the "
+                       "orchestrator on :8090."),
             "where": request.url.path,
             "error": str(exc),
         },

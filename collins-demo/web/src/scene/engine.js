@@ -304,6 +304,23 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
     const pin = pStatusPin(statusColor[data.status] || statusColor.ok); pin.position.set(0, g.userData.topY + 1.2, 0); g.add(pin)
     g.userData.asset = data; g.userData.pin = pin
     g.traverse(o => { o.userData.pickRoot = g })
+    // clone every mesh material so we can pulse emissive without affecting other assets
+    // save original emissive on each mesh for restore
+    const blinkMeshes = []
+    g.traverse(o => {
+      if (!o.isMesh || !o.material) return
+      // skip pin children, spark, LED blink, wire glow — those have their own animations
+      if (o.userData.spark || o.userData.blink || o.userData.glow) return
+      let inPin = false
+      let p = o.parent
+      while (p && p !== g) { if (p.userData.pin) { inPin = true; break } p = p.parent }
+      if (inPin) return
+      o.material = o.material.clone()
+      o.userData._origEmissive = o.material.emissive.clone()
+      o.userData._origEmissiveIntensity = o.material.emissiveIntensity
+      blinkMeshes.push(o)
+    })
+    g.userData._blinkMeshes = blinkMeshes
     scene.add(g); selectable.push(g)
     g.traverse(o => { if (o.userData && (o.userData.blink || o.userData.spin || o.userData.robot || o.userData.cargo || o.userData.press || o.userData.spark || o.userData.glow)) animators.push(o) })
     return g
@@ -423,7 +440,32 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
       if (u.glow && o.material) o.material.emissiveIntensity = .3 + Math.sin(t * 12) * .3
       if (u.robot) { const r = u.robot; r.arm1.rotation.y = Math.sin(t * 0.6) * 0.8; r.arm1.rotation.z = Math.sin(t * 0.8) * 0.25; r.arm2.rotation.z = Math.sin(t * 0.7 + 1) * 0.5; r.base.rotation.y += dt * 0.3 }
     }
-    selectable.forEach(g => { if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15 })
+    const alertRed = _alertRed
+    selectable.forEach(g => {
+      if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15
+      // critical blink: pulse the actual asset meshes red
+      const isCrit = g.userData.asset && g.userData.asset.status === 'crit'
+      const meshes = g.userData._blinkMeshes
+      if (meshes && meshes.length > 0) {
+        if (isCrit) {
+          const pulse = Math.sin(t * 5) * 0.5 + 0.5  // 0..1
+          for (let i = 0; i < meshes.length; i++) {
+            const o = meshes[i]
+            o.material.emissive.copy(o.userData._origEmissive).lerp(alertRed, pulse)
+            o.material.emissiveIntensity = o.userData._origEmissiveIntensity + pulse * 1.5
+          }
+        } else {
+          // restore original emissive when not critical
+          for (let i = 0; i < meshes.length; i++) {
+            const o = meshes[i]
+            if (!o.material.emissive.equals(o.userData._origEmissive) || o.material.emissiveIntensity !== o.userData._origEmissiveIntensity) {
+              o.material.emissive.copy(o.userData._origEmissive)
+              o.material.emissiveIntensity = o.userData._origEmissiveIntensity
+            }
+          }
+        }
+      }
+    })
     controls.update()
     if (composer) composer.render(); else renderer.render(scene, camera)
   }
@@ -440,13 +482,20 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
       if (o.material) { if (o.material.emissive) o.material.emissive.copy(col); if (o.material.color) o.material.color.copy(col) }
     })
   }
+
+  // ── alert color constant ──
+  const _alertRed = new THREE.Color(0xe11d48)
+
   function updateAssets(updates) {
     if (!updates) return
     for (const g of selectable) {
       const a = g.userData.asset, u = updates[a.id]
       if (!u) continue
       if (u.metrics) a.metrics = u.metrics
-      if (u.status && u.status !== a.status) { a.status = u.status; recolorPin(g, u.status) }
+      if (u.status && u.status !== a.status) {
+        a.status = u.status
+        recolorPin(g, u.status)
+      }
       if (selected === g && !inspector.classList.contains('hidden')) {
         const mvs = inspector.querySelectorAll('.insp-metric .mv')
         ;(a.metrics || []).forEach((m, i) => { if (mvs[i]) mvs[i].textContent = m[2] + (m[1] ? ' ' + m[1] : '') })
