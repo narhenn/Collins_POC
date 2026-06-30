@@ -151,6 +151,8 @@ def health():
         "orchestrator": "ok",
         "claude": {"enabled": config.claude_enabled, "model": config.CLAUDE_MODEL},
         "tripo": {"enabled": config.tripo_enabled},
+        "model_3d": {"provider": config.model_3d_provider,
+                     "runpod": config.runpod_enabled, "tripo": config.tripo_enabled},
         **out,
     }
 
