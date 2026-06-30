@@ -8,6 +8,8 @@ import Prediction from './Prediction.jsx'
 import BuildTwin from './BuildTwin.jsx'
 import TurbineModel from './TurbineModel.jsx'
 import Scene3D from './Scene3D.jsx'
+import Chat from './Chat.jsx'
+import Markdown from './Markdown.jsx'
 
 const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
@@ -413,6 +415,19 @@ function Dashboard({ ctx }) {
         </div>
       )}
 
+      {/* Ask-the-assistant chat (live status Q&A) */}
+      {source && (
+        <div className="card section-gap" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="card-title"><Icon n="ti-message-2" /> Ask the assistant <span className="pill pill-purple">Claude</span></div>
+          <Chat height={300}
+            greeting={`Ask me anything about **${machineName}** right now — current readings, what a finding means, or what to do next.`}
+            suggestions={['How is the machine doing?', "What's the most concerning signal?", 'What should I check next?']}
+            placeholder="Ask about the live status…"
+            send={(messages) => api.dashboardChat({ machine: machineName, messages,
+              snapshot: { latest: live, findings, health: h } }).then(r => r.reply)} />
+        </div>
+      )}
+
       {/* Live telemetry (generic, domain-driven) */}
       <div className="card section-gap">
         <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
@@ -542,10 +557,10 @@ function Dashboard({ ctx }) {
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap',
+              <div style={{ fontSize: 13, lineHeight: 1.8,
                 borderLeft: '3px solid var(--brand-2)', padding: '14px 16px',
                 background: 'var(--brand-softer)', borderRadius: '0 12px 12px 0' }}>
-                {cascade}
+                <Markdown text={cascade} />
               </div>
               <button className="btn" onClick={runCascade} disabled={cascadeLoading} style={{ marginTop: 12 }}>
                 {cascadeLoading ? <><span className="spinner" /> Analyzing…</> : <><Icon n="ti-refresh" /> Re-run</>}

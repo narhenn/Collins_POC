@@ -1171,3 +1171,144 @@ def forecast_snapshot(machine: str, domain: str, latest: dict,
     except Exception as e:  # noqa: BLE001
         logger.warning("forecast_snapshot failed (%s); stub", e)
         return _stub()
+
+
+# ── Interactive maintenance TRAINING agent ────────────────────────────
+# A full ordered repair procedure for a scenario/fault where every step also
+# carries the consequence of skipping it or doing it out of order — the UI turns
+# this into an interactive trainer.
+
+class TrainStep(BaseModel):
+    id: str = Field(description="Short id like 'S1','S2' in the CORRECT order.")
+    title: str = Field(description="Short step name.")
+    action: str = Field(description="Exactly what the technician does.")
+    rationale: str = Field(description="Why this step matters / what it achieves.")
+    criteria: str = Field(description="How to confirm it was done correctly.")
+    safety: bool = Field(default=False, description="True if this is a safety / isolation / LOTO step.")
+    requires: list[str] = Field(default_factory=list,
+        description="Ids of steps that MUST be completed before this one.")
+    skip_consequence: str = Field(description="What goes wrong on the machine if this step is skipped.")
+    wrong_order_consequence: str = Field(description="What goes wrong if done before its prerequisites.")
+
+
+class MaintenanceProcedure(BaseModel):
+    title: str = Field(description="Procedure title for this fault/scenario.")
+    fault: str = Field(description="The fault id being repaired, or 'none'.")
+    summary: str = Field(description="1-2 sentence overview of the repair.")
+    steps: list[TrainStep] = Field(description="The correctly-ordered repair steps.")
+    success_criteria: str = Field(description="How to confirm the machine is fully restored.")
+    common_mistakes: list[str] = Field(default_factory=list,
+        description="Frequent trainee mistakes and why they are dangerous.")
+
+
+def build_procedure(machine: str, domain: str, fault: str,
+                    scenario_title: str = "", scenario_context: str = "") -> MaintenanceProcedure:
+    """Master trainer: a complete ordered repair procedure for THIS fault on THIS
+    machine, with per-step skip / wrong-order consequences for interactive training."""
+    def _stub() -> MaintenanceProcedure:
+        return MaintenanceProcedure(
+            title=f"Repair: {scenario_title or fault}", fault=fault or "none",
+            summary="Isolate, diagnose, repair, verify.",
+            steps=[
+                TrainStep(id="S1", title="Isolate & make safe",
+                          action="Apply LOTO and confirm a zero-energy state.",
+                          rationale="Protects the technician before any intervention.",
+                          criteria="Energy isolated and verified.", safety=True, requires=[],
+                          skip_consequence="Live-energy hazard during the repair.",
+                          wrong_order_consequence="N/A — this must be first."),
+                TrainStep(id="S2", title="Diagnose",
+                          action="Confirm the faulted component from the telemetry.",
+                          rationale="Targets the real root cause.", criteria="Root cause confirmed.",
+                          requires=["S1"], skip_consequence="You may repair the wrong component.",
+                          wrong_order_consequence="Diagnosing live is unsafe and inaccurate."),
+                TrainStep(id="S3", title="Repair",
+                          action="Service or replace the faulted component.",
+                          rationale="Restores the machine.", criteria="Component within spec.",
+                          requires=["S1", "S2"], skip_consequence="The fault persists.",
+                          wrong_order_consequence="Repairing the wrong part wastes the window."),
+                TrainStep(id="S4", title="Verify & return to service",
+                          action="Re-run and confirm readings nominal.",
+                          rationale="Proves the fix.", criteria="All signals within limits.",
+                          requires=["S1", "S2", "S3"], skip_consequence="Undetected residual fault.",
+                          wrong_order_consequence="Cannot verify before repairing."),
+            ],
+            success_criteria="All signals within limits and the fault cleared.",
+            common_mistakes=["Skipping isolation (safety).", "Repairing before diagnosing.",
+                             "Returning to service without verification."])
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        ctx = (f" arising from the situation: {scenario_title}. {scenario_context}"
+               if scenario_title else "")
+        system = (
+            f"You are a master maintenance trainer for a {machine}. Produce a complete, "
+            f"correctly-ordered repair procedure a trainee can follow for the fault "
+            f"'{fault}'{ctx}. For EACH step give: a short title, the action, the rationale, "
+            "the acceptance criteria, whether it is a safety/isolation step, the ids of "
+            "steps that must come first (requires), the consequence of SKIPPING it, and the "
+            "consequence of doing it OUT OF ORDER. Order steps safety-first, diagnose before "
+            "repair, verify last. List common trainee mistakes. Be specific to this machine "
+            "and fault — name real components and signals.")
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=8000,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nDomain: {domain}\nFault: {fault}\n"
+                f"Scenario: {scenario_title}\nContext: {scenario_context}"}],
+            output_format=MaintenanceProcedure)
+        return resp.parsed_output or _stub()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("build_procedure failed (%s); stub", e)
+        return _stub()
+
+
+def _chat(messages: list, system: str, max_tokens: int = 600) -> str:
+    """Shared multi-turn chat helper. `messages` is [{role, content}]."""
+    if not config.claude_enabled:
+        last = next((m.get("content", "") for m in reversed(messages or [])
+                     if m.get("role") == "user"), "")
+        return ("AI chat is in stub mode (no ANTHROPIC_API_KEY set). You said: "
+                f"{last[:140]}")
+    try:
+        norm = [{"role": ("assistant" if m.get("role") == "assistant" else "user"),
+                 "content": str(m.get("content", ""))}
+                for m in (messages or []) if m.get("content")]
+        if not norm:
+            norm = [{"role": "user", "content": "Hello"}]
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=max_tokens,
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            messages=norm)
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or "(no reply)"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("_chat failed (%s)", e)
+        return "Sorry — I couldn't reach the AI just now. Try again."
+
+
+def scenario_chat(messages: list, context: dict, machine: str) -> str:
+    """Interactive training coach: knows the scenario, the procedure and the
+    trainee's progress, and explains the outcome of ANY decision they explore."""
+    import json as _json
+    system = (
+        f"You are an interactive maintenance TRAINING coach for a {machine}. The trainee is "
+        "working a scenario and its repair procedure. Teach by doing: answer questions, and "
+        "when they ask 'what if I skip / reorder / do X', explain the concrete consequence "
+        "on the machine, why the correct flow matters, and the safe next move. Be concise "
+        "(3-6 sentences), specific to the steps and signals, and encouraging. You may "
+        "reference step ids. Context:\n" + _json.dumps(context, default=str)[:5000])
+    return _chat(messages, system, max_tokens=700)
+
+
+def dashboard_chat(messages: list, snapshot: dict, machine: str) -> str:
+    """Live operations assistant: answers questions about the CURRENT machine
+    status from its telemetry + findings."""
+    import json as _json
+    system = (
+        f"You are the live operations assistant for a {machine}. Answer the operator's "
+        "questions about the CURRENT status using the telemetry and findings below. Be "
+        "concise and specific, name the signals and their values, and flag anything "
+        "concerning with a clear next action. Current snapshot:\n"
+        + _json.dumps(snapshot, default=str)[:4000])
+    return _chat(messages, system, max_tokens=600)

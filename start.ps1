@@ -1,184 +1,72 @@
-# start.ps1 — one-command BACKEND launcher for the Collins Aerospace PoC (Windows / PowerShell).
+# start.ps1 — ONE-COMMAND launcher for the Collins agentic digital-twin demo.
 #
-# Brings the WHOLE backend up in Docker — you never run `python -m server.main` by hand.
-# Then start the frontend separately:  cd frontend ; npm run dev   (Vite dev server on :5173).
+# Runs FULLY LOCAL — no Docker, no Neo4j, no separate backend. The orchestrator
+# (:8090) runs the live-twin physics (Wire EDM, turbine) + the 3-tier behaviour
+# rules + prediction engine IN-PROCESS, and the web app (:5173) talks only to it.
+# This is deliberate: the demo can never be broken by Docker not starting.
 #
-#   ./start.ps1            full backend stack in Docker (build + up):
-#                            • Neo4j        :7474 / :7687   (NextXR graph store)
-#                            • Redis        :6379           (NextXR event bus)
-#                            • Postgres     :5433           (AUTOMIND db)
-#                            • Redis-AM     :6380           (AUTOMIND Celery broker)
-#                            • NextXR API   :8000           (Digital Twin backend  ← frontend talks here)
-#                            • AUTOMIND     :8001           (workflow engine)
-#                            • GoalCert     :8002           (simulation engine)
-#   ./start.ps1 -Build     force a clean rebuild of all images before starting
-#   ./start.ps1 -Infra     databases only (Neo4j+Redis+Postgres+Redis-AM) — for running NextXR from the venv
-#   ./start.ps1 -Local     databases + AUTOMIND + GoalCert in Docker, but run the NextXR
-#                          backend locally from the venv (live code, hot edits) on :8000
-#   ./start.ps1 -Down      stop and remove all PoC containers
+#   ./start.ps1          start the web app (:5173) + orchestrator (:8090)
+#   ./start.ps1 -Down    stop both
 #
-# This is self-healing: it detects when Docker Desktop is down, starts it, and
-# waits for the engine + Neo4j before bringing the stack up.
+# Re-running ALWAYS kills the previous session first, so there is never a stale
+# server or a drifting Vite port. The web app is locked to :5173.
+#
+# Prereqs: the Python venv at .venv, and (for real AI) ANTHROPIC_API_KEY in
+# collins-demo/orchestrator/.env.  Internet is needed for the Claude + Tripo APIs.
 
-param(
-    [switch]$Build,
-    [switch]$Infra,
-    [switch]$Local,
-    [switch]$Down
-)
+param([switch]$Down)
 
-$ErrorActionPreference = "Stop"
-$root = $PSScriptRoot
-$ontology = Join-Path $root "nextxr-ontology"
-$venvPy   = Join-Path $root ".venv\Scripts\python.exe"
+$ErrorActionPreference = "Continue"
+$root   = $PSScriptRoot
+$venvPy = Join-Path $root ".venv\Scripts\python.exe"
+$orch   = Join-Path $root "collins-demo\orchestrator"
+$webDir = Join-Path $root "collins-demo\web"
 
-function Write-Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
-function Write-Ok($msg)   { Write-Host "  [ok] $msg" -ForegroundColor Green }
-function Write-Warn($msg) { Write-Host "  [!!] $msg" -ForegroundColor Yellow }
+function Step($m) { Write-Host "`n=== $m ===" -ForegroundColor Cyan }
+function Ok($m)   { Write-Host "  [ok] $m" -ForegroundColor Green }
+function Warn($m) { Write-Host "  [!!] $m" -ForegroundColor Yellow }
 
-function Test-DockerUp {
-    try { docker ps *> $null; return $LASTEXITCODE -eq 0 } catch { return $false }
+# Kill whatever is listening on a TCP port (clears stale servers / Vite).
+function Stop-Port($port) {
+    Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique |
+        ForEach-Object { try { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } catch {} }
 }
 
-function Test-Port($port) {
-    (Test-NetConnection -ComputerName localhost -Port $port -WarningAction SilentlyContinue).TcpTestSucceeded
-}
+# ── always kill the previous session ──
+Step "Stopping any previous session"
+Stop-Port 8090                                   # orchestrator
+5173..5180 | ForEach-Object { Stop-Port $_ }      # Vite (current + any drifted)
+Ok "previous orchestrator + web stopped"
 
-# ── Tear-down shortcut ──────────────────────────────────────────────
-if ($Down) {
-    Write-Step "Stopping all PoC containers"
-    Push-Location $root
-    try { docker compose --profile full down } finally { Pop-Location }
-    Write-Ok "Stack stopped"
+if ($Down) { Ok "all stopped."; return }
+
+if (-not (Test-Path $venvPy)) {
+    Warn "Python venv not found at .venv"
+    Write-Host "  Create it once:" -ForegroundColor Cyan
+    Write-Host "      python -m venv .venv" -ForegroundColor Cyan
+    Write-Host "      .\.venv\Scripts\python.exe -m pip install -r collins-demo\orchestrator\requirements.txt" -ForegroundColor Cyan
     return
 }
-
-# ── 1. Ensure Docker Desktop is running ─────────────────────────────
-Write-Step "Checking Docker"
-if (Test-DockerUp) {
-    Write-Ok "Docker daemon is running"
-} else {
-    Write-Warn "Docker daemon not responding — starting Docker Desktop"
-    $dockerExe = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    if (Test-Path $dockerExe) {
-        Start-Process $dockerExe
-        Write-Host "  Waiting for Docker to become ready (up to 120s)..." -NoNewline
-        $ready = $false
-        for ($i = 0; $i -lt 60; $i++) {
-            Start-Sleep -Seconds 2
-            Write-Host "." -NoNewline
-            if (Test-DockerUp) { $ready = $true; break }
-        }
-        Write-Host ""
-        if ($ready) { Write-Ok "Docker is ready" }
-        else {
-            Write-Warn "Docker did not come up in time."
-            Write-Warn "Open Docker Desktop manually, wait for the whale icon to settle, then re-run ./start.ps1"
-            return
-        }
-    } else {
-        Write-Warn "Docker Desktop not found at $dockerExe — start Docker manually, then re-run."
-        return
-    }
+if (-not (Test-Path (Join-Path $orch ".env"))) {
+    Write-Host "  [i] No collins-demo/orchestrator/.env — agents run in deterministic stub mode." -ForegroundColor DarkGray
+    Write-Host "      Copy .env.example to .env and add ANTHROPIC_API_KEY to enable Claude." -ForegroundColor DarkGray
 }
 
-# ── 2. Decide which services to bring up ────────────────────────────
-# Default + -Local both need the infra; default + -Infra differ only in whether
-# the app services (NextXR/AUTOMIND/GoalCert) are containerized.
-$infraServices = @("neo4j", "redis", "postgres", "redis-am")
-
-Push-Location $root
-try {
-    if ($Infra) {
-        Write-Step "Starting infrastructure only (databases)"
-        docker compose up -d @infraServices
-    }
-    elseif ($Local) {
-        Write-Step "Starting databases + AUTOMIND + GoalCert in Docker (NextXR runs locally)"
-        $buildArg = if ($Build) { "--build" } else { $null }
-        docker compose --profile full up -d $buildArg @infraServices automind automind-worker goalcert
-    }
-    else {
-        Write-Step "Starting the FULL backend stack in Docker"
-        if ($Build) {
-            Write-Host "  Rebuilding images (this can take a few minutes the first time)..."
-            docker compose --profile full build
-        }
-        docker compose --profile full up -d
-    }
-} finally { Pop-Location }
-
-# ── 3. Wait for Neo4j (every mode needs the graph store) ────────────
-Write-Step "Waiting for Neo4j on :7687 (up to 60s)"
-Write-Host "  " -NoNewline
-for ($i = 0; $i -lt 30; $i++) {
-    if (Test-Port 7687) { break }
-    Start-Sleep -Seconds 2; Write-Host "." -NoNewline
+# ── web app (Vite) locked to :5173 ──
+Step "Web app (Vite) on http://localhost:5173"
+if (-not (Test-Path (Join-Path $webDir "node_modules"))) {
+    Write-Host "  Installing web dependencies (first run only)..." -ForegroundColor DarkGray
+    Push-Location $webDir; npm install; Pop-Location
 }
+Start-Process powershell -ArgumentList "-NoExit", "-Command", (
+    "cd '$webDir'; `$host.UI.RawUI.WindowTitle='Web :5173'; npm run dev")
+Ok "web app starting — http://localhost:5173"
+
+# ── orchestrator (foreground; this window is the app's brain) ──
+Step "Orchestrator on http://localhost:8090  (in-process twin engine — no Docker)"
+Write-Host "  -> Open the demo:  http://localhost:5173" -ForegroundColor Green
+Write-Host "  Stop everything:   ./start.ps1 -Down" -ForegroundColor DarkGray
 Write-Host ""
-if (Test-Port 7687) { Write-Ok "Neo4j is reachable" }
-else { Write-Warn "Neo4j not reachable yet — give it another moment." }
-
-# ── 4. Local mode: run the NextXR backend from the venv ─────────────
-if ($Local) {
-    if (-not (Test-Path $venvPy)) {
-        Write-Warn "venv not found at .venv — create it with:  python -m venv .venv ; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
-        return
-    }
-    Write-Step "Freeing port 8000 (kill stale local servers)"
-    $pids = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
-            Select-Object -ExpandProperty OwningProcess -Unique
-    foreach ($procId in $pids) {
-        try { taskkill /F /T /PID $procId *> $null; Write-Ok "killed stale server (PID $procId)" } catch {}
-    }
-
-    Write-Step "Starting the NextXR backend locally (venv)"
-    Write-Host "  → NextXR API:  http://localhost:8000        (← the frontend talks here)" -ForegroundColor Green
-    Write-Host "  → API docs:    http://localhost:8000/docs" -ForegroundColor Green
-    Write-Host "  → AUTOMIND:    http://localhost:8001    GoalCert: http://localhost:8002" -ForegroundColor Green
-    Write-Host "  Then run the frontend in another window:  cd frontend ; npm run dev" -ForegroundColor Cyan
-    Write-Host ""
-    $env:NEO4J_URI      = "bolt://localhost:7687"
-    $env:NEO4J_USER     = "neo4j"
-    $env:NEO4J_PASSWORD = "nextxr2026"
-    $env:NXR_REDIS_URL  = "redis://localhost:6379/0"
-    $env:AUTOMIND_URL   = "http://localhost:8001"
-    $env:GOALCERT_URL   = "http://localhost:8002"
-    Push-Location $ontology
-    try { & $venvPy -m server.main } finally { Pop-Location }
-    return
-}
-
-# ── 5. Containerized modes: wait for the NextXR API health ──────────
-if (-not $Infra) {
-    Write-Step "Waiting for the NextXR API on :8000 (up to 90s)"
-    Write-Host "  " -NoNewline
-    $healthy = $false
-    for ($i = 0; $i -lt 45; $i++) {
-        try {
-            $r = Invoke-WebRequest -Uri "http://localhost:8000/api/v1/health" -UseBasicParsing -TimeoutSec 3
-            if ($r.StatusCode -eq 200) { $healthy = $true; break }
-        } catch {}
-        Start-Sleep -Seconds 2; Write-Host "." -NoNewline
-    }
-    Write-Host ""
-    if ($healthy) { Write-Ok "NextXR backend is up" }
-    else { Write-Warn "NextXR API not answering yet — check 'docker compose logs -f server'." }
-}
-
-# ── 6. Summary ──────────────────────────────────────────────────────
-Write-Step "Backend is running in Docker"
-docker compose --profile full ps
-Write-Host ""
-if ($Infra) {
-    Write-Host "  Infra only. Run the NextXR backend with:  ./start.ps1 -Local" -ForegroundColor Cyan
-} else {
-    Write-Host "  → NextXR API:  http://localhost:8000        (← the frontend talks here)" -ForegroundColor Green
-    Write-Host "  → API docs:    http://localhost:8000/docs" -ForegroundColor Green
-    Write-Host "  → AUTOMIND:    http://localhost:8001        GoalCert: http://localhost:8002" -ForegroundColor Green
-}
-Write-Host ""
-Write-Host "  Now start the frontend separately (Vite dev server → http://localhost:5173):" -ForegroundColor Cyan
-Write-Host "      cd frontend ; npm run dev" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  Stop everything with:  ./start.ps1 -Down" -ForegroundColor DarkGray
+Push-Location $orch
+try { & $venvPy -m uvicorn main:app --port 8090 } finally { Pop-Location }

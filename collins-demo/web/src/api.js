@@ -39,6 +39,9 @@ export const api = {
   twinScenarios: (domain) => req(`/twins/scenarios?domain=${encodeURIComponent(domain || 'edm-machine')}`),
   simAuthor: (body) => req('/agents/sim/author', { method: 'POST', body: JSON.stringify(body) }),
   simRun: (body) => req('/agents/sim/run', { method: 'POST', body: JSON.stringify(body) }),
+  procedure: (body) => req('/agents/procedure', { method: 'POST', body: JSON.stringify(body) }),
+  scenarioChat: (body) => req('/agents/scenario-chat', { method: 'POST', body: JSON.stringify(body) }),
+  dashboardChat: (body) => req('/agents/dashboard-chat', { method: 'POST', body: JSON.stringify(body) }),
 
   // AI co-pilot: narration, work orders, predictive alerts, cascade analysis
   narrate: (tenant, machine) => req(`/agents/narrate/${tenant}?machine=${encodeURIComponent(machine || 'Turbine Engine')}`),

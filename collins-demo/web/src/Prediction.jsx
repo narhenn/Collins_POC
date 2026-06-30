@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import api from './api'
 import Chart from './Chart.jsx'
+import Markdown from './Markdown.jsx'
 import { Icon, pct, hColor, predictCharts, subsysFor, SUBSYS, simTrajectory, signalsAtRisk, fmt } from './lib.jsx'
 
 const HORIZONS = ['1 hour', '2 hours', '6 hours', '24 hours', '3 days', '1 week', '2 weeks']
@@ -138,7 +139,7 @@ export default function Prediction({ tenant, machineName, domain, isLive = true 
       {narrative && (
         <div className="card section-gap">
           <div className="card-title"><Icon n="ti-message-chatbot" /> AI forecast summary <span className="pill pill-purple">Claude</span></div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{narrative}</div>
+          <Markdown text={narrative} />
         </div>
       )}
     </div>

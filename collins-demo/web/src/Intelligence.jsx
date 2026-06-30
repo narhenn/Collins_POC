@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import api from './api'
+import Markdown from './Markdown.jsx'
 import { Icon, pct, hColor, statusColor, fmt, sevClass, SIG, domainMeta } from './lib.jsx'
 
 /* ── tiny helpers ──────────────────────────────────────────────────── */
@@ -224,19 +225,18 @@ export default function Intelligence({ tenant, machineName, domain, isLive = tru
                 </tbody></table>
               </div>
             </div>
-            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap',
-              borderLeft: '3px solid var(--accent-blue)', paddingLeft: 12, background: 'var(--brand-softer)',
-              borderRadius: '0 10px 10px 0', padding: '12px 14px 12px 14px', borderLeftWidth: 3, borderLeftStyle: 'solid',
-              borderLeftColor: 'var(--accent-blue)' }}>{diag.report}</div>
+            <div style={{ marginTop: 14, borderLeft: '3px solid var(--accent-blue)', paddingLeft: 12,
+              background: 'var(--brand-softer)', borderRadius: '0 10px 10px 0', padding: '12px 14px' }}>
+              <Markdown text={diag.report} /></div>
           </div>
         )}
 
         {analysis && (
           <div className="card">
             <div className="card-title"><Icon n="ti-trending-up" /> Analysis <span className="pill pill-purple">Claude</span></div>
-            <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap',
-              borderLeft: '3px solid var(--accent-teal)', padding: '12px 14px',
-              background: 'rgba(13,148,136,.04)', borderRadius: '0 10px 10px 0' }}>{analysis.report}</div>
+            <div style={{ borderLeft: '3px solid var(--accent-teal)', padding: '12px 14px',
+              background: 'rgba(13,148,136,.04)', borderRadius: '0 10px 10px 0' }}>
+              <Markdown text={analysis.report} /></div>
           </div>
         )}
       </>}
