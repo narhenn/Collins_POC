@@ -498,14 +498,9 @@ def analysis_agent(diagnostics: dict, prediction: dict, machine: str,
 
 def narrate_sensors(state: dict, machine: str, prediction: dict | None = None) -> str:
     """Claude watches the current sensor snapshot and issues a 1-2 sentence
-<<<<<<< HEAD
     observation in real-time, like an experienced operations engineer. Works for
     any twin (turbine, wire-EDM, facility…) — it reasons from whatever signals it
     is given, so the same co-pilot narrates every machine from its own telemetry."""
-=======
-    observation in real-time. Includes prediction context for forward-looking
-    narration like 'EGT redline projected in ~18 minutes'."""
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
     signals = state.get("latest", state.get("signals", {}))
     findings = state.get("findings", [])
     health = state.get("health", {})
@@ -514,20 +509,6 @@ def narrate_sensors(state: dict, machine: str, prediction: dict | None = None) -
     crossings = [r for r in rul if r.get("within_horizon")]
 
     def _stub() -> str:
-<<<<<<< HEAD
-=======
-        egt = signals.get("aero:exhaustGasTemp")
-        vib = signals.get("aero:vibrationG")
-        n1 = signals.get("aero:shaftSpeedN1")
-        if crossings:
-            c = crossings[0]
-            return f"Heads up — {c['mode']} projected in ~{c.get('time_to_limit_min', '?'):.0f} minutes at current degradation rate. Recommend reducing thrust."
-        if egt and egt > 720:
-            res = residuals.get("aero:exhaustGasTemp", 0)
-            return f"EGT climbing through {egt:.0f}C (physics residual: +{res:.0f}C). Hot section may be degrading."
-        if vib and vib > 1.0:
-            return f"Vibration at {vib:.2f}g — above the baseline. Could be early bearing wear."
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
         if findings:
             return f"Active finding: {findings[0].get('message', 'anomaly detected')[:90]}."
         # Generic, domain-neutral fallback from whatever signals exist.
@@ -543,19 +524,11 @@ def narrate_sensors(state: dict, machine: str, prediction: dict | None = None) -
     try:
         import json as _json
         system = (
-<<<<<<< HEAD
             f"You are an experienced operations & maintenance engineer monitoring "
             f"a live {machine} on the control console. Given the current sensor "
             "readings, issue ONE concise observation (1-2 sentences, present tense). "
             "Flag anomalies, trends, or quiet-but-concerning patterns and name the "
             "specific signals. Sound experienced and calm — not alarmed unless "
-=======
-            "You are a turbine test cell engineer watching a live ground run on "
-            "the monitoring console. Given the current sensor readings and physics "
-            "residuals (measured minus expected), issue ONE concise observation "
-            "(1-2 sentences, present tense). If a RUL crossing is projected, mention "
-            "the estimated time. Sound experienced and calm — not alarmed unless "
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
             "readings are truly critical. No preamble, no labels.")
         user = (
             f"Machine: {machine}\n"
