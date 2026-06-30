@@ -3,7 +3,7 @@ import api from './api'
 import { Logo, Icon, SIG, sevClass, fmt, pct, hColor, statusColor,
   DOMAINS, domainMeta, tilesFor, simTwin } from './lib.jsx'
 import Scenario from './Scenario.jsx'
-import Intelligence from './Intelligence.jsx'
+import Intelligence, { StepFlow } from './Intelligence.jsx'
 import Prediction from './Prediction.jsx'
 import BuildTwin from './BuildTwin.jsx'
 import TurbineModel from './TurbineModel.jsx'
@@ -497,29 +497,58 @@ function Dashboard({ ctx }) {
               </button>
             </div>
           ) : (
-            <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <div><span style={{ color: 'var(--hint)' }}>WO#:</span> <b>{wo.wo_number}</b></div>
-                <div><span style={{ color: 'var(--hint)' }}>ATA:</span> {wo.ata_chapter}</div>
-                <div><span style={{ color: 'var(--hint)' }}>Priority:</span> <span className={`pill ${wo.priority === 'AOG' ? 'pill-red' : 'pill-surface'}`}>{wo.priority}</span></div>
-                <div><span style={{ color: 'var(--hint)' }}>Est. Hours:</span> {wo.estimated_hours}h</div>
-                <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--hint)' }}>Compliance:</span> {wo.compliance_ref}</div>
+            <div>
+              {/* WO header KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+                <div className="kpibox"><div className="l">WO Number</div><div className="v" style={{ fontSize: 15 }}>{wo.wo_number}</div></div>
+                <div className="kpibox"><div className="l">ATA Chapter</div><div className="v" style={{ fontSize: 13 }}>{wo.ata_chapter}</div></div>
+                <div className="kpibox"><div className="l">Priority</div><div className="v">
+                  <span className={`pill ${wo.priority === 'AOG' ? 'pill-red' : wo.priority === 'Critical' ? 'pill-amber' : 'pill-surface'}`}>{wo.priority}</span></div></div>
+                <div className="kpibox"><div className="l">Est. Hours</div><div className="v">{wo.estimated_hours}h</div></div>
               </div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Fault: {wo.fault_description}</div>
-              <div style={{ color: 'var(--hint)', marginBottom: 10 }}>Root Cause: {wo.root_cause}</div>
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Repair Steps:</div>
-              {(wo.steps || []).map((s, i) => (
-                <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div><b>Step {s.step}:</b> {s.action}</div>
-                  <div style={{ color: 'var(--hint)', fontSize: 11 }}>Criteria: {s.criteria}</div>
-                  {s.safety && <div style={{ color: 'var(--accent-amber)', fontSize: 11 }}><Icon n="ti-alert-triangle" /> {s.safety}</div>}
+
+              {/* fault + root cause */}
+              <div className="grid-2" style={{ marginBottom: 16, gap: 10 }}>
+                <div style={{ background: 'rgba(225,29,72,.04)', border: '1px solid rgba(225,29,72,.12)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div className="card-label" style={{ color: 'var(--accent-red)' }}>Fault Description</div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 6 }}>{wo.fault_description}</div>
                 </div>
-              ))}
+                <div style={{ background: 'rgba(217,119,6,.04)', border: '1px solid rgba(217,119,6,.12)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div className="card-label" style={{ color: 'var(--accent-amber)' }}>Root Cause</div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.6, marginTop: 6 }}>{wo.root_cause}</div>
+                </div>
+              </div>
+
+              {/* compliance */}
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon n="ti-certificate" /> Compliance: {wo.compliance_ref}
+              </div>
+
+              {/* repair steps as visual flow */}
+              <div className="card-label" style={{ marginBottom: 10 }}>Repair Procedure</div>
+              <StepFlow steps={wo.steps || []} />
+
+              {/* parts as chips */}
               {wo.parts_required?.length > 0 && (
-                <div style={{ marginTop: 10 }}><span style={{ color: 'var(--hint)' }}>Parts:</span> {wo.parts_required.join(', ')}</div>
+                <div style={{ marginTop: 16 }}>
+                  <div className="card-label" style={{ marginBottom: 8 }}>Parts Required</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {wo.parts_required.map((p, i) => (
+                      <span key={i} className="pill pill-blue" style={{ fontSize: 11, padding: '4px 10px' }}>{p}</span>
+                    ))}
+                  </div>
+                </div>
               )}
-              <div style={{ marginTop: 8, color: 'var(--hint)' }}>Sign-off: {wo.sign_off}</div>
-              <button className="btn" onClick={printWO} style={{ marginTop: 12 }}><Icon n="ti-printer" /> Print Work Order</button>
+
+              {/* sign-off + print */}
+              <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(22,163,74,.04)', border: '1px solid rgba(22,163,74,.12)',
+                borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div className="card-label" style={{ color: 'var(--accent-green)' }}>Sign-off</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>{wo.sign_off}</div>
+                </div>
+                <button className="btn" onClick={printWO}><Icon n="ti-printer" /> Print</button>
+              </div>
             </div>
           )}
         </div>
@@ -529,7 +558,7 @@ function Dashboard({ ctx }) {
       {source && (
         <div className="card section-gap">
           <div className="card-title"><Icon n="ti-affiliate" /> Cascade Analysis
-            <span className="pill pill-surface" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
+            <span className="pill pill-purple" style={{ fontSize: 9 }}>Claude</span>
           </div>
           {!cascade ? (
             <div>
@@ -539,8 +568,12 @@ function Dashboard({ ctx }) {
               </button>
             </div>
           ) : (
-            <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-              <Markdown text={cascade} />
+            <div>
+              <div style={{ fontSize: 13, lineHeight: 1.8,
+                borderLeft: '3px solid var(--brand-2)', padding: '14px 16px',
+                background: 'var(--brand-softer)', borderRadius: '0 12px 12px 0' }}>
+                <Markdown text={cascade} />
+              </div>
               <button className="btn" onClick={runCascade} disabled={cascadeLoading} style={{ marginTop: 12 }}>
                 {cascadeLoading ? <><span className="spinner" /> Analyzing…</> : <><Icon n="ti-refresh" /> Re-run</>}
               </button>
