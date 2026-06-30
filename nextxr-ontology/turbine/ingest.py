@@ -70,6 +70,8 @@ class _TenantTwin:
         self.physics = TurbinePhysics()
         self.fwd_state = self.physics.init_state()   # for throttle-driven sim
         self.latest: dict[str, float] = {}      # signal -> value
+        self.history: dict[str, list] = {}      # signal -> [{t, v}] ring buffer (last 120 pts)
+        self._history_max = 120
         self.findings_emitted = 0
         self.frames = 0
         self.last_diag = 0.0
@@ -99,6 +101,13 @@ class _TenantTwin:
         with self.lock:
             self.latest.update(readings)
             self.frames += 1
+            # Record history for sparklines and trend charts
+            t_iso = ts.isoformat()
+            for sig, val in readings.items():
+                buf = self.history.setdefault(sig, [])
+                buf.append({"t": t_iso, "v": round(val, 2)})
+                if len(buf) > self._history_max:
+                    buf.pop(0)
 
             # 1. Stamp co-located latest values on the engine node so Tier-A
             #    residual behaviours can read fuel/N1/EGT together.
@@ -275,6 +284,10 @@ class _TenantTwin:
             incidents = self.query.list_by_label(self.tenant, "Incident", limit=5)
         except Exception:  # noqa: BLE001
             pass
+        # Build compact sparkline data (last 30 points per signal)
+        with self.lock:
+            sparklines = {sig: pts[-30:] for sig, pts in self.history.items()}
+
         return {
             "tenant": self.tenant,
             "entity_id": self.entity_id,
@@ -283,9 +296,18 @@ class _TenantTwin:
             "health": round(health, 3),
             "latest": latest,
             "residuals": {k: round(v, 1) for k, v in residuals.items()},
+            "sparklines": sparklines,
             "findings": findings,
             "incidents": incidents,
         }
+
+    def get_history(self, signal: str | None = None, points: int = 120) -> dict:
+        """Return time-series history for one or all signals."""
+        with self.lock:
+            if signal:
+                pts = self.history.get(signal, [])
+                return {signal: pts[-points:]}
+            return {sig: pts[-points:] for sig, pts in self.history.items()}
 
 
 class IngestService:

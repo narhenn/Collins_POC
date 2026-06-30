@@ -52,6 +52,11 @@ export const api = {
   predictAlert: (body) => req('/agents/predict-alert', { method: 'POST', body: JSON.stringify(body) }),
   cascade: (body) => req('/agents/cascade', { method: 'POST', body: JSON.stringify(body) }),
 
+  // new agents: troubleshooting, procurement, incident report
+  troubleshoot: (body) => req('/agents/troubleshoot', { method: 'POST', body: JSON.stringify(body) }),
+  procurement: (body) => req('/agents/procurement', { method: 'POST', body: JSON.stringify(body) }),
+  incidentReport: (body) => req('/agents/incident-report', { method: 'POST', body: JSON.stringify(body) }),
+
   // build a twin: conversational agent + Tripo image->3D
   buildTwinMessage: (body) => req('/build-twin/message', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinGenerate: (body) => req('/build-twin/generate', { method: 'POST', body: JSON.stringify(body) }),

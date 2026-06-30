@@ -19,8 +19,13 @@ from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
     diagnosis_agent, analysis_agent, build_twin_reply,
     narrate_sensors, generate_work_order, predictive_alert,
+<<<<<<< HEAD
     cascade_analysis, asset_status, author_sim, analyze_projection,
     diagnose_snapshot, forecast_snapshot,
+=======
+    cascade_analysis, troubleshoot_chat, parts_procurement_agent,
+    generate_incident_report,
+>>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
 )
 from config import config
 
@@ -403,9 +408,20 @@ def sim_run(req: SimRunReq):
 @router.get("/agents/narrate/{tenant}")
 def narrate(tenant: str, machine: str = "Turbine Engine"):
     """Real-time AI narration — Claude watches the live sensor stream and
+<<<<<<< HEAD
     issues a 1-2 sentence observation like an experienced engineer."""
+=======
+    issues a 1-2 sentence observation like an experienced test cell engineer.
+    Includes prediction context so narration can reference upcoming limits."""
+>>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
     state = nextxr.ingest_state(tenant)
-    text = narrate_sensors(state, machine)
+    # Feed prediction into narration so it can say "redline in ~18 min"
+    prediction = None
+    try:
+        prediction = nextxr.predict(tenant, horizon_min=60)
+    except Exception:
+        pass
+    text = narrate_sensors(state, machine, prediction=prediction)
     return {"narration": text, "tenant": tenant}
 
 
@@ -523,6 +539,47 @@ def cascade(req: AgentRunRequest):
     prediction = nextxr.predict(req.tenant, horizon_min=horizon_min)
     analysis = cascade_analysis(diag, prediction, req.machine)
     return {"cascade_analysis": analysis, "diagnostics": diag}
+
+
+# ── Multi-turn troubleshooting chatbot ────────────────────────────────
+
+class TroubleshootRequest(BaseModel):
+    tenant: str
+    machine: str = "Turbine Engine"
+    history: list[dict] = []
+    message: str = ""
+
+
+@router.post("/agents/troubleshoot")
+def troubleshoot(req: TroubleshootRequest):
+    """Multi-turn diagnostic chatbot — the AI Mechanic. Asks clarifying
+    questions to narrow down the fault hypothesis."""
+    diag = nextxr.diagnostics(req.tenant)
+    reply = troubleshoot_chat(req.history, req.message, diag, req.machine)
+    return reply.model_dump()
+
+
+# ── Parts procurement agent ──────────────────────────────────────────
+
+@router.post("/agents/procurement")
+def procurement(req: WorkOrderRequest):
+    """From the current diagnosis, generate a work order then identify
+    specific parts needed with costs and lead times."""
+    diag = nextxr.diagnostics(req.tenant)
+    wo = generate_work_order(diag, req.machine)
+    parts = parts_procurement_agent(wo.model_dump(), req.machine)
+    return {"work_order": wo.model_dump(), "procurement": parts.model_dump()}
+
+
+# ── Incident report generator ────────────────────────────────────────
+
+@router.post("/agents/incident-report")
+def incident_report(req: AgentRunRequest):
+    """Generate a formal MRO incident report with regulatory closure."""
+    diag = nextxr.diagnostics(req.tenant)
+    findings = diag.get("findings", [])
+    report = generate_incident_report(diag, findings, req.machine)
+    return {"report": report.model_dump()}
 
 
 # ── 5. AUTOMIND agents on top ────────────────────────────────────────
