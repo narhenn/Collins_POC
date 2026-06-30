@@ -367,7 +367,7 @@ function WorkflowPipeline({ findings, incidents, health, wo, cascade, onMaint })
 
 // ── Generic, domain-aware dashboard ──────────────────────────────────
 function Dashboard({ ctx }) {
-  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint } = ctx
+  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint, setSimFault } = ctx
   const live = twin?.latest || {}
   const h = twin?.health
   const findings = twin?.findings || []
@@ -482,12 +482,19 @@ function Dashboard({ ctx }) {
   const [faults, setFaults] = useState([])
   const [fault, setFault] = useState('')
   useEffect(() => {
-    if (!isLive) { setFaults([]); setFault(''); return }
+    // load fault catalogue for ALL domains (live and simulated)
     api.twinFaults(domain).then(r => setFaults(r?.faults || [])).catch(() => {})
-  }, [isLive, domain])
+  }, [domain])
   const injectFault = async (f) => {
-    setFault(f === 'none' ? '' : f)
-    try { await api.step({ tenant, fault: f || 'none', severity: 1.0 }) } catch {}
+    const faultId = f === 'none' ? '' : f
+    setFault(faultId)
+    if (isLive) {
+      // live twin: push fault into the physics engine
+      try { await api.step({ tenant, fault: f || 'none', severity: 1.0 }) } catch {}
+    } else if (setSimFault) {
+      // simulated twin: bias the frontend simulation
+      setSimFault(faultId || null)
+    }
   }
 
   return (
@@ -498,24 +505,24 @@ function Dashboard({ ctx }) {
           <div className="panel-subtitle">{machineName} · streaming sensor telemetry in real time</div>
         </div>
         <div className="panel-actions">
-          <button className={`btn ${findings.length ? 'btn-primary repair-cta' : ''}`} onClick={openMaint}
+          <button className="btn btn-primary repair-cta" onClick={openMaint}
             title="Enter AI Maintenance Director">
             <Icon n="ti-robot" /> Repair with AI
           </button>
-          {isLive && (domain === 'edm-machine' || domain === 'turbine-engine') && <>
+          {isLive && <>
             <span className="hint" style={{ alignSelf: 'center' }}>{throttleLabel}:</span>
             <button className="btn" onClick={() => stepLive(0.5)}>Low</button>
             <button className="btn" onClick={() => stepLive(0.75)}>Mid</button>
             <button className="btn btn-primary" onClick={() => stepLive(1.0)}>High</button>
-            {faults.length > 0 && (
-              <select className="select" style={{ width: 'auto', minWidth: 150 }}
-                value={fault} onChange={e => injectFault(e.target.value)}>
-                <option value="">Inject fault…</option>
-                <option value="none">✓ Healthy (clear)</option>
-                {faults.map(f => <option key={f.id} value={f.id}>⚠ {f.label}</option>)}
-              </select>
-            )}
           </>}
+          {faults.length > 0 && (
+            <select className="select" style={{ width: 'auto', minWidth: 150 }}
+              value={fault} onChange={e => injectFault(e.target.value)}>
+              <option value="">Inject fault…</option>
+              <option value="none">✓ Healthy (clear)</option>
+              {faults.map(f => <option key={f.id} value={f.id}>⚠ {f.label}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
