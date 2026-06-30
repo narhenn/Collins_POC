@@ -356,7 +356,6 @@ function Dashboard({ ctx }) {
         </div>
       </div>
 
-<<<<<<< HEAD
       {/* KPIs — the dashboard summary, on top */}
       <div className="grid-4 section-gap">
         <div className="card kpi"><div className="card-label">Twin Health</div>
@@ -372,20 +371,6 @@ function Dashboard({ ctx }) {
           <div className="card-value" style={{ color: sevClass(headlineSig, live[headlineSig]) === 'crit' ? 'var(--accent-red)' : 'var(--text)' }}>
             {fmt(live[headlineSig])}<span style={{ fontSize: 14 }}>{headline.unit ? ' ' + headline.unit : ''}</span></div>
           <div className="card-change">{headline.crit != null ? `limit ${headline.crit} ${headline.unit}` : headline.critLow != null ? `min ${headline.critLow} ${headline.unit}` : 'live'}</div></div>}
-=======
-      {/* 3D hero — live model when generated, else placeholder */}
-      <div className="section-gap">
-        {modelUrl
-          ? <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} health={twin?.health} />
-          : <div className="hero3d">
-              <div className="v-chip"><Icon n="ti-cube" /> <b>3D Twin</b> · {machineName}</div>
-              <div className="lbl">
-                <div className="big">⬡ 3D Turbine Visualization</div>
-                {tenant ? <>Build the 3D model from a 2D image — <a style={{ color: '#c4b5fd', cursor: 'pointer' }} onClick={goBuild}>open Build a Twin</a>.</>
-                  : 'Build a twin to start the live stream and 3D model.'}
-              </div>
-            </div>}
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
       </div>
 
       {/* 3D twin scene */}
@@ -407,7 +392,6 @@ function Dashboard({ ctx }) {
           <div className="card-title" style={{ color: 'var(--accent-red)' }}><Icon n="ti-alert-octagon" /> Predictive Alert</div>
           <div style={{ fontSize: 13, lineHeight: 1.7 }}>{alert}</div>
         </div>
-<<<<<<< HEAD
       )}
 
       {/* AI co-pilot — narrates every twin from its own live telemetry */}
@@ -415,25 +399,6 @@ function Dashboard({ ctx }) {
         <div className="card section-gap">
           <div className="card-title"><Icon n="ti-message-chatbot" /> AI Co-Pilot {narrating && <span className="spinner" style={{ marginLeft: 8 }} />}
             <span className="pill pill-green" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
-=======
-      ) : (
-        <>
-          {/* KPIs */}
-          <div className="grid-4 section-gap">
-            <div className="card kpi" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div className="card-label">Twin Health</div>
-              <HealthDonut value={h} size={72} />
-              <div className="card-change">physics health index</div></div>
-            <div className="card kpi"><div className="card-label">Risk</div>
-              <div className="card-value">{risk == null ? '—' : risk}</div>
-              <div className="card-change">{risk >= 60 ? 'HIGH' : risk >= 30 ? 'ELEVATED' : 'LOW'}</div></div>
-            <div className="card kpi"><div className="card-label">Active Findings</div>
-              <div className="card-value" style={{ color: 'var(--accent-amber)' }}>{findings.length}</div>
-              <div className="card-change">{incidents.length} incident(s)</div></div>
-            <div className="card kpi"><div className="card-label">EGT</div>
-              <div className="card-value" style={{ color: egt >= 780 ? 'var(--accent-red)' : 'var(--text)' }}>{fmt(egt)}<span style={{ fontSize: 14 }}>°C</span></div>
-              <div className="card-change">redline 780 °C</div></div>
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
           </div>
           {narration.length === 0
             ? <div className="empty">Waiting for sensor data to narrate…</div>
@@ -497,7 +462,6 @@ function Dashboard({ ctx }) {
           <div className="card-title"><Icon n="ti-file-certificate" /> Maintenance Work Order
             <span className="pill pill-surface" style={{ fontSize: 9 }}>AS9100 / EASA Part 145</span>
           </div>
-<<<<<<< HEAD
           {!wo ? (
             <div>
               <div className="empty" style={{ marginBottom: 12 }}>Generate a compliant maintenance work order from the current diagnosis.</div>
@@ -526,97 +490,6 @@ function Dashboard({ ctx }) {
               ))}
               {wo.parts_required?.length > 0 && (
                 <div style={{ marginTop: 10 }}><span style={{ color: 'var(--hint)' }}>Parts:</span> {wo.parts_required.join(', ')}</div>
-=======
-
-          {/* Live telemetry with sparklines */}
-          <div className="card section-gap">
-            <div className="card-title"><Icon n="ti-activity" /> Live Telemetry
-              <span className="pill pill-green">● streaming</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--hint)', fontFamily: 'var(--mono)' }}>
-                {twin?.frames || 0} frames
-              </span>
-            </div>
-            <div className="sensor-grid">
-              {TILE_ORDER.filter(s => live[s] != null).map(s => {
-                const sparkData = (twin?.sparklines || {})[s] || []
-                return (
-                  <div key={s} className={`sensor-card ${sevClass(s, live[s])}`}>
-                    <span className="live-indicator" />
-                    <div className="sensor-label">{SIG[s].label}</div>
-                    <div><span className="sensor-value">{fmt(live[s])}</span><span className="sensor-unit">{SIG[s].unit}</span></div>
-                    {sparkData.length > 3 && <Sparkline data={sparkData} signal={s} />}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Findings + incidents */}
-          <div className="grid-2">
-            <div className="card">
-              <div className="card-title"><Icon n="ti-alert-triangle" /> Active Findings
-                <span className="pill pill-surface">{findings.length}</span></div>
-              {findings.length === 0
-                ? <div className="empty">No findings — engine within limits.</div>
-                : <div className="event-list">{findings.slice(0, 6).map((f, i) => (
-                    <div key={i} className="event-item">
-                      <div className={`event-icon ${f.severity === 'critical' ? 'ev-crit' : 'ev-warn'}`}><Icon n="ti-alert-triangle" /></div>
-                      <div className="event-body"><div className="event-title">{f.behaviorId || 'finding'}</div>
-                        <div className="event-meta">{f.message}</div></div>
-                    </div>))}</div>}
-            </div>
-            <div className="card">
-              <div className="card-title"><Icon n="ti-git-merge" /> Incidents
-                <span className="pill pill-surface">{incidents.length}</span></div>
-              {incidents.length === 0
-                ? <div className="empty">No incidents grouped yet.</div>
-                : <div className="event-list">{incidents.map((inc, i) => (
-                    <div key={i} className="event-item" style={{ borderColor: 'rgba(225,29,72,.25)' }}>
-                      <div className="event-icon ev-crit"><Icon n="ti-urgent" /></div>
-                      <div className="event-body"><div className="event-title">{inc.displayName || 'Incident'}</div>
-                        <div className="event-meta">{inc.severity} · {inc.status}</div></div>
-                    </div>))}</div>}
-            </div>
-          </div>
-
-          {/* Work Order generation */}
-          {findings.length > 0 && (
-            <div className="card section-gap">
-              <div className="card-title"><Icon n="ti-file-certificate" /> AS9100 Work Order
-                <span className="pill pill-surface" style={{ fontSize: 9 }}>EASA Part 145</span>
-              </div>
-              {!wo ? (
-                <div>
-                  <div className="empty" style={{ marginBottom: 12 }}>Generate an AS9100-compliant maintenance work order from the current diagnosis.</div>
-                  <button className="btn btn-primary" onClick={generateWO} disabled={woLoading} style={{ width: '100%' }}>
-                    {woLoading ? <><span className="spinner" /> Generating...</> : <><Icon n="ti-file-certificate" /> Generate Work Order</>}
-                  </button>
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, lineHeight: 1.8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                    <div><span style={{ color: 'var(--hint)' }}>WO#:</span> <b>{wo.wo_number}</b></div>
-                    <div><span style={{ color: 'var(--hint)' }}>ATA:</span> {wo.ata_chapter}</div>
-                    <div><span style={{ color: 'var(--hint)' }}>Priority:</span> <span className={`pill ${wo.priority === 'AOG' ? 'pill-red' : 'pill-surface'}`}>{wo.priority}</span></div>
-                    <div><span style={{ color: 'var(--hint)' }}>Est. Hours:</span> {wo.estimated_hours}h</div>
-                    <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--hint)' }}>Compliance:</span> {wo.compliance_ref}</div>
-                  </div>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Fault: {wo.fault_description}</div>
-                  <div style={{ color: 'var(--hint)', marginBottom: 10 }}>Root Cause: {wo.root_cause}</div>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Repair Steps:</div>
-                  {(wo.steps || []).map((s, i) => (
-                    <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div><b>Step {s.step}:</b> {s.action}</div>
-                      <div style={{ color: 'var(--hint)', fontSize: 11 }}>Criteria: {s.criteria}</div>
-                      {s.safety && <div style={{ color: 'var(--accent-amber)', fontSize: 11 }}><Icon n="ti-alert-triangle" /> {s.safety}</div>}
-                    </div>
-                  ))}
-                  {wo.parts_required?.length > 0 && (
-                    <div style={{ marginTop: 10 }}><span style={{ color: 'var(--hint)' }}>Parts:</span> {wo.parts_required.join(', ')}</div>
-                  )}
-                  <div style={{ marginTop: 8, color: 'var(--hint)' }}>Sign-off: {wo.sign_off}</div>
-                </div>
->>>>>>> b897b07ed9b73494ac064fa1e9e96bd43a31fe69
               )}
               <div style={{ marginTop: 8, color: 'var(--hint)' }}>Sign-off: {wo.sign_off}</div>
               <button className="btn" onClick={printWO} style={{ marginTop: 12 }}><Icon n="ti-printer" /> Print Work Order</button>
@@ -650,50 +523,5 @@ function Dashboard({ ctx }) {
       )}
 
     </div>
-  )
-}
-
-/** Inline SVG sparkline for sensor cards */
-function Sparkline({ data, signal }) {
-  if (!data || data.length < 3) return null
-  const vals = data.map(d => d.v)
-  const min = Math.min(...vals)
-  const max = Math.max(...vals)
-  const range = max - min || 1
-  const w = 100, h = 24
-  const pts = vals.map((v, i) =>
-    `${(i / (vals.length - 1)) * w},${h - ((v - min) / range) * h}`
-  ).join(' ')
-  const color = sevClass(signal, vals[vals.length - 1]).includes('crit') ? '#e2564e'
-    : sevClass(signal, vals[vals.length - 1]).includes('warn') ? '#e0962f'
-    : '#22cc77'
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
-         style={{ marginTop: 4, opacity: 0.7 }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5"
-                vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
-}
-
-/** SVG health donut ring */
-function HealthDonut({ value, size = 64 }) {
-  const pct = Math.max(0, Math.min(1, value || 0))
-  const r = (size - 8) / 2
-  const circ = 2 * Math.PI * r
-  const offset = circ * (1 - pct)
-  const color = pct > 0.7 ? '#22cc77' : pct > 0.4 ? '#e0962f' : '#e2564e'
-  return (
-    <svg width={size} height={size} style={{ display: 'block' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="5"
-              strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-              transform={`rotate(-90 ${size/2} ${size/2})`}
-              style={{ transition: 'stroke-dashoffset 0.5s ease' }} />
-      <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
-            fill="var(--text)" fontSize="14" fontWeight="700" fontFamily="var(--mono)">
-        {Math.round(pct * 100)}%
-      </text>
-    </svg>
   )
 }
