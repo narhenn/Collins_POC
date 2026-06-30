@@ -29,8 +29,9 @@ def _client(token: str | None = None) -> httpx.Client:
 
 
 def health() -> dict:
+    # Short timeout so the health badge stays snappy when AUTOMIND is down.
     try:
-        with httpx.Client(timeout=10.0) as c:
+        with httpx.Client(timeout=2.5) as c:
             r = c.get(config.AUTOMIND_URL.rstrip("/") + "/docs")
             return {"ok": r.status_code == 200}
     except Exception as e:  # noqa: BLE001
@@ -60,9 +61,11 @@ def _login() -> str | None:
 
 
 def status() -> dict:
-    """Lightweight reachability + auth status for the UI."""
-    tok = _login()
-    return {"reachable": health().get("ok", False), "authenticated": bool(tok)}
+    """Lightweight reachability + auth status for the UI. Skips the (slow) login
+    attempt entirely when AUTOMIND isn't reachable, so /health stays fast."""
+    if not health().get("ok", False):
+        return {"reachable": False, "authenticated": False}
+    return {"reachable": True, "authenticated": bool(_login())}
 
 
 def ensure_agent(token: str) -> str | None:

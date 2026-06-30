@@ -19,7 +19,8 @@ from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
     diagnosis_agent, analysis_agent, build_twin_reply,
     narrate_sensors, generate_work_order, predictive_alert,
-    cascade_analysis,
+    cascade_analysis, asset_status, author_sim, analyze_projection,
+    diagnose_snapshot, forecast_snapshot,
 )
 from config import config
 
@@ -104,14 +105,25 @@ def serve_model(tenant: str):
 
 @router.get("/health")
 def health():
-    """Reachability of all three platforms + whether Claude is wired."""
+    """Reachability of all three platforms + whether Claude is wired. The platform
+    probes run concurrently so a single down service (slow to refuse on Windows)
+    can't stall the whole health check."""
+    from concurrent.futures import ThreadPoolExecutor
+    probes = {"nextxr": nextxr.health, "goalcert": goalcert.health,
+              "automind": automind.status}
+    out = {}
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futs = {k: ex.submit(fn) for k, fn in probes.items()}
+        for k, f in futs.items():
+            try:
+                out[k] = f.result(timeout=6)
+            except Exception as e:  # noqa: BLE001
+                out[k] = {"ok": False, "error": str(e)}
     return {
         "orchestrator": "ok",
         "claude": {"enabled": config.claude_enabled, "model": config.CLAUDE_MODEL},
         "tripo": {"enabled": config.tripo_enabled},
-        "nextxr": nextxr.health(),
-        "goalcert": goalcert.health(),
-        "automind": automind.status(),
+        **out,
     }
 
 
@@ -223,15 +235,252 @@ def feed_stop():
     return nextxr.stop_feed()
 
 
+# ── Twins library: list domain templates + create any twin ─────────
+
+@router.get("/twins/templates")
+def twins_templates():
+    """The twin-domain templates the platform can seed (turbine, wire-EDM,
+    facility, datacenter-style…) — what the Twins library offers."""
+    return {"templates": nextxr.list_templates()}
+
+
+class CreateTwinReq(BaseModel):
+    name: str = "Twin"
+    domain: str = "edm-machine"
+
+
+@router.post("/twins/create")
+def twins_create(req: CreateTwinReq):
+    """Create + seed a twin of any domain (e.g. 'edm-machine', 'turbine-engine',
+    'generic-facility'). Returns tenant + primary machine + assets; the live
+    feed and every Claude agent then work against it unchanged."""
+    return nextxr.build_domain(req.name, req.domain)
+
+
+# Static fault catalogue per machine domain, so the Scenario panel can offer
+# the right what-ifs. (Live faults are driven through the feed simulate path.)
+TWIN_FAULTS = {
+    "edm-machine": [
+        {"id": "wire_break", "label": "Wire breakage"},
+        {"id": "dielectric_contamination", "label": "Dielectric contamination"},
+        {"id": "flushing_loss", "label": "Flushing loss"},
+        {"id": "guide_wear", "label": "Guide / roller wear"},
+        {"id": "chiller_failure", "label": "Dielectric chiller failure"},
+        {"id": "servo_instability", "label": "Servo / gap-control instability"},
+    ],
+    "turbine-engine": [
+        {"id": "blade_erosion", "label": "Blade erosion"},
+        {"id": "nozzle_coking", "label": "Nozzle coking"},
+        {"id": "bearing_wear", "label": "Bearing wear"},
+        {"id": "oil_starvation", "label": "Oil starvation"},
+        {"id": "compressor_fouling", "label": "Compressor fouling"},
+        {"id": "surge", "label": "Compressor surge"},
+    ],
+    "datacenter": [
+        {"id": "crac_failure", "label": "CRAC cooling failure"},
+        {"id": "thermal_runaway", "label": "Rack thermal runaway"},
+        {"id": "ups_depletion", "label": "UPS battery depletion"},
+        {"id": "power_surge", "label": "Power distribution surge"},
+    ],
+    "hospital": [
+        {"id": "laminar_loss", "label": "OR laminar-flow loss"},
+        {"id": "medgas_drop", "label": "Medical gas pressure drop"},
+        {"id": "coldchain_excursion", "label": "Pharmacy cold-chain excursion"},
+        {"id": "hvac_fault", "label": "Ward HVAC fault"},
+    ],
+    "manufacturing": [
+        {"id": "spindle_bearing", "label": "CNC spindle bearing wear"},
+        {"id": "robot_overload", "label": "Robot joint overload"},
+        {"id": "conveyor_jam", "label": "Conveyor jam / overload"},
+        {"id": "compressor_fault", "label": "Compressed-air failure"},
+    ],
+}
+
+
+@router.get("/twins/faults")
+def twins_faults(domain: str = "edm-machine"):
+    """The injectable fault catalogue for a twin domain (for the Scenario panel)."""
+    return {"domain": domain, "faults": TWIN_FAULTS.get(domain, [])}
+
+
+# External-situation presets per domain (the "Scenarios" tab examples). These are
+# starting prompts; the agent authors a runnable spec from any free-text request.
+SCENARIO_PRESETS = {
+    "edm-machine": [
+        {"title": "Summer heatwave", "description": "Shop ambient climbs toward 40C across a long shift and the dielectric chiller struggles to hold tank temperature."},
+        {"title": "New dielectric batch", "description": "A supplier change delivered dielectric with higher conductivity and the de-ioniser resin is near end of life."},
+        {"title": "Aggressive roughing run", "description": "Operator pushes maximum discharge energy for a fast roughing cut through thick stock."},
+        {"title": "Unattended overnight cut", "description": "A long lights-out job runs for hours with nobody to clear debris or restore flushing."},
+    ],
+    "turbine-engine": [
+        {"title": "Hot-and-high takeoff", "description": "Full-thrust ground run on a 45C day with reduced air density."},
+        {"title": "Sustained max-continuous", "description": "Engine held at near-maximum thrust for an extended endurance run."},
+        {"title": "Off-spec fuel batch", "description": "A batch of contaminated fuel feeds the combustor during a full-power run."},
+    ],
+    "datacenter": [
+        {"title": "AI training surge", "description": "Every rack pushed to 100% load for hours during a large model training run."},
+        {"title": "Cooling maintenance on a hot day", "description": "One CRAC unit is taken offline for service while ambient is high."},
+        {"title": "Grid brownout", "description": "Utility power dips and the hall runs on UPS while the generator spins up."},
+        {"title": "New high-density rack", "description": "A dense GPU rack is added, concentrating heat in one aisle."},
+    ],
+    "hospital": [
+        {"title": "Flu-season surge", "description": "Wards and ED at full occupancy for an extended period, stressing HVAC and med-gas."},
+        {"title": "Heatwave on the OR HVAC", "description": "A heatwave stresses the operating-theatre air handling and laminar flow."},
+        {"title": "Power failure", "description": "Mains fails and the hospital runs on emergency generator power."},
+        {"title": "Cold-chain delivery backlog", "description": "Pharmacy fridges are repeatedly opened during a large delivery."},
+    ],
+    "manufacturing": [
+        {"title": "Three-shift rush order", "description": "Every line runs at maximum for three shifts to clear a rush order."},
+        {"title": "Summer heat in the plant", "description": "High ambient temperature stresses motors, compressors and robotics."},
+        {"title": "Skipped maintenance window", "description": "A planned lubrication/maintenance window is skipped under schedule pressure."},
+        {"title": "Material hardness spike", "description": "A harder-than-spec material batch increases tool and spindle load."},
+    ],
+}
+
+
+@router.get("/twins/scenarios")
+def twins_scenarios(domain: str = "edm-machine"):
+    """External-situation scenario presets for a twin domain (Scenarios tab)."""
+    return {"domain": domain, "scenarios": SCENARIO_PRESETS.get(domain, [])}
+
+
+def _twin_signals(tenant: str) -> list:
+    try:
+        st = nextxr.ingest_state(tenant)
+        return list((st.get("latest") or {}).keys())
+    except Exception:  # noqa: BLE001
+        return []
+
+
+class SimAuthorReq(BaseModel):
+    tenant: str
+    machine: str = "Machine"
+    domain: str = "edm-machine"
+    kind: str = "scenario"           # 'scenario' (external) | 'fault' (component)
+    description: str = ""
+    horizon_label: str = "2 hours"
+
+
+@router.post("/agents/sim/author")
+def sim_author(req: SimAuthorReq):
+    """Agent: author a runnable what-if spec from a free-text situation/fault,
+    grounded in THIS twin's fault catalogue + live signals."""
+    faults = TWIN_FAULTS.get(req.domain, [])
+    horizon_min = HORIZONS.get(req.horizon_label, 120)
+    spec = author_sim(req.description, req.machine, req.domain, req.kind,
+                      faults, _twin_signals(req.tenant), horizon_min)
+    return {"spec": spec.model_dump()}
+
+
+class SimRunReq(BaseModel):
+    tenant: str
+    machine: str = "Machine"
+    domain: str = "edm-machine"
+    fault: str | None = None
+    severity: float = 0.85
+    control: float | None = None
+    horizon_min: float = 120.0
+    title: str = ""
+    analyze: bool = True
+
+
+@router.post("/agents/sim/run")
+def sim_run(req: SimRunReq):
+    """Run a what-if spec: project it on the twin's physics (non-destructive) and
+    add an AI outcome analysis."""
+    projection = nextxr.project_sim(req.tenant, req.fault, req.severity,
+                                    req.control, req.horizon_min)
+    narrative = None
+    if req.analyze:
+        spec = {"title": req.title, "fault": req.fault, "severity": req.severity,
+                "control": req.control, "horizon_min": req.horizon_min}
+        narrative = analyze_projection(spec, projection, req.machine, req.domain)
+    return {"projection": projection, "narrative": narrative}
+
+
 # ── AI Co-Pilot: real-time narration, work orders, alerts, cascades ──
 
 @router.get("/agents/narrate/{tenant}")
 def narrate(tenant: str, machine: str = "Turbine Engine"):
     """Real-time AI narration — Claude watches the live sensor stream and
-    issues a 1-2 sentence observation like an experienced test cell engineer."""
+    issues a 1-2 sentence observation like an experienced engineer."""
     state = nextxr.ingest_state(tenant)
     text = narrate_sensors(state, machine)
     return {"narration": text, "tenant": tenant}
+
+
+class NarrateSnapshotReq(BaseModel):
+    machine: str = "Machine"
+    latest: dict = {}
+    findings: list = []
+    health: float | None = None
+
+
+@router.post("/agents/narrate")
+def narrate_snapshot(req: NarrateSnapshotReq):
+    """Telemetry-snapshot narration — the AI co-pilot reasons from whatever live
+    readings the caller provides, so every twin gets a real, telemetry-grounded
+    observation (no backend tenant required)."""
+    state = {"latest": req.latest, "findings": req.findings, "health": req.health}
+    return {"narration": narrate_sensors(state, req.machine)}
+
+
+class SnapshotReq(BaseModel):
+    machine: str = "Machine"
+    domain: str = ""
+    latest: dict = {}
+    findings: list = []
+    components: list = []
+    horizon_label: str = "6 hours"
+    context: str = ""
+
+
+@router.post("/agents/diagnose-snapshot")
+def diagnose_snapshot_route(req: SnapshotReq):
+    """Diagnosis on a telemetry snapshot (works for simulated twins too)."""
+    return {"report": diagnose_snapshot(req.machine, req.domain, req.latest,
+                                        req.findings, req.components)}
+
+
+@router.post("/agents/forecast-snapshot")
+def forecast_snapshot_route(req: SnapshotReq):
+    """Qualitative forecast on a telemetry snapshot over a horizon."""
+    return {"report": forecast_snapshot(req.machine, req.domain, req.latest,
+                                        req.horizon_label, req.context)}
+
+
+def _snapshot_diag(req: "SnapshotReq") -> dict:
+    """Build a diagnostics-shaped dict from a snapshot so the work-order / cascade
+    agents (which expect diagnostics) run on simulated twins."""
+    sensors = [{"name": k.split(":")[-1], "signal": k, "value": v}
+               for k, v in (req.latest or {}).items()]
+    return {"machine": req.machine, "components": req.components or [],
+            "sensors": sensors, "findings": req.findings or []}
+
+
+@router.post("/agents/work-order-snapshot")
+def work_order_snapshot(req: SnapshotReq):
+    """AS9100-style work order from a snapshot (simulated twins included)."""
+    wo = generate_work_order(_snapshot_diag(req), req.machine)
+    return {"work_order": wo.model_dump()}
+
+
+@router.post("/agents/cascade-snapshot")
+def cascade_snapshot(req: SnapshotReq):
+    """Cascade analysis from a snapshot."""
+    return {"cascade_analysis": cascade_analysis(_snapshot_diag(req), {}, req.machine)}
+
+
+class AssetStatusReq(BaseModel):
+    machine: str = "Machine"
+    domain: str = ""
+    asset: dict = {}     # {id, name, type, status, metrics: {label: value}}
+
+
+@router.post("/agents/asset")
+def agent_asset_status(req: AssetStatusReq):
+    """Detailed AI status for ONE component the operator clicked in the 3-D scene."""
+    return {"status": asset_status(req.asset, req.machine, req.domain)}
 
 
 class WorkOrderRequest(BaseModel):

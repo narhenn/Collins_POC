@@ -32,8 +32,22 @@ export const api = {
   runDiagnosis: (body) => req('/agents/diagnosis', { method: 'POST', body: JSON.stringify(body) }),
   runAnalysis: (body) => req('/agents/analysis', { method: 'POST', body: JSON.stringify(body) }),
 
+  // twins library: list domain templates + create any twin domain
+  twinTemplates: () => req('/twins/templates'),
+  createTwin: (body) => req('/twins/create', { method: 'POST', body: JSON.stringify(body) }),
+  twinFaults: (domain) => req(`/twins/faults?domain=${encodeURIComponent(domain || 'edm-machine')}`),
+  twinScenarios: (domain) => req(`/twins/scenarios?domain=${encodeURIComponent(domain || 'edm-machine')}`),
+  simAuthor: (body) => req('/agents/sim/author', { method: 'POST', body: JSON.stringify(body) }),
+  simRun: (body) => req('/agents/sim/run', { method: 'POST', body: JSON.stringify(body) }),
+
   // AI co-pilot: narration, work orders, predictive alerts, cascade analysis
   narrate: (tenant, machine) => req(`/agents/narrate/${tenant}?machine=${encodeURIComponent(machine || 'Turbine Engine')}`),
+  narrateSnapshot: (body) => req('/agents/narrate', { method: 'POST', body: JSON.stringify(body) }),
+  assetStatus: (body) => req('/agents/asset', { method: 'POST', body: JSON.stringify(body) }),
+  diagnoseSnapshot: (body) => req('/agents/diagnose-snapshot', { method: 'POST', body: JSON.stringify(body) }),
+  forecastSnapshot: (body) => req('/agents/forecast-snapshot', { method: 'POST', body: JSON.stringify(body) }),
+  workOrderSnapshot: (body) => req('/agents/work-order-snapshot', { method: 'POST', body: JSON.stringify(body) }),
+  cascadeSnapshot: (body) => req('/agents/cascade-snapshot', { method: 'POST', body: JSON.stringify(body) }),
   workOrder: (body) => req('/agents/work-order', { method: 'POST', body: JSON.stringify(body) }),
   predictAlert: (body) => req('/agents/predict-alert', { method: 'POST', body: JSON.stringify(body) }),
   cascade: (body) => req('/agents/cascade', { method: 'POST', body: JSON.stringify(body) }),

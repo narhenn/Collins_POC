@@ -1,0 +1,267 @@
+@prefix edm:  <https://ontology.nextxr.io/v3/edm#> .
+@prefix cfp:  <https://ontology.nextxr.io/v3/cfp#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+
+#################################################################
+#  WIRE-EDM DOMAIN PACK  v1.0
+#
+#  Extension layer for CNC wire-cut Electrical Discharge Machining
+#  (submerged dielectric, brass wire). Adds the machine, its four
+#  subsystems (discharge generator / dielectric & flushing / wire
+#  transport / guides & axes), the machining cell, and the full
+#  process-sensor suite.
+#
+#  Ontology stack position:
+#    BFO -> SOSA -> platform -> CFP -> EDM
+#
+#  Extends CFP downward only. Never edits layers 1-4.
+#################################################################
+
+<https://ontology.nextxr.io/v3/edm> a owl:Ontology ;
+    dct:title "NextXR Wire-EDM Pack" ;
+    owl:versionInfo "1.0.0" ;
+    dct:description "Domain pack for CNC wire-cut EDM machines: discharge generator, dielectric & flushing system, wire transport, guides & axes, and the process-sensor suite." ;
+    owl:imports <https://ontology.nextxr.io/v3/cfp> .
+
+
+#################################################################
+#  RELATIONSHIP PREDICATES
+#################################################################
+
+edm:hasComponent a owl:ObjectProperty ;
+    rdfs:subPropertyOf nxr:hasPart ;
+    rdfs:label "has component" ;
+    skos:definition "A wire-EDM machine is composed of internal subsystems (discharge generator, dielectric system, wire transport, guides & axes)." ;
+    rdfs:domain edm:WireEDMMachine ;
+    rdfs:range edm:EDMModule .
+
+
+#################################################################
+#  CUSTOM QUDT UNITS (declared so observable properties resolve)
+#################################################################
+
+unit:VOLT a qudt:Unit ; rdfs:label "volt" .
+unit:A a qudt:Unit ; rdfs:label "ampere" .
+unit:MicroSEC a qudt:Unit ; rdfs:label "microsecond" .
+unit:KiloHZ a qudt:Unit ; rdfs:label "kilohertz" .
+unit:MilliJ a qudt:Unit ; rdfs:label "millijoule" .
+unit:N a qudt:Unit ; rdfs:label "newton" .
+unit:M-PER-MIN a qudt:Unit ; rdfs:label "metre per minute" .
+unit:PERCENT a qudt:Unit ; rdfs:label "percent" .
+unit:MilliM2-PER-MIN a qudt:Unit ; rdfs:label "square millimetre per minute" .
+unit:L-PER-MIN a qudt:Unit ; rdfs:label "litre per minute" .
+unit:BAR a qudt:Unit ; rdfs:label "bar" .
+unit:MicroM a qudt:Unit ; rdfs:label "micrometre" .
+unit:MicroS-PER-CentiM a qudt:Unit ; rdfs:label "microsiemens per centimetre" .
+
+
+#################################################################
+#  OBSERVABLE PROPERTIES (the live telemetry channels)
+#################################################################
+
+edm:gapVoltage a sosa:ObservableProperty ;
+    rdfs:label "Gap Voltage" ;
+    skos:definition "Average servo-controlled discharge gap voltage." ;
+    nxr:expectedUnit unit:VOLT ; nxr:expectedQuantityKind quantitykind:Voltage .
+
+edm:peakCurrent a sosa:ObservableProperty ;
+    rdfs:label "Peak Discharge Current" ;
+    skos:definition "Peak current of each spark discharge." ;
+    nxr:expectedUnit unit:A ; nxr:expectedQuantityKind quantitykind:ElectricCurrent .
+
+edm:pulseOnTime a sosa:ObservableProperty ;
+    rdfs:label "Pulse On-Time (Ton)" ;
+    skos:definition "Duration the discharge current flows each pulse." ;
+    nxr:expectedUnit unit:MicroSEC .
+
+edm:pulseOffTime a sosa:ObservableProperty ;
+    rdfs:label "Pulse Off-Time (Toff)" ;
+    skos:definition "Idle interval between discharges that lets the gap de-ionise." ;
+    nxr:expectedUnit unit:MicroSEC .
+
+edm:sparkFrequency a sosa:ObservableProperty ;
+    rdfs:label "Spark Frequency" ;
+    skos:definition "Effective discharge repetition frequency." ;
+    nxr:expectedUnit unit:KiloHZ .
+
+edm:dischargeEnergy a sosa:ObservableProperty ;
+    rdfs:label "Discharge Energy" ;
+    skos:definition "Energy delivered per spark discharge." ;
+    nxr:expectedUnit unit:MilliJ .
+
+edm:wireTension a sosa:ObservableProperty ;
+    rdfs:label "Wire Tension" ;
+    skos:definition "Mechanical tension in the travelling wire electrode." ;
+    nxr:expectedUnit unit:N ; nxr:expectedQuantityKind quantitykind:Force .
+
+edm:wireFeedRate a sosa:ObservableProperty ;
+    rdfs:label "Wire Feed Rate" ;
+    skos:definition "Speed at which fresh wire is fed from the spool." ;
+    nxr:expectedUnit unit:M-PER-MIN .
+
+edm:wireWear a sosa:ObservableProperty ;
+    rdfs:label "Wire / Guide Wear" ;
+    skos:definition "Consumable wear index of the wire path and guides." ;
+    nxr:expectedUnit unit:PERCENT .
+
+edm:cuttingSpeed a sosa:ObservableProperty ;
+    rdfs:label "Cutting Speed" ;
+    skos:definition "Area material-removal rate." ;
+    nxr:expectedUnit unit:MilliM2-PER-MIN .
+
+edm:dielectricFlow a sosa:ObservableProperty ;
+    rdfs:label "Dielectric Flow" ;
+    skos:definition "Flushing flow rate of de-ionised dielectric through the kerf." ;
+    nxr:expectedUnit unit:L-PER-MIN ; nxr:expectedQuantityKind quantitykind:VolumeFlowRate .
+
+edm:dielectricPressure a sosa:ObservableProperty ;
+    rdfs:label "Dielectric Pressure" ;
+    skos:definition "High-pressure flushing pressure at the guides." ;
+    nxr:expectedUnit unit:BAR ; nxr:expectedQuantityKind quantitykind:Pressure .
+
+edm:dielectricTemperature a sosa:ObservableProperty ;
+    rdfs:label "Dielectric Temperature" ;
+    skos:definition "Temperature of the dielectric bath (chiller-controlled)." ;
+    nxr:expectedUnit unit:DEG_C ; nxr:expectedQuantityKind quantitykind:Temperature .
+
+edm:dielectricConductivity a sosa:ObservableProperty ;
+    rdfs:label "Dielectric Conductivity" ;
+    skos:definition "Electrical conductivity of the dielectric; rises as the de-ioniser resin depletes." ;
+    nxr:expectedUnit unit:MicroS-PER-CentiM .
+
+edm:shortCircuitRate a sosa:ObservableProperty ;
+    rdfs:label "Short-Circuit Rate" ;
+    skos:definition "Fraction of pulses that collapse into a short circuit instead of a clean discharge." ;
+    nxr:expectedUnit unit:PERCENT .
+
+edm:sparkGap a sosa:ObservableProperty ;
+    rdfs:label "Spark Gap" ;
+    skos:definition "Servo-held working gap width between wire and workpiece." ;
+    nxr:expectedUnit unit:MicroM .
+
+edm:surfaceRoughnessRa a sosa:ObservableProperty ;
+    rdfs:label "Surface Finish Ra" ;
+    skos:definition "Arithmetic mean surface roughness of the cut flank." ;
+    nxr:expectedUnit unit:MicroM .
+
+edm:wireBreakRisk a sosa:ObservableProperty ;
+    rdfs:label "Wire-Break Risk" ;
+    skos:definition "Derived risk index that the wire electrode will break." ;
+    nxr:expectedUnit unit:PERCENT .
+
+quantitykind:VolumeFlowRate a qudt:QuantityKind ; rdfs:label "Volume Flow Rate" .
+
+
+#################################################################
+#  1 - SPATIAL CLASS
+#################################################################
+
+edm:MachiningCell a owl:Class ;
+    rdfs:subClassOf cfp:Room ;
+    rdfs:label "EDM Machining Cell" ;
+    skos:definition "A temperature-controlled cell housing a wire-EDM machine, its dielectric tank, chiller, and de-ioniser." ;
+    nxr:taxonomyCategory "Location" .
+
+
+#################################################################
+#  2 - EQUIPMENT CLASSES (machine + subsystems)
+#################################################################
+
+edm:WireEDMMachine a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Wire EDM Machine" ;
+    skos:definition "A CNC wire-cut electrical-discharge machine. Removes material by a train of controlled spark discharges across a servo-held gap between a travelling wire electrode and the workpiece, flushed by pressurised de-ionised dielectric." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:EDMModule a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "EDM Subsystem" ;
+    skos:definition "An internal subsystem of a wire-EDM machine." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:DischargeGenerator a owl:Class ;
+    rdfs:subClassOf edm:EDMModule ;
+    rdfs:label "Discharge Generator" ;
+    skos:definition "The pulse power supply that sets discharge current, on/off time and gap voltage. Its stability governs the short-circuit rate." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:DielectricSystem a owl:Class ;
+    rdfs:subClassOf edm:EDMModule ;
+    rdfs:label "Dielectric & Flushing System" ;
+    skos:definition "Tank, pump, filter, chiller and de-ioniser that supply clean, cool, high-resistivity dielectric and flush debris from the kerf." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:WireTransport a owl:Class ;
+    rdfs:subClassOf edm:EDMModule ;
+    rdfs:label "Wire Transport System" ;
+    skos:definition "Spool, tension servo, drive capstan and take-up that feed the wire electrode at controlled tension and speed." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:GuideSystem a owl:Class ;
+    rdfs:subClassOf edm:EDMModule ;
+    rdfs:label "Guides & Axes" ;
+    skos:definition "Diamond wire guides and the X/Y/U/V positioning axes that hold wire path accuracy. Guide wear degrades finish and tension stability." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+
+#################################################################
+#  3 - SENSOR CLASSES
+#################################################################
+
+edm:EDMSensor a owl:Class ;
+    rdfs:subClassOf nxr:Sensor ;
+    rdfs:label "EDM Process Sensor" ;
+    skos:definition "A sensor instrumenting the wire-EDM process." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:GapVoltageSensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Gap Voltage Sensor" ;
+    skos:definition "Measures the average discharge-gap voltage at the servo." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:DischargeCurrentSensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Discharge Current Sensor" ;
+    skos:definition "Measures peak discharge current per pulse." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:WireTensionSensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Wire Tension Sensor" ;
+    skos:definition "Measures the mechanical tension of the travelling wire." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:DielectricTemperatureSensor a owl:Class ;
+    rdfs:subClassOf cfp:TemperatureSensor ;
+    rdfs:label "Dielectric Temperature Sensor" ;
+    skos:definition "An RTD measuring dielectric bath temperature." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:DielectricConductivitySensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Dielectric Conductivity Sensor" ;
+    skos:definition "Measures dielectric conductivity to track de-ioniser health." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:FlushFlowSensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Flushing Flow Sensor" ;
+    skos:definition "Measures dielectric flushing flow rate." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+edm:FlushPressureSensor a owl:Class ;
+    rdfs:subClassOf edm:EDMSensor ;
+    rdfs:label "Flushing Pressure Sensor" ;
+    skos:definition "Measures high-pressure flushing pressure." ;
+    nxr:taxonomyCategory "PhysicalAsset" .

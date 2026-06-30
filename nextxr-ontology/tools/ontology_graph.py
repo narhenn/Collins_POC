@@ -43,10 +43,16 @@ AEROSPACE_FILES = [
     "packs/aerospace/aero-shapes.ttl",
 ]
 
+# Layer 4 — wire-EDM machine pack.
+EDM_FILES = [
+    "packs/edm/edm-classes.ttl",
+    "packs/edm/edm-shapes.ttl",
+]
+
 PACK_FILES = CFP_FILES + [
     "packs/hvac/hvac-classes.ttl",
     "packs/hvac/hvac-shapes.ttl",
-] + AEROSPACE_FILES
+] + AEROSPACE_FILES + EDM_FILES
 
 # Governance shapes validate the T-Box, NOT tenant mutations. They are
 # intentionally excluded from the gate's bundle so they never fire on a

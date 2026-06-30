@@ -30,6 +30,7 @@ CORE = "https://ontology.nextxr.io/v3/core#"
 HVAC = "https://ontology.nextxr.io/v3/hvac#"
 CFP  = "https://ontology.nextxr.io/v3/cfp#"
 AERO = "https://ontology.nextxr.io/v3/aero#"
+EDM  = "https://ontology.nextxr.io/v3/edm#"
 
 _DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "twins.db"
 
@@ -67,6 +68,19 @@ TEMPLATES = {
                        "oil temp/pressure). Fed by real sensor data from the 3D "
                        "layer via /api/v1/ingest.",
         "primary_signal": "aero:exhaustGasTemp",
+        "seeds_feed": False,
+    },
+    "edm-machine": {
+        "label": "Wire EDM Machine",
+        "description": "A single CNC wire-cut EDM machine, modelled down to its "
+                       "discharge generator / dielectric & flushing / wire "
+                       "transport / guides & axes subsystems with a full process "
+                       "sensor suite (gap voltage, discharge current, pulse timing, "
+                       "wire tension, dielectric temp/conductivity/flow/pressure, "
+                       "short-circuit rate, cutting speed, surface finish, wire-break "
+                       "risk). Fed by real sensor data from the 3D layer via "
+                       "/api/v1/ingest.",
+        "primary_signal": "edm:cuttingSpeed",
         "seeds_feed": False,
     },
     "blank": {
@@ -235,6 +249,9 @@ class TwinRegistry:
 
         if twin.domain == "turbine-engine":
             return self._seed_turbine_engine(twin, writer, actor)
+
+        if twin.domain == "edm-machine":
+            return self._seed_edm_machine(twin, writer, actor)
 
         # hvac template: Site, Space, AirHandler (servesSpace).
         writer.create(
@@ -580,6 +597,84 @@ class TwinRegistry:
             (AERO + "VibrationProbe", "Vibration Probe", "aero:vibrationG"),
             (AERO + "OilTempSensor", "Oil Temp Sensor", "aero:oilTemperature"),
             (AERO + "OilPressureSensor", "Oil Pressure Sensor", "aero:oilPressure"),
+        ]
+        for ctype, name, obs in sensors:
+            writer.create(
+                tenant_id=t, canonical_type=ctype, actor=actor,
+                properties={"displayName": name, "status": "running"},
+                relationships=[
+                    Rel("nxr:monitors", eid),
+                    Rel("sosa:observes", obs, ontology_ref=True),
+                ],
+            )
+
+        return eid
+
+    def _seed_edm_machine(self, twin: Twin, writer, actor: str) -> Optional[str]:
+        """Seed a single CNC wire-cut EDM machine: a machining cell, the machine's
+        four internal subsystems (discharge generator / dielectric & flushing /
+        wire transport / guides & axes), the machine itself, and a full process
+        sensor suite — each sensor wired with nxr:monitors -> machine and
+        sosa:observes -> its observable property. Returns the machine node id
+        (the asset the ingestion layer and 3D hotspots target)."""
+        from graph.writer import Rel
+        t = twin.tenant_id
+
+        # Machining cell (a temperature-controlled room; no containment required).
+        cell = writer.create(
+            tenant_id=t, canonical_type=EDM + "MachiningCell", actor=actor,
+            properties={"displayName": "EDM Machining Cell 1",
+                        "roomFunction": "wire-edm", "areaM2": 40})
+
+        # Internal subsystems.
+        gen = writer.create(
+            tenant_id=t, canonical_type=EDM + "DischargeGenerator", actor=actor,
+            properties={"displayName": "Discharge Generator", "status": "running"})
+        die = writer.create(
+            tenant_id=t, canonical_type=EDM + "DielectricSystem", actor=actor,
+            properties={"displayName": "Dielectric & Flushing System", "status": "running"})
+        wire = writer.create(
+            tenant_id=t, canonical_type=EDM + "WireTransport", actor=actor,
+            properties={"displayName": "Wire Transport System", "status": "running"})
+        guides = writer.create(
+            tenant_id=t, canonical_type=EDM + "GuideSystem", actor=actor,
+            properties={"displayName": "Guides & Axes", "status": "running"})
+
+        # The machine under monitoring.
+        m_rels = []
+        if cell.ok:
+            m_rels.append(Rel("nxr:locatedIn", cell.node_id))
+        for mod in (gen, die, wire, guides):
+            if mod.ok:
+                m_rels.append(Rel("edm:hasComponent", mod.node_id))
+        machine = writer.create(
+            tenant_id=t, canonical_type=EDM + "WireEDMMachine", actor=actor,
+            properties={
+                "displayName": twin.name or "Wire EDM WX-01",
+                "status": "running",
+                "wireDiameterMm": 0.25,
+                "nominalCuttingSpeed": 150.0,
+                "maxDischargeCurrent": 34.0,
+            },
+            relationships=m_rels or None,
+        )
+        if not machine.ok:
+            raise RuntimeError(f"wire-EDM machine seed failed: {machine.error}")
+        eid = machine.node_id
+
+        # Process sensor suite. Each: monitors the machine + observes one property.
+        sensors = [
+            (EDM + "GapVoltageSensor", "Gap Voltage Sensor", "edm:gapVoltage"),
+            (EDM + "DischargeCurrentSensor", "Discharge Current Sensor", "edm:peakCurrent"),
+            (EDM + "WireTensionSensor", "Wire Tension Sensor", "edm:wireTension"),
+            (EDM + "DielectricTemperatureSensor", "Dielectric Temp Sensor", "edm:dielectricTemperature"),
+            (EDM + "DielectricConductivitySensor", "Dielectric Conductivity Sensor", "edm:dielectricConductivity"),
+            (EDM + "FlushFlowSensor", "Flushing Flow Sensor", "edm:dielectricFlow"),
+            (EDM + "FlushPressureSensor", "Flushing Pressure Sensor", "edm:dielectricPressure"),
+            (EDM + "EDMSensor", "Cutting Speed Monitor", "edm:cuttingSpeed"),
+            (EDM + "EDMSensor", "Short-Circuit Monitor", "edm:shortCircuitRate"),
+            (EDM + "EDMSensor", "Surface Finish Monitor", "edm:surfaceRoughnessRa"),
+            (EDM + "EDMSensor", "Wire-Break Risk Monitor", "edm:wireBreakRisk"),
         ]
         for ctype, name, obs in sensors:
             writer.create(

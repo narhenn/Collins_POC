@@ -22,8 +22,9 @@ def _client() -> httpx.Client:
 
 
 def health() -> dict:
+    # Short timeout: the health badge must never stall the UI when GoalCert is down.
     try:
-        with _client() as c:
+        with httpx.Client(base_url=BASE, timeout=2.5) as c:
             r = c.get("/health")
             return {"ok": r.status_code == 200, **(r.json() if r.content else {})}
     except Exception as e:  # noqa: BLE001

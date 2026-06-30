@@ -498,35 +498,35 @@ def analysis_agent(diagnostics: dict, prediction: dict, machine: str,
 
 def narrate_sensors(state: dict, machine: str) -> str:
     """Claude watches the current sensor snapshot and issues a 1-2 sentence
-    observation in real-time. Sounds like an experienced test cell engineer."""
+    observation in real-time, like an experienced operations engineer. Works for
+    any twin (turbine, wire-EDM, facility…) — it reasons from whatever signals it
+    is given, so the same co-pilot narrates every machine from its own telemetry."""
     signals = state.get("latest", state.get("signals", {}))
     findings = state.get("findings", [])
     health = state.get("health", {})
 
     def _stub() -> str:
-        egt = signals.get("aero:exhaustGasTemp")
-        vib = signals.get("aero:vibrationG")
-        n1 = signals.get("aero:shaftSpeedN1")
-        if egt and egt > 720:
-            return f"EGT climbing through {egt:.0f}C — watching the trend closely. Hot section may be degrading."
-        if vib and vib > 1.0:
-            return f"Vibration at {vib:.2f}g — above the baseline. Could be early bearing wear."
         if findings:
-            return f"Active finding: {findings[0].get('message', 'anomaly detected')[:80]}."
-        if egt:
-            return f"All readings nominal. EGT {egt:.0f}C, N1 {n1:.0f} RPM. Engine running clean."
-        return "Waiting for sensor data..."
+            return f"Active finding: {findings[0].get('message', 'anomaly detected')[:90]}."
+        # Generic, domain-neutral fallback from whatever signals exist.
+        items = [(k.split(':')[-1], v) for k, v in list(signals.items())[:3]
+                 if isinstance(v, (int, float))]
+        if items:
+            shown = ", ".join(f"{n} {v:.0f}" for n, v in items)
+            return f"All readings nominal — {shown}. {machine} running clean."
+        return "Waiting for sensor data…"
 
     if not config.claude_enabled:
         return _stub()
     try:
         import json as _json
         system = (
-            "You are a turbine test cell engineer watching a live ground run on "
-            "the monitoring console. Given the current sensor readings, issue ONE "
-            "concise observation (1-2 sentences, present tense). Flag anomalies, "
-            "trends, or quiet-but-concerning patterns. Sound experienced and calm — "
-            "not alarmed unless readings are truly critical. No preamble, no labels.")
+            f"You are an experienced operations & maintenance engineer monitoring "
+            f"a live {machine} on the control console. Given the current sensor "
+            "readings, issue ONE concise observation (1-2 sentences, present tense). "
+            "Flag anomalies, trends, or quiet-but-concerning patterns and name the "
+            "specific signals. Sound experienced and calm — not alarmed unless "
+            "readings are truly critical. No preamble, no labels.")
         user = (
             f"Machine: {machine}\n"
             f"Sensors: {_json.dumps(signals, default=str)}\n"
@@ -542,6 +542,52 @@ def narrate_sensors(state: dict, machine: str) -> str:
         return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
     except Exception as e:
         logger.warning("narrate_sensors failed (%s); stub", e)
+        return _stub()
+
+
+# ── Per-asset AI status (click an asset in the 3D scene → ask the AI) ──
+
+def asset_status(asset: dict, machine: str, domain: str = "") -> str:
+    """Detailed, telemetry-grounded status for ONE component/asset the user
+    clicked in the 3-D scene. Works for any twin — it reasons from the asset's
+    own readings."""
+    import json as _json
+    name = asset.get("name") or asset.get("id") or "Component"
+    atype = asset.get("type") or ""
+    metrics = asset.get("metrics") or {}
+    status = asset.get("status") or "ok"
+
+    def _stub() -> str:
+        sev = {"crit": "CRITICAL", "warn": "WARNING"}.get(status, "HEALTHY")
+        mtxt = ", ".join(f"{k} {v}" for k, v in list(metrics.items())[:4]) or "no live readings"
+        if status == "crit":
+            return (f"{name} — {sev}. Readings: {mtxt}. This component has crossed an "
+                    f"operating limit; isolate it and raise a work order before continued use.")
+        if status == "warn":
+            return (f"{name} — {sev}. Readings: {mtxt}. Drifting out of band; trend it "
+                    f"closely and schedule an inspection.")
+        return f"{name} — {sev}. Readings: {mtxt}. Operating within normal limits."
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        system = (
+            f"You are an experienced maintenance engineer for a {machine}. The "
+            "operator clicked one component in the live 3-D twin. Give a detailed "
+            "but concise status (3-5 sentences): current condition, anything "
+            "concerning in the readings, the most likely cause if degraded, and the "
+            "recommended action. Name the specific readings. No preamble.")
+        user = (f"Machine: {machine}\nDomain: {domain}\n"
+                f"Component: {name} (type: {atype}, status: {status})\n"
+                f"Live readings: {_json.dumps(metrics, default=str)}")
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=350,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:
+        logger.warning("asset_status failed (%s); stub", e)
         return _stub()
 
 
@@ -605,7 +651,7 @@ def generate_work_order(diagnostics: dict, machine: str) -> WorkOrder:
             "Language must be precise enough for a Level II-certified technician. "
             "Estimate realistic labour hours and list specific parts/tools needed.")
         resp = _anthropic().messages.parse(
-            model=config.CLAUDE_MODEL, max_tokens=2000,
+            model=config.CLAUDE_MODEL, max_tokens=4000,
             system=[{"type": "text", "text": system,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content":
@@ -626,6 +672,10 @@ def predictive_alert(prediction: dict, machine: str) -> str | None:
     if not crossings:
         return None
 
+    # The prediction engine emits RUL entries in dict-iteration order, not by
+    # urgency — sort by projected time-to-limit so crossings[0] is the soonest.
+    crossings.sort(key=lambda c: c.get("time_to_limit_min")
+                   if c.get("time_to_limit_min") is not None else float("inf"))
     r = crossings[0]  # most urgent
 
     def _stub() -> str:
@@ -666,7 +716,7 @@ def cascade_analysis(diagnostics: dict, prediction: dict, machine: str) -> str:
         bad = [c for c in comps if (c.get("health") or 1) < 0.7]
         if not bad:
             return "No cascade risks identified. All subsystems operating within margins."
-        names = [c["name"] for c in bad]
+        names = [c.get("name") or "a subsystem" for c in bad]
         return (f"Degradation detected in {', '.join(names)}. "
                 f"If uncorrected, bearing wear can propagate to oil system stress "
                 f"(elevated oil temp → reduced lubrication → accelerated wear cycle). "
@@ -719,3 +769,202 @@ def scenario_brief(prompt: str, machine: str, sensors: list[str]) -> ScenarioBri
     except Exception as e:  # noqa: BLE001
         logger.warning("scenario brief failed (%s); using stub", e)
         return _scenario_stub(prompt)
+
+
+# ── Generic, per-twin Scenario / Fault engine ─────────────────────────
+# Works for ANY twin: the agent reads the machine's own fault catalogue + live
+# signals and authors a runnable spec, which is then projected on the twin's
+# physics (non-destructive). Scenarios = external conditions; faults = degraded
+# components — both ultimately drive the same physics via (fault, control).
+
+class AuthoredSim(BaseModel):
+    title: str = Field(description="Short, specific title for the situation/fault.")
+    fault: str = Field(description="EXACTLY one fault id from the catalogue, or "
+                                   "'none' for a pure operating-condition scenario.")
+    severity: float = Field(description="0..1 how aggressive / degraded.")
+    control: float = Field(description="0..1 machine load during the run "
+                                       "(turbine throttle / EDM machining intensity).")
+    horizon_min: float = Field(description="Minutes to project forward.")
+    rationale: str = Field(description="Why these parameters model the request for THIS machine.")
+    expected_outcome: str = Field(description="One-sentence prediction of the result.")
+
+
+def author_sim(description: str, machine: str, domain: str, kind: str,
+               faults: list, signals: list, horizon_min: float = 120.0) -> AuthoredSim:
+    """Agent: turn a natural-language situation/fault into a runnable spec for the
+    given twin. `faults` is [{id,label}] from the twin's own catalogue; `kind` is
+    'scenario' (external factors) or 'fault' (component degradation)."""
+    fault_ids = {f.get("id") for f in faults}
+
+    def _stub() -> AuthoredSim:
+        p = (description or "").lower()
+        fid = "none"
+        for f in faults:
+            if f["id"].split("_")[0] in p or f["id"] in p or f.get("label", "").lower() in p:
+                fid = f["id"]
+                break
+        return AuthoredSim(
+            title=(description or kind).strip()[:60] or kind.title(),
+            fault=fid, severity=0.85, control=0.85, horizon_min=horizon_min,
+            rationale=f"Mapped the request to the '{fid}' physics lever.",
+            expected_outcome="")
+
+    if not config.claude_enabled:
+        return _stub()
+    catalog = "\n".join(f"  - {f['id']}: {f.get('label','')}" for f in faults) or "  (none)"
+    if kind == "scenario":
+        kind_hint = ("an EXTERNAL operating SITUATION (ambient conditions, production "
+                     "load / duty cycle, supply or material quality, environment). Map it "
+                     "to the closest fault id that such conditions would induce — or 'none' "
+                     "if it is purely a load/condition change — and pick a realistic machine "
+                     "load (control).")
+    else:
+        kind_hint = ("a COMPONENT FAULT or degradation. Choose the single best-matching "
+                     "fault id and a severity that clearly reveals it.")
+    system = (
+        f"You are the Scenario & Fault engine for a {machine} digital twin. The "
+        f"operator describes {kind_hint}\n"
+        f"Available fault ids for THIS machine:\n{catalog}\n"
+        f"Available live signals: {', '.join(signals[:24])}.\n"
+        "Produce a runnable spec: 'fault' MUST be exactly one of the ids above or "
+        "'none'; severity 0..1; control 0..1; horizon_min realistic for the request. "
+        "Be specific to this machine and these signals.")
+    try:
+        resp = _anthropic().messages.parse(
+            model=config.CLAUDE_MODEL, max_tokens=1000,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nKind: {kind}\nRequest: {description}"}],
+            output_format=AuthoredSim)
+        spec = resp.parsed_output or _stub()
+        if spec.fault not in fault_ids and spec.fault != "none":
+            spec.fault = _stub().fault
+        return spec
+    except Exception as e:  # noqa: BLE001
+        logger.warning("author_sim failed (%s); stub", e)
+        return _stub()
+
+
+def analyze_projection(spec: dict, projection: dict, machine: str, domain: str = "") -> str:
+    """Agent: plain-English analysis of a what-if projection for ANY twin — what
+    happens, which subsystem leads the degradation, time-to-limit, and the
+    precautions/maintenance to be ready. Stub falls back to a numeric summary."""
+    rul = projection.get("rul", [])
+    events = projection.get("events", [])
+    chn = projection.get("component_health_now", {}) or {}
+    chh = projection.get("component_health_horizon", {}) or {}
+
+    def _stub() -> str:
+        bits = []
+        crossings = [r for r in rul if r.get("within_horizon")]
+        if crossings:
+            c = min(crossings, key=lambda r: r.get("time_to_limit_min") or 1e9)
+            bits.append(f"{c['mode']} is reached in about "
+                        f"{(c.get('time_to_limit_min') or 0):.0f} minutes.")
+        on = (chn.get("overall") or {}).get("health")
+        oh = (chh.get("overall") or {}).get("health")
+        if on is not None and oh is not None:
+            bits.append(f"Overall health goes from {on*100:.0f}% to {oh*100:.0f}% "
+                        f"over the horizon.")
+        if events:
+            bits.append("Detections (in order): " +
+                        ", ".join(e.get("behavior_id", "") for e in events) + ".")
+        return " ".join(bits) or ("No operating limit is crossed within the horizon — "
+                                  "the machine stays within margins.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        payload = {"spec": spec, "rul": rul, "events": events,
+                   "health_now": chn, "health_horizon": chh,
+                   "final_frame": (projection.get("trajectory") or [{}])[-1]}
+        system = (
+            f"You are a senior maintenance engineer for a {machine}. Given a what-if "
+            "scenario/fault and its physics projection, explain in plain English: what "
+            "happens to the machine, which subsystem leads the degradation, the time-to-"
+            "limit, and the precautions / maintenance to have ready. Be specific and "
+            "grounded in the numbers. 4-6 sentences, no preamble.")
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=600,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\n{_json.dumps(payload, default=str)[:6500]}"}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("analyze_projection failed (%s); stub", e)
+        return _stub()
+
+
+# ── Snapshot agents (run any agent on a telemetry snapshot — live OR simulated) ──
+
+def diagnose_snapshot(machine: str, domain: str, latest: dict,
+                      findings: list, components: list | None = None) -> str:
+    """Diagnosis from a telemetry snapshot — works for any twin (incl. the
+    simulated facility twins), grounded in whatever signals it is given."""
+    findings = findings or []
+
+    def _stub() -> str:
+        crit = [f for f in findings if f.get("severity") == "critical"]
+        return (f"{machine}: {len(findings)} active finding(s), {len(crit)} critical. "
+                f"Review the out-of-band signals and inspect the flagged assets.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            f"You are a maintenance engineer for a {machine}. Given the live "
+            "telemetry and active findings, produce a concise diagnosis: overall "
+            "condition, the 2-3 signals/components of most concern, the most likely "
+            "root cause, and prioritised actions. Short sections, grounded in the "
+            "numbers, no preamble.")
+        user = (f"Machine: {machine}\nDomain: {domain}\n"
+                f"Signals: {_json.dumps(latest, default=str)}\n"
+                f"Findings: {_json.dumps(findings, default=str)[:1500]}")
+        if components:
+            user += f"\nComponents: {_json.dumps(components, default=str)[:1200]}"
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=700,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("diagnose_snapshot failed (%s); stub", e)
+        return _stub()
+
+
+def forecast_snapshot(machine: str, domain: str, latest: dict,
+                      horizon_label: str, context: str = "") -> str:
+    """Qualitative forecast from a telemetry snapshot over a horizon — for any
+    twin. `context` lets a scenario/fault frame the forecast (the assumed
+    situation)."""
+    def _stub() -> str:
+        return (f"Over the next {horizon_label}, {machine} is expected to continue "
+                f"near its current operating point; watch any signals close to their "
+                f"limits and keep spares ready for the most-loaded assets.")
+
+    if not config.claude_enabled:
+        return _stub()
+    try:
+        import json as _json
+        system = (
+            f"You are a reliability engineer for a {machine}. Given the current "
+            f"telemetry, forecast how the machine is likely to behave over the next "
+            f"{horizon_label}: which signals trend toward their limits, the main "
+            f"risks, and what to watch or pre-empt. {context} Be specific and grounded "
+            "in the numbers. 4-6 sentences, no preamble.")
+        resp = _anthropic().messages.create(
+            model=config.CLAUDE_MODEL, max_tokens=600,
+            system=[{"type": "text", "text": system,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content":
+                f"Machine: {machine}\nDomain: {domain}\n"
+                f"Signals: {_json.dumps(latest, default=str)}"}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("forecast_snapshot failed (%s); stub", e)
+        return _stub()

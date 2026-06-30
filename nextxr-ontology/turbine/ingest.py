@@ -245,6 +245,22 @@ class _TenantTwin:
         return predict(self.fwd_state, horizon_min=horizon_min, points=points,
                        physics=self.physics)
 
+    def project(self, fault: str | None = None, severity: float = 0.85,
+                control: float | None = None, horizon_min: float = 120.0,
+                points: int = 120) -> dict:
+        """Non-destructive what-if: fork the CURRENT live state, apply a
+        hypothetical fault (+ throttle), and project forward. `control` is the
+        throttle (0..1). The live twin is untouched."""
+        from turbine.predict import predict
+        import copy as _copy
+        state = _copy.deepcopy(self.fwd_state)
+        if control is not None:
+            state.throttle = float(control)
+        if fault and fault != "none":
+            self.physics.inject(state, fault, float(severity))
+        return predict(state, horizon_min=horizon_min, points=points,
+                       physics=self.physics)
+
     def state(self) -> dict:
         with self.lock:
             latest = dict(self.latest)
@@ -316,14 +332,31 @@ class IngestService:
             pass
         return None
 
-    def twin(self, tenant: str, entity_id: str | None = None) -> _TenantTwin | None:
+    def _domain(self, tenant: str) -> str | None:
+        """The twin's domain template, if registered (selects the twin class)."""
+        try:
+            from twins import TwinRegistry
+            tw = TwinRegistry().get(tenant)
+            return tw.domain if tw else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    def twin(self, tenant: str, entity_id: str | None = None):
+        """Resolve (and lazily build) the live twin for a tenant. The twin class
+        is chosen by the tenant's domain: a wire-EDM machine gets an EDMTwin,
+        everything else gets the gas-turbine _TenantTwin. Both expose the same
+        simulate / ingest / state / diagnostics / predict_forward interface."""
         with self._lock:
             t = self._twins.get(tenant)
             if t is None:
                 ent = self._resolve_entity(tenant, entity_id)
                 if ent is None:
                     return None
-                t = _TenantTwin(tenant, ent)
+                if self._domain(tenant) == "edm-machine":
+                    from edm.ingest import EDMTwin
+                    t = EDMTwin(tenant, ent)
+                else:
+                    t = _TenantTwin(tenant, ent)
                 self._twins[tenant] = t
             elif entity_id and entity_id != t.entity_id:
                 t.entity_id = entity_id

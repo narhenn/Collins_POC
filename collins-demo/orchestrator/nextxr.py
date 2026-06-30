@@ -73,6 +73,45 @@ def build_twin(spec: TwinSpec) -> dict:
         return {"tenant": tenant, "twin": twin, "machine": machine, "assets": assets}
 
 
+def list_templates() -> list[dict]:
+    """The twin-domain templates the platform can seed (turbine, edm, facility…)."""
+    try:
+        with _client() as c:
+            r = c.get("/twins/templates")
+            return r.json().get("templates", []) if r.status_code == 200 else []
+    except Exception as e:  # noqa: BLE001
+        logger.warning("templates lookup failed: %s", e)
+        return []
+
+
+def build_domain(name: str, domain: str) -> dict:
+    """Create a twin of any domain template; return tenant + primary machine +
+    its physical assets. The primary machine is the seed asset (turbine engine,
+    wire-EDM machine, UPS, chiller…) the live feed / 3D layer targets."""
+    with _client() as c:
+        r = c.post("/twins", json={"name": name or "Twin", "domain": domain})
+        r.raise_for_status()
+        twin = r.json().get("twin", {})
+        tenant = twin.get("tenant_id")
+        seed_id = twin.get("seed_asset_id")
+        machine = {"id": seed_id, "name": name or "Twin"}
+        assets = []
+        try:
+            er = c.get("/entities", params={"tenant": tenant,
+                                            "label": "PhysicalAsset", "limit": 100})
+            nodes = (er.json() or {}).get("nodes", []) if er.status_code == 200 else []
+            assets = [{"id": n.get("id"), "name": n.get("displayName"),
+                       "type": (n.get("canonicalType") or "").split("#")[-1]} for n in nodes]
+            for n in nodes:
+                if n.get("id") == seed_id:
+                    machine = {"id": seed_id, "name": n.get("displayName")}
+                    break
+        except Exception as e:  # noqa: BLE001
+            logger.warning("entity lookup failed: %s", e)
+    return {"tenant": tenant, "twin": twin, "domain": domain,
+            "machine": machine, "assets": assets}
+
+
 def build_turbine(name: str) -> dict:
     """Create the turbine-engine twin with a given name; return tenant + machine + assets."""
     with _client() as c:
@@ -109,6 +148,19 @@ def stop_feed() -> dict:
     with _client() as c:
         r = c.post("/feed/stop")
         return r.json() if r.content else {"status": r.status_code}
+
+
+def project_sim(tenant: str, fault: str | None = None, severity: float = 0.85,
+                control: float | None = None, horizon_min: float = 120.0,
+                points: int = 120) -> dict:
+    """Generic, domain-aware what-if projection: fork the live twin's current
+    state, apply a hypothetical fault (+ control), project forward. Non-destructive."""
+    with _client() as c:
+        r = c.post(f"/ingest/{tenant}/project", json={
+            "fault": fault, "severity": severity, "control": control,
+            "horizon_min": horizon_min, "points": points})
+        r.raise_for_status()
+        return r.json()
 
 
 def project(tenant: str, fault: str, severity: float = 0.85,

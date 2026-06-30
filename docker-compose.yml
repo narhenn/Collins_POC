@@ -23,8 +23,8 @@ services:
     image: neo4j:5-community
     container_name: collins-neo4j
     ports:
-      - "7475:7474"
-      - "7688:7687"
+      - "7474:7474"
+      - "7687:7687"
     environment:
       NEO4J_AUTH: neo4j/nextxr2026
       NEO4J_PLUGINS: '["apoc"]'
@@ -40,7 +40,7 @@ services:
     image: redis:7-alpine
     container_name: collins-redis
     ports:
-      - "6381:6379"
+      - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
@@ -101,16 +101,17 @@ services:
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: nextxr2026
       NXR_REDIS_URL: redis://redis:6379/0
-      PORT: "8080"
-      AUTOMIND_URL: http://automind:8001
-      GOALCERT_URL: http://goalcert:8002
+      # Inside the compose network, reach the other services on their CONTAINER
+      # port (8000). The 8001/8002 mappings are host-side only.
+      AUTOMIND_URL: http://automind:8000
+      GOALCERT_URL: http://goalcert:8000
 
   # ── AUTOMIND Server (profile: full) ──
   automind:
     profiles: ["full"]
     build:
-      context: ./automind-engine
-      dockerfile: backend/Dockerfile
+      context: ./automind-engine/backend
+      dockerfile: Dockerfile
     container_name: automind-server
     ports:
       - "8001:8000"
@@ -128,8 +129,8 @@ services:
   automind-worker:
     profiles: ["full"]
     build:
-      context: ./automind-engine
-      dockerfile: backend/Dockerfile
+      context: ./automind-engine/backend
+      dockerfile: Dockerfile
     container_name: automind-worker
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
     depends_on:
@@ -146,8 +147,8 @@ services:
   goalcert:
     profiles: ["full"]
     build:
-      context: ./goalcert-engine
-      dockerfile: backend/Dockerfile
+      context: ./goalcert-engine/backend
+      dockerfile: Dockerfile
     container_name: goalcert-server
     ports:
       - "8002:8000"

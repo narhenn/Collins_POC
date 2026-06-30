@@ -127,3 +127,26 @@ def ingest_predict(tenant: str, horizon_min: float = 120.0, points: int = 120):
     if twin is None:
         raise HTTPException(404, "No turbine entity for this tenant.")
     return twin.predict_forward(horizon_min=horizon_min, points=points)
+
+
+class ProjectRequest(BaseModel):
+    fault: str | None = None          # a domain fault id, or None/"none"
+    severity: float = 0.85            # 0..1
+    control: float | None = None      # throttle (turbine) / intensity (edm), 0..1
+    horizon_min: float = 120.0
+    points: int = 120
+
+
+@router.post("/{tenant}/project")
+def ingest_project(tenant: str, req: ProjectRequest):
+    """Non-destructive what-if projection: fork the live twin's CURRENT state,
+    apply a hypothetical fault (+ control), and project forward. The live twin is
+    untouched. Used by the Scenario / Fault engine. Domain-aware (the twin class
+    knows its own faults + physics)."""
+    twin = get_service().twin(tenant)
+    if twin is None:
+        raise HTTPException(404, "No twin for this tenant.")
+    if not hasattr(twin, "project"):
+        raise HTTPException(400, "This twin does not support what-if projection.")
+    return twin.project(fault=req.fault, severity=req.severity, control=req.control,
+                        horizon_min=req.horizon_min, points=req.points)

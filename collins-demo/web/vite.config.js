@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
+    strictPort: true,   // never drift to 5175/5176 — fail loudly instead
     proxy: {
       '/api': { target: 'http://localhost:8090', changeOrigin: true },
     },

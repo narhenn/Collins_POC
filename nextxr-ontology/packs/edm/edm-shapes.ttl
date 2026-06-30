@@ -1,0 +1,24 @@
+@prefix edm:  <https://ontology.nextxr.io/v3/edm#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+#  WIRE-EDM SHACL SHAPES
+#
+#  EDM classes inherit all required validation from the platform
+#  base shapes (nxr:PhysicalAssetShape for equipment/sensors,
+#  nxr:SpaceShape for the machining cell). This file only adds
+#  OPTIONAL, advisory property shapes — no new hard requirements,
+#  so a machine seeds with just displayName + status like every
+#  other twin.
+#################################################################
+
+edm:WireEDMMachineShape a sh:NodeShape ;
+    sh:targetClass edm:WireEDMMachine ;
+    sh:node nxr:BaseEntityShape ;
+    sh:property [
+        sh:path nxr:status ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+    ] .

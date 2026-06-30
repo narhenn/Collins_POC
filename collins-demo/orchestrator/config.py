@@ -21,7 +21,7 @@ class Config:
     ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
     # Default to the latest, most capable model. Override with CLAUDE_MODEL
     # (e.g. claude-sonnet-4-6) for faster/cheaper demo runs.
-    CLAUDE_MODEL: str = os.environ.get("CLAUDE_MODEL", "claude-opus-4-8")
+    CLAUDE_MODEL: str = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 
     # ── The three platforms (host ports published by docker compose) ──
     NEXTXR_URL: str = os.environ.get("NEXTXR_URL", "http://localhost:8000")
