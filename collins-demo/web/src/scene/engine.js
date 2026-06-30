@@ -94,7 +94,81 @@ function pSensor(M) { const g = grp(); g.add(cyl(.4, .5, .8, M.white, 0, .4, 0))
 function pEdmGenerator(M) { const g = grp(); g.add(box(3, 5, 2.4, M.dark, 0, 2.5, 0)); g.add(box(2.4, 1.4, .08, M.screen, 0, 3.6, 1.21)); for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.5, .12, .05), M.led(0x22d3ee)); l.position.set(-.6 + i * .4, 1.6, 1.21); l.userData.blink = true; g.add(l) } return g }
 function pEdmDielectric(M) { const g = grp(); g.add(box(4, 3.4, 3, M.metal, 0, 1.7, 0)); g.add(cyl(.7, .7, 2, M.steel, 1.6, 1.7, 1.4)); const pump = cyl(.6, .6, 1.2, M.amber, -1.4, 1.2, 1.5); pump.rotation.x = Math.PI / 2; g.add(pump); g.add(box(2.6, .8, 3, M.glass, 0, 2.6, 0)); return g }
 function pEdmWireFeed(M) { const g = grp(); g.add(box(2.4, 4.4, 2, M.dark, 0, 2.2, 0)); const spool = cyl(1.2, 1.2, 1, M.brass, 0, 3.4, 1.1, 24); spool.rotation.x = Math.PI / 2; spool.userData.spin = 1.6; g.add(spool); return g }
-function pEdmMachine(M) { const g = grp(); g.add(box(7, 1.2, 5, M.metal, 0, .6, 0)); g.add(box(2, 7, 2, M.steel, -2.4, 4, -1.4)); g.add(box(5, .6, 4, M.glass, 0, 1.6, 0)); g.add(box(2.6, 1.4, 2, M.dark, 0, 2, 0)); g.add(box(.4, 2.4, .4, M.dark, 0, 3.4, 0)); g.add(box(.4, 2.4, .4, M.dark, 0, .6, 0)); const wire = cyl(.05, .05, 5, M.brass, 0, 2, 0, 8); wire.userData.glow = true; g.add(wire); const spk = new THREE.Mesh(new THREE.SphereGeometry(.28, 14, 14), M.led(0x22d3ee)); spk.position.set(0, 2, 0); spk.userData.spark = true; g.add(spk); return g }
+function pEdmMachine(M) {
+  const g = grp()
+  // Light-gray machine body material (RAL 7035)
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd4d8de, roughness: .55, metalness: .45 })
+  const colMat = new THREE.MeshStandardMaterial({ color: 0xa8adb6, roughness: .6, metalness: .4 })
+  const tankGlass = new THREE.MeshStandardMaterial({ color: 0x80c4cc, roughness: .05, transparent: true, opacity: .28, envMapIntensity: 1.6 })
+  const fluidMat = new THREE.MeshStandardMaterial({ color: 0x6bbcc8, roughness: .05, transparent: true, opacity: .14 })
+  const wpMat = new THREE.MeshStandardMaterial({ color: 0x8892a0, roughness: .35, metalness: .85 })
+
+  // Machine base / bed (wide, low, light gray)
+  g.add(box(6, 1.0, 4.5, bodyMat, 0, .5, 0))
+  // Lower housing with servo bay doors
+  g.add(box(5.6, 1.8, 4.2, bodyMat, 0, 1.9, 0))
+  g.add(box(2.4, 1.2, .06, M.dark, -1.2, 1.7, 2.14))  // left door panel
+  g.add(box(2.4, 1.2, .06, M.dark, 1.4, 1.7, 2.14))    // right door panel
+
+  // Main column (rear-left, rigid C-frame casting — substantial)
+  g.add(box(1.6, 7.2, 1.6, colMat, -2.2, 4.4, -1.4))
+
+  // Horizontal U/V arm (extends from column top over the tank)
+  g.add(box(4.2, .45, .55, colMat, .2, 7.7, -1.0))
+  // Z-axis carriage (vertical travel on the arm for upper guide head)
+  g.add(box(.5, 1.6, .5, M.dark, 1.8, 7.0, -1.0))
+
+  // Upper wire guide head (precision assembly at arm tip, over the tank)
+  g.add(box(.35, .45, .35, M.metal, 1.8, 6.1, -0.2))
+  // Flush nozzles on guide head (two small cylinders)
+  const nL = cyl(.05, .05, .3, M.steel, 1.55, 6.1, -0.2, 8); nL.rotation.z = Math.PI/2; g.add(nL)
+  const nR = cyl(.05, .05, .3, M.steel, 2.05, 6.1, -0.2, 8); nR.rotation.z = Math.PI/2; g.add(nR)
+
+  // Lower wire guide head (submerged, below worktable surface)
+  g.add(box(.35, .4, .35, M.metal, 1.8, 2.0, -0.2))
+
+  // Dielectric tank (transparent, sits on the worktable — the dominant visual element)
+  g.add(box(3.2, 2.4, 2.8, tankGlass, 1.2, 3.6, -0.1))
+  // Dielectric fluid fill inside the tank (slightly more opaque, blue-green tint)
+  g.add(box(3.0, 2.0, 2.6, fluidMat, 1.2, 3.3, -0.1))
+
+  // Workpiece (metal block inside tank, on the worktable)
+  g.add(box(1.2, .65, .8, wpMat, 1.8, 2.7, -0.2))
+
+  // The wire (very thin vertical line between guide heads)
+  const wire = cyl(.015, .015, 4.0, M.brass, 1.8, 4.1, -0.2, 6)
+  wire.userData.glow = true; g.add(wire)
+
+  // Spark point (tiny, at the wire/workpiece interface — warm yellow)
+  const sparkMat = M.led(0xffe566)
+  const spk = new THREE.Mesh(new THREE.SphereGeometry(.07, 10, 10), sparkMat)
+  spk.position.set(1.8, 3.05, -0.2)
+  spk.userData.spark = true; g.add(spk)
+  // Add a point light for flickering spark glow
+  const sparkLight = new THREE.PointLight(0xffe566, .6, 2.0)
+  sparkLight.position.copy(spk.position)
+  sparkLight.userData.spark = true; g.add(sparkLight)
+
+  // CNC control panel (pendant on right side)
+  g.add(box(.08, 1.8, .06, M.steel, 3.2, 5.5, .8))      // vertical arm
+  g.add(box(.8, .5, .06, M.steel, 3.6, 6.2, .8))         // horizontal mount
+  g.add(box(.9, .7, .06, M.screen, 3.6, 5.5, .85))       // CNC touchscreen
+  g.add(box(.75, .3, .06, M.dark, 3.6, 4.9, .85))        // button cluster
+  // E-stop (red circle)
+  const estop = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .04, 12), M.led(0xe11d48))
+  estop.position.set(3.95, 4.9, .88); estop.rotation.x = Math.PI/2; g.add(estop)
+
+  // Wire spool cabinet (adjacent to column, integrated)
+  g.add(box(1.0, 2.8, .9, M.dark, -3.6, 1.4, -1.4))
+  const spool = cyl(.5, .5, .45, M.brass, -3.6, 2.6, -.9, 24)
+  spool.rotation.x = Math.PI/2; spool.userData.spin = .3; g.add(spool)
+
+  // Status tower light on top of column
+  const tower = cyl(.07, .07, .35, M.led(0x16a34a), -2.2, 8.2, -1.4, 8)
+  tower.userData.blink = true; g.add(tower)
+
+  return g
+}
 
 const PROP_FOR = {
   'Compute Rack': pRack, 'Cooling Unit': pCRAC, 'Power / UPS': pUPS, 'Network': pNetwork,
@@ -145,10 +219,10 @@ const ENV = {
   edm: { name: 'Wire EDM Machine', icon: 'ti-grill', accent: 0x7c3aed, floors: 1,
     assets: [
       { id: 'EDM-1', name: 'Wire EDM Machine', type: 'EDM Machine', f: 0, x: 0, z: 0, status: 'ok', icon: 'ti-grill', metrics: [['Cut', 'mm²/min', 150], ['Gap V', 'V', 52]] },
-      { id: 'GEN-1', name: 'Discharge Generator', type: 'Discharge Generator', f: 0, x: -10, z: -6, status: 'ok', icon: 'ti-bolt', metrics: [['Peak I', 'A', 18], ['Short', '%', 5]] },
-      { id: 'DIE-1', name: 'Dielectric & Flushing', type: 'Dielectric System', f: 0, x: 10, z: -6, status: 'ok', icon: 'ti-droplet', metrics: [['Cond', 'µS/cm', 10], ['Temp', '°C', 24]] },
-      { id: 'WIRE-1', name: 'Wire Transport', type: 'Wire Transport', f: 0, x: -10, z: 7, status: 'ok', icon: 'ti-line-dashed', metrics: [['Tension', 'N', 15], ['Feed', 'm/min', 9]] },
-      { id: 'GUIDE-1', name: 'Guides & Axes', type: 'Guides & Axes', f: 0, x: 10, z: 7, status: 'ok', icon: 'ti-square', metrics: [['Wear', '%', 0], ['Ra', 'µm', 1.5]] },
+      { id: 'GEN-1', name: 'Discharge Generator', type: 'Discharge Generator', f: 0, x: -7, z: -5, status: 'ok', icon: 'ti-bolt', metrics: [['Peak I', 'A', 18], ['Short', '%', 5]] },
+      { id: 'DIE-1', name: 'Dielectric & Flushing', type: 'Dielectric System', f: 0, x: 7, z: -5, status: 'ok', icon: 'ti-droplet', metrics: [['Cond', 'µS/cm', 10], ['Temp', '°C', 24]] },
+      { id: 'WIRE-1', name: 'Wire Transport', type: 'Wire Transport', f: 0, x: -7, z: 5, status: 'ok', icon: 'ti-line-dashed', metrics: [['Tension', 'N', 15], ['Feed', 'm/min', 9]] },
+      { id: 'GUIDE-1', name: 'Guides & Axes', type: 'Guides & Axes', f: 0, x: 7, z: 5, status: 'ok', icon: 'ti-square', metrics: [['Wear', '%', 0], ['Ra', 'µm', 1.5]] },
     ] },
 }
 
@@ -344,8 +418,9 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
       if (u.spin) o.rotation.y += dt * u.spin * 3
       if (u.cargo) { o.position.x += dt * 1.2; if (o.position.x > 4) o.position.x = -4 }
       if (u.press) o.position.y = 2.6 + Math.sin(t * 2) * 0.5
-      if (u.spark) o.scale.setScalar(0.7 + Math.abs(Math.sin(t * 8)) * 0.9)
-      if (u.glow && o.material) o.material.emissiveIntensity = 1 + Math.sin(t * 10) * 0.5
+      if (u.spark && o.isLight) o.intensity = .3 + Math.abs(Math.sin(t * 20)) * .8
+      else if (u.spark) o.scale.setScalar(0.5 + Math.abs(Math.sin(t * 20)) * 1.0)
+      if (u.glow && o.material) o.material.emissiveIntensity = .3 + Math.sin(t * 12) * .3
       if (u.robot) { const r = u.robot; r.arm1.rotation.y = Math.sin(t * 0.6) * 0.8; r.arm1.rotation.z = Math.sin(t * 0.8) * 0.25; r.arm2.rotation.z = Math.sin(t * 0.7 + 1) * 0.5; r.base.rotation.y += dt * 0.3 }
     }
     selectable.forEach(g => { if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15 })
