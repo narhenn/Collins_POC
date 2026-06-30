@@ -258,6 +258,56 @@ function TwinsLibrary({ building, active, onLive, onSim, goBuild }) {
 }
 
 
+// ── Workflow pipeline (horizontal flowchart) ──────────────────────────
+function WorkflowPipeline({ findings, incidents, health, wo, cascade, onMaint }) {
+  const hasFinding = findings.length > 0
+  const hasIncident = incidents.length > 0
+  const hasDiag = hasIncident
+  const hasWO = !!wo
+  const hasCascade = !!cascade
+  const healthBad = health != null && health < 0.6
+
+  const steps = [
+    { id: 'sense', icon: 'ti-antenna-bars-5', label: 'Sensor\nIngestion', active: true, color: 'var(--accent-green)' },
+    { id: 'detect', icon: 'ti-alert-triangle', label: 'Anomaly\nDetection', active: hasFinding, color: hasFinding ? 'var(--accent-amber)' : 'var(--hint)' },
+    { id: 'classify', icon: 'ti-category', label: 'Incident\nClassification', active: hasIncident, color: hasIncident ? 'var(--accent-red)' : 'var(--hint)' },
+    { id: 'diagnose', icon: 'ti-stethoscope', label: 'AI\nDiagnosis', active: hasDiag, color: hasDiag ? 'var(--accent-blue)' : 'var(--hint)' },
+    { id: 'workorder', icon: 'ti-file-certificate', label: 'Work\nOrder', active: hasWO, color: hasWO ? 'var(--brand)' : 'var(--hint)' },
+    { id: 'repair', icon: 'ti-tool', label: 'Guided\nRepair', active: false, color: 'var(--hint)', onClick: onMaint },
+    { id: 'resolve', icon: 'ti-circle-check', label: 'Return to\nService', active: healthBad === false && hasFinding === false, color: !hasFinding ? 'var(--accent-green)' : 'var(--hint)' },
+  ]
+
+  return (
+    <div className="card section-gap" style={{ padding: '14px 18px', overflow: 'hidden' }}>
+      <div className="card-title" style={{ marginBottom: 10 }}><Icon n="ti-git-branch" /> Maintenance Workflow</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto', padding: '4px 0' }}>
+        {steps.map((s, i) => (
+          <React.Fragment key={s.id}>
+            {i > 0 && (
+              <div style={{ width: 32, height: 2, flexShrink: 0,
+                background: steps[i - 1].active && s.active ? 'var(--brand)' : 'var(--border2)',
+                transition: 'background .5s' }} />
+            )}
+            <div onClick={s.onClick} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              minWidth: 72, cursor: s.onClick ? 'pointer' : 'default', transition: 'opacity .3s',
+              opacity: s.active ? 1 : 0.4 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18, background: s.active ? s.color : 'var(--surface2)', color: s.active ? '#fff' : 'var(--hint)',
+                border: s.active ? 'none' : '2px solid var(--border)', transition: 'all .5s',
+                boxShadow: s.active ? `0 0 12px ${s.color}44` : 'none',
+                animation: s.active && s.color === 'var(--accent-red)' ? 'pulse 1.5s infinite' : 'none' }}>
+                <Icon n={s.icon} />
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, whiteSpace: 'pre-line',
+                color: s.active ? 'var(--text)' : 'var(--hint)' }}>{s.label}</div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Generic, domain-aware dashboard ──────────────────────────────────
 function Dashboard({ ctx }) {
   const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint } = ctx
@@ -386,6 +436,10 @@ function Dashboard({ ctx }) {
             {fmt(live[headlineSig])}<span style={{ fontSize: 14 }}>{headline.unit ? ' ' + headline.unit : ''}</span></div>
           <div className="card-change">{headline.crit != null ? `limit ${headline.crit} ${headline.unit}` : headline.critLow != null ? `min ${headline.critLow} ${headline.unit}` : 'live'}</div></div>}
       </div>
+
+      {/* Workflow pipeline — detection to resolution */}
+      <WorkflowPipeline findings={findings} incidents={incidents} health={h}
+        wo={wo} cascade={cascade} onMaint={openMaint} />
 
       {/* 3D twin scene */}
       <div className="section-gap">
