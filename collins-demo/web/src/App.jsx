@@ -394,27 +394,52 @@ function Dashboard({ ctx }) {
     }
   }, [live])
 
-  // ── AI co-pilot (every twin, grounded in its own live telemetry) ──
+  // ── AI co-pilot: unified chat + auto-narration ─────────────────────
   const twinRef = useRef(twin); twinRef.current = twin
-  const [narration, setNarration] = useState([])
-  const [narrating, setNarrating] = useState(false)
+  const [copilotMsgs, setCopilotMsgs] = useState([])
+  const [copilotInput, setCopilotInput] = useState('')
+  const [copilotBusy, setCopilotBusy] = useState(false)
+  const copilotEndRef = useRef(null)
+
+  // auto-narrate every 10s — appears as AI messages in the chat
   useEffect(() => {
     if (!source) return
     const tick = async () => {
       const tw = twinRef.current
       if (!tw || !tw.latest) return
-      setNarrating(true)
       try {
         const r = await api.narrateSnapshot({ machine: machineName, latest: tw.latest,
           findings: tw.findings || [], health: tw.health })
-        if (r?.narration) setNarration(prev => [{ text: r.narration, ts: new Date().toLocaleTimeString() }, ...prev].slice(0, 12))
+        if (r?.narration) setCopilotMsgs(prev => [...prev, { role: 'auto', text: r.narration, ts: new Date().toLocaleTimeString() }].slice(-20))
       } catch {}
-      setNarrating(false)
     }
     tick()
-    const t = setInterval(tick, 8000)
+    const t = setInterval(tick, 10000)
     return () => clearInterval(t)
   }, [source, domain, machineName])
+
+  // scroll to bottom on new messages
+  useEffect(() => { copilotEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [copilotMsgs])
+
+  async function sendCopilotMsg() {
+    const msg = copilotInput.trim()
+    if (!msg) return
+    setCopilotMsgs(prev => [...prev, { role: 'user', text: msg, ts: new Date().toLocaleTimeString() }])
+    setCopilotInput('')
+    setCopilotBusy(true)
+    try {
+      const history = copilotMsgs.filter(m => m.role !== 'auto').map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant', content: m.text
+      }))
+      history.push({ role: 'user', content: msg })
+      const r = await api.dashboardChat({ machine: machineName, messages: history,
+        snapshot: { latest: live, findings, health: h } })
+      setCopilotMsgs(prev => [...prev, { role: 'assistant', text: r.reply, ts: new Date().toLocaleTimeString() }])
+    } catch (e) {
+      setCopilotMsgs(prev => [...prev, { role: 'assistant', text: 'Sorry, I could not process that.', ts: new Date().toLocaleTimeString() }])
+    }
+    setCopilotBusy(false)
+  }
 
   // snapshot body for the snapshot-based agents (work-order / cascade on sim twins)
   const snap = () => ({ machine: machineName, domain, latest: live, findings,
@@ -540,35 +565,65 @@ function Dashboard({ ctx }) {
         </div>
       )}
 
-      {/* AI co-pilot — narrates every twin from its own live telemetry */}
-      {source && (
-        <div className="card section-gap">
-          <div className="card-title"><Icon n="ti-message-chatbot" /> AI Co-Pilot {narrating && <span className="spinner" style={{ marginLeft: 8 }} />}
-            <span className="pill pill-green" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
-          </div>
-          {narration.length === 0
-            ? <div className="empty">Waiting for sensor data to narrate…</div>
-            : <div style={{ maxHeight: 140, overflowY: 'auto', fontSize: 12, lineHeight: 1.8 }}>
-                {narration.map((n, i) => (
-                  <div key={i} style={{ padding: '3px 0', borderBottom: '1px solid var(--border)', opacity: i === 0 ? 1 : 0.5 + (0.5 / (i + 1)) }}>
-                    <span style={{ color: 'var(--hint)', fontFamily: 'var(--mono)', fontSize: 10, marginRight: 8 }}>{n.ts}</span>
-                    {n.text}
-                  </div>
-                ))}
-              </div>}
-        </div>
-      )}
-
-      {/* Ask-the-assistant chat (live status Q&A) */}
+      {/* AI Co-Pilot — unified chat: auto-narration + user Q&A */}
       {source && (
         <div className="card section-gap" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="card-title"><Icon n="ti-message-2" /> Ask the assistant <span className="pill pill-purple">Claude</span></div>
-          <Chat height={300}
-            greeting={`Ask me anything about **${machineName}** right now — current readings, what a finding means, or what to do next.`}
-            suggestions={['How is the machine doing?', "What's the most concerning signal?", 'What should I check next?']}
-            placeholder="Ask about the live status…"
-            send={(messages) => api.dashboardChat({ machine: machineName, messages,
-              snapshot: { latest: live, findings, health: h } }).then(r => r.reply)} />
+          <div className="card-title"><Icon n="ti-message-chatbot" /> AI Co-Pilot
+            <span className="pill pill-purple" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
+            <span className="pill pill-green" style={{ fontSize: 9 }}>live</span>
+          </div>
+
+          {/* chat messages */}
+          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0', marginBottom: 10 }}>
+            {copilotMsgs.length === 0 && (
+              <div className="empty" style={{ margin: '12px 0' }}>
+                The co-pilot is observing {machineName} in real time. Auto-observations will appear here, or ask a question below.</div>
+            )}
+            {copilotMsgs.map((m, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 8 }}>
+                {m.role !== 'user' && (
+                  <div style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 13,
+                    background: m.role === 'auto' ? 'rgba(22,163,74,.12)' : 'var(--gradient)', color: m.role === 'auto' ? 'var(--accent-green)' : '#fff' }}>
+                    <Icon n={m.role === 'auto' ? 'ti-antenna-bars-5' : 'ti-sparkles'} />
+                  </div>
+                )}
+                <div style={{ maxWidth: '80%', padding: '9px 13px', fontSize: 12.5, lineHeight: 1.6,
+                  borderRadius: m.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
+                  background: m.role === 'user' ? 'var(--gradient)' : m.role === 'auto' ? 'var(--surface2)' : 'var(--surface2)',
+                  color: m.role === 'user' ? '#fff' : 'var(--text)',
+                  border: m.role === 'user' ? 'none' : '1px solid var(--border)' }}>
+                  {m.role === 'auto' && <div style={{ fontSize: 9, color: 'var(--accent-green)', fontWeight: 700, marginBottom: 3, fontFamily: 'var(--mono)' }}>
+                    OBSERVATION · {m.ts}</div>}
+                  {m.role === 'assistant' && <div style={{ fontSize: 9, color: 'var(--brand)', fontWeight: 700, marginBottom: 3, fontFamily: 'var(--mono)' }}>
+                    CO-PILOT · {m.ts}</div>}
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {copilotBusy && <div style={{ padding: 6 }}><span className="spinner" /> Thinking...</div>}
+            <div ref={copilotEndRef} />
+          </div>
+
+          {/* quick suggestions */}
+          {copilotMsgs.filter(m => m.role === 'user').length === 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {['How is the machine doing?', "What's the most concerning signal?", 'What should I check next?'].map(s => (
+                <button key={s} className="chat-chip" onClick={() => { setCopilotInput(s); }}>{s}</button>
+              ))}
+            </div>
+          )}
+
+          {/* input */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={copilotInput} onChange={e => setCopilotInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendCopilotMsg()}
+              placeholder={`Ask about ${machineName}…`}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)',
+                fontSize: 13, outline: 'none', background: 'var(--surface)', fontFamily: 'var(--font)' }} />
+            <button className="btn btn-primary" onClick={sendCopilotMsg} disabled={copilotBusy || !copilotInput.trim()}>
+              <Icon n="ti-send" /></button>
+          </div>
         </div>
       )}
 
