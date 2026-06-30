@@ -469,16 +469,6 @@ export function createViewer(host, { domain, machine, onAskAI, onReady, cinemati
       if (u.glow && o.material) o.material.emissiveIntensity = .3 + Math.sin(t * 12) * .3
       if (u.robot) { const r = u.robot; r.arm1.rotation.y = Math.sin(t * 0.6) * 0.8; r.arm1.rotation.z = Math.sin(t * 0.8) * 0.25; r.arm2.rotation.z = Math.sin(t * 0.7 + 1) * 0.5; r.base.rotation.y += dt * 0.3 }
     }
-<<<<<<< HEAD
-    selectable.forEach(g => { if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15 })
-    if (camAnim) {
-      camAnim.t += dt; const k = Math.min(1, camAnim.t / camAnim.dur)
-      const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2   // easeInOutCubic
-      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, e)
-      controls.target.lerpVectors(camAnim.fromTgt, camAnim.toTgt, e)
-      if (k >= 1) camAnim = null
-    }
-=======
     const alertRed = _alertRed
     selectable.forEach(g => {
       if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15
@@ -494,7 +484,6 @@ export function createViewer(host, { domain, machine, onAskAI, onReady, cinemati
             o.material.emissiveIntensity = o.userData._origEmissiveIntensity + pulse * 1.5
           }
         } else {
-          // restore original emissive when not critical
           for (let i = 0; i < meshes.length; i++) {
             const o = meshes[i]
             if (!o.material.emissive.equals(o.userData._origEmissive) || o.material.emissiveIntensity !== o.userData._origEmissiveIntensity) {
@@ -505,7 +494,14 @@ export function createViewer(host, { domain, machine, onAskAI, onReady, cinemati
         }
       }
     })
->>>>>>> 8d7e1b6abb7e95d26214369469375fd4fe55312e
+    // cinematic camera animation
+    if (camAnim) {
+      camAnim.t += dt; const k = Math.min(1, camAnim.t / camAnim.dur)
+      const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
+      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, e)
+      controls.target.lerpVectors(camAnim.fromTgt, camAnim.toTgt, e)
+      if (k >= 1) camAnim = null
+    }
     controls.update()
     if (composer) composer.render(); else renderer.render(scene, camera)
   }
