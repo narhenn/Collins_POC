@@ -267,7 +267,7 @@ function skyTexture() { const c = document.createElement('canvas'); c.width = 8;
 function groundMat() { const c = document.createElement('canvas'); c.width = c.height = 512; const ctx = c.getContext('2d'); ctx.fillStyle = '#2c3142'; ctx.fillRect(0, 0, 512, 512); for (let i = 0; i < 2200; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`; ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2) } const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(40, 40); return new THREE.MeshStandardMaterial({ map: tex, roughness: .95 }) }
 
 // ── the viewer ───────────────────────────────────────────────────────
-export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
+export function createViewer(host, { domain, machine, onAskAI, onReady, cinematic = false } = {}) {
   const key = ({ 'datacenter': 'datacenter', 'hospital': 'hospital', 'manufacturing': 'factory', 'edm-machine': 'edm' })[domain] || 'datacenter'
   const e = ENV[key], M = makeMats()
   const W = () => host.clientWidth || 800, H = () => host.clientHeight || 540
@@ -316,7 +316,36 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true; controls.dampingFactor = .08; controls.maxPolarAngle = Math.PI * 0.49
   controls.minDistance = 12; controls.maxDistance = 200; controls.target.copy(camTarget)
-  controls.autoRotate = true; controls.autoRotateSpeed = .45
+  controls.autoRotate = !cinematic; controls.autoRotateSpeed = .45
+
+  // ── cinematic camera director (smooth fly-to / frame / reset) ────────
+  let camAnim = null   // { fromPos,toPos,fromTgt,toTgt,t,dur }
+  function flyCamera(toPos, toTgt, dur = 1.7) {
+    camAnim = { fromPos: camera.position.clone(), toPos: toPos.clone(),
+      fromTgt: controls.target.clone(), toTgt: toTgt.clone(), t: 0, dur }
+  }
+  function assetById(id) { return selectable.find(g => g.userData.asset && g.userData.asset.id === id) }
+  function boxOf(g) { return new THREE.Box3().setFromObject(g) }
+  function focusAsset(id, opts = {}) {
+    const g = assetById(id); if (!g) return false
+    const b = boxOf(g); const c = new THREE.Vector3(); b.getCenter(c)
+    const size = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z) || 6
+    const dist = opts.dist || Math.max(13, size * 2.4)
+    const dir = (opts.dir ? new THREE.Vector3(...opts.dir) : new THREE.Vector3(0.62, 0.46, 0.9)).normalize()
+    flyCamera(c.clone().add(dir.multiplyScalar(dist)), c, opts.dur || 1.7)
+    return true
+  }
+  const homePos = new THREE.Vector3(span * 0.7, span * 0.55, span * 0.85)
+  function resetView(dur = 1.8) { flyCamera(homePos.clone(), camTarget.clone(), dur) }
+  // Project an asset's top-of-bounds to host pixel coords (for glued 2-D callouts).
+  function worldToScreen(id) {
+    const g = assetById(id); if (!g) return null
+    const b = boxOf(g)
+    const p = new THREE.Vector3((b.min.x + b.max.x) / 2, b.max.y + 1.2, (b.min.z + b.max.z) / 2)
+    const v = p.project(camera)
+    return { x: (v.x * 0.5 + 0.5) * W(), y: (-v.y * 0.5 + 0.5) * H(), visible: v.z < 1 }
+  }
+  function setAutoRotate(on) { controls.autoRotate = on; const tA = host.querySelector('.v-tools .v-tool'); if (tA) tA.classList.toggle('on', on) }
 
   // ── overlays ──
   host.append(el('div', { class: 'v-top' },
@@ -343,8 +372,8 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
   // palette
   const pal = el('div', { class: 'v-palette' });
   (PALETTE[key] || []).forEach(([label, ic, type]) => pal.append(el('div', { class: 'v-pal-item', title: 'Add ' + label, onClick: () => addFromPalette(type, label) }, icon(ic), label)))
-  host.append(pal)
-  const tip = el('div', { class: 'v-tip' }, 'Click equipment to inspect · drag to orbit · add assets from the palette'); host.append(tip)
+  if (!cinematic) host.append(pal)
+  const tip = el('div', { class: 'v-tip' }, 'Click equipment to inspect · drag to orbit · add assets from the palette'); if (!cinematic) host.append(tip)
   const tooltip = el('div', { class: 'v-tooltip' }); host.append(tooltip)
   const inspector = el('div', { class: 'inspector hidden' }); host.append(inspector)
 
@@ -424,6 +453,13 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
       if (u.robot) { const r = u.robot; r.arm1.rotation.y = Math.sin(t * 0.6) * 0.8; r.arm1.rotation.z = Math.sin(t * 0.8) * 0.25; r.arm2.rotation.z = Math.sin(t * 0.7 + 1) * 0.5; r.base.rotation.y += dt * 0.3 }
     }
     selectable.forEach(g => { if (g.userData.pin) g.userData.pin.position.y = (g.userData.topY || 4) + 1.2 + Math.sin(t * 2 + g.position.x) * 0.15 })
+    if (camAnim) {
+      camAnim.t += dt; const k = Math.min(1, camAnim.t / camAnim.dur)
+      const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2   // easeInOutCubic
+      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, e)
+      controls.target.lerpVectors(camAnim.fromTgt, camAnim.toTgt, e)
+      if (k >= 1) camAnim = null
+    }
     controls.update()
     if (composer) composer.render(); else renderer.render(scene, camera)
   }
@@ -455,7 +491,7 @@ export function createViewer(host, { domain, machine, onAskAI, onReady } = {}) {
   }
 
   return {
-    updateAssets,
+    updateAssets, focusAsset, resetView, worldToScreen, setAutoRotate,
     dispose() {
       cancelAnimationFrame(raf); window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp)

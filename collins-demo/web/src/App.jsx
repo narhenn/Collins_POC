@@ -10,6 +10,7 @@ import TurbineModel from './TurbineModel.jsx'
 import Scene3D from './Scene3D.jsx'
 import Chat from './Chat.jsx'
 import Markdown from './Markdown.jsx'
+import Maintenance from './Maintenance.jsx'
 
 const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
@@ -32,6 +33,7 @@ export default function App() {
   const [building, setBuilding] = useState(null)      // domain key currently seeding
   const [err, setErr] = useState(null)
   const [simFault, setSimFault] = useState(null)      // active fault on a simulated twin
+  const [maint, setMaint] = useState(false)          // AI Maintenance Director overlay
   const pollRef = useRef(null)
   const simPhase = useRef(0)
   const simFaultRef = useRef(null); simFaultRef.current = simFault
@@ -103,7 +105,8 @@ export default function App() {
   const nIncidents = (twin?.incidents || []).length
 
   const ctx = { tenant, domain, source, isLive, meta, machine, machineName, twin, claudeOn,
-    stepLive, modelUrl, simFault, setSimFault, goBuild: () => setRoute('build'), goTwins: () => setRoute('twins') }
+    stepLive, modelUrl, simFault, setSimFault, openMaint: () => setMaint(true),
+    goBuild: () => setRoute('build'), goTwins: () => setRoute('twins') }
 
   return (
     <div className="app-root">
@@ -162,6 +165,11 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
         </div>
       </div>
+
+      {maint && source && (
+        <Maintenance domain={domain} machineName={machineName} twin={twin}
+          claudeOn={claudeOn} onExit={() => setMaint(false)} />
+      )}
     </div>
   )
 }
@@ -252,7 +260,7 @@ function TwinsLibrary({ building, active, onLive, onSim, goBuild }) {
 
 // ── Generic, domain-aware dashboard ──────────────────────────────────
 function Dashboard({ ctx }) {
-  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn } = ctx
+  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint } = ctx
   const live = twin?.latest || {}
   const h = twin?.health
   const findings = twin?.findings || []
@@ -341,6 +349,10 @@ function Dashboard({ ctx }) {
           <div className="panel-subtitle">{machineName} · streaming sensor telemetry in real time</div>
         </div>
         <div className="panel-actions">
+          <button className={`btn ${findings.length ? 'btn-primary repair-cta' : ''}`} onClick={openMaint}
+            title="Enter AI Maintenance Director">
+            <Icon n="ti-robot" /> Repair with AI
+          </button>
           {isLive && (domain === 'edm-machine' || domain === 'turbine-engine') && <>
             <span className="hint" style={{ alignSelf: 'center' }}>{throttleLabel}:</span>
             <button className="btn" onClick={() => stepLive(0.5)}>Low</button>
