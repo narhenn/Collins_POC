@@ -6,8 +6,9 @@
 // Design note (per brief): no flying-bot gimmick. The AI presence is a fixed
 // holographic "core", and everything is screen-space animation, component
 // highlights, and method panels beside the machine — all GPU-cheap and smooth.
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { createViewer } from './scene/engine.js'
+import ModelViewer from './ModelViewer.jsx'
 import { SIG, sevClass, fmt } from './lib.jsx'
 import './Maintenance.css'
 
@@ -468,12 +469,18 @@ function buildPlan(domain, twin) {
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
 const lerp = (a, b, t) => a + (b - a) * t
 
-export default function Maintenance({ domain = 'edm-machine', machineName = 'Wire EDM Machine', twin, claudeOn, onExit }) {
+export default function Maintenance({ domain = 'edm-machine', machineName = 'Wire EDM Machine', twin, modelUrl, claudeOn, onExit }) {
   const hostRef = useRef(null)
   const viewerRef = useRef(null)
   const calloutRef = useRef(null)
   const startRef = useRef(Date.now())
   const eventsRef = useRef([])
+  const flowRef = useRef(null)
+  const nodeRefs = useRef({})
+  // When the current twin has a reconstructed GLB, show THAT model (the twin the
+  // user is actually on) instead of the procedural domain scene — which for
+  // unmapped domains (e.g. turbine) would otherwise fall back to a data center.
+  const useGlb = !!modelUrl
 
   const plan = useMemo(() => buildPlan(domain, twin), [domain, twin?.findings?.length])
   const steps = plan.steps
@@ -483,7 +490,9 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const [introOut, setIntroOut] = useState(false)
   const [rcLit, setRcLit] = useState(0)                 // root-cause nodes lit
   const [step, setStep] = useState(0)                   // current repair step (0-based)
-  const [playing, setPlaying] = useState(true)
+  const [playing, setPlaying] = useState(false)         // manual by default — user clicks "Next step"
+  const [viewStep, setViewStep] = useState(null)        // step index the user clicked to inspect (floating detail)
+  const [anchor, setAnchor] = useState(null)            // {top,left} for the floating step-detail window
   const [voice, setVoice] = useState(false)
   const [focusSub, setFocusSub] = useState(plan.focusSub)
   const [subtitle, setSubtitle] = useState('')
@@ -503,17 +512,21 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const health = stage === 'complete' ? 1 : lerp(startHealth, 0.99, frac)
 
   // ── mount the cinematic 3-D viewer (scene loads behind the intro) ──
+  // Only for procedural domains; when a reconstructed GLB exists we render
+  // <ModelViewer> (the actual twin model) instead.
   useEffect(() => {
-    if (!hostRef.current) return
+    if (useGlb || !hostRef.current) return
     let v
     try { v = createViewer(hostRef.current, { domain, machine: machineName, cinematic: true }) }
     catch (e) { /* graceful: HUD still works without the 3-D */ }
     viewerRef.current = v
     return () => { try { v && v.dispose() } catch {} viewerRef.current = null }
-  }, [domain, machineName])
+  }, [domain, machineName, useGlb])
 
   // keep the glued callout pinned to the focused subsystem every frame
+  // (procedural scene only — the GLB has no named subsystems to project to)
   useEffect(() => {
+    if (useGlb) return
     let raf
     const tick = () => {
       raf = requestAnimationFrame(tick)
@@ -528,7 +541,7 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [focusSub, stage])
+  }, [focusSub, stage, useGlb])
 
   const focus = (id) => { setFocusSub(id); viewerRef.current && viewerRef.current.focusAsset(id) }
   const colorSubsystems = (allGood) => {
@@ -577,17 +590,38 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   // per-step choreography while repairing
   useEffect(() => {
     if (stage !== 'repair') return
+    setViewStep(null)   // active step changed — collapse any manually-opened detail
     const s = steps[step]; if (!s) return
     focus(s.f || plan.focusSub || 'EDM-1')
     say(`Step ${step + 1} of ${total}: ${s.t}. ${s.d}`)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, step])
 
+  // Which step's detail is shown in the floating window: an explicitly-clicked
+  // step wins, else the active repair step.
+  const detailStep = viewStep != null ? viewStep : (stage === 'repair' ? step : null)
+
+  // Anchor the floating detail window beside its flow node (re-measured on
+  // step change, list scroll and resize).
+  const measureAnchor = useCallback(() => {
+    const node = detailStep != null ? nodeRefs.current[detailStep] : null
+    if (!node) { setAnchor(null); return }
+    const r = node.getBoundingClientRect()
+    setAnchor({ top: Math.round(r.top + r.height / 2), left: Math.round(r.right + 14) })
+  }, [detailStep])
+  useLayoutEffect(measureAnchor, [measureAnchor, stage, step, rcLit])
+  useEffect(() => {
+    const fl = flowRef.current
+    window.addEventListener('resize', measureAnchor)
+    fl && fl.addEventListener('scroll', measureAnchor)
+    return () => { window.removeEventListener('resize', measureAnchor); fl && fl.removeEventListener('scroll', measureAnchor) }
+  }, [measureAnchor])
+
   // auto-advance the repair when playing
   useEffect(() => {
     if (stage !== 'repair' || !playing) return
     const s = steps[step]; if (!s) return
-    const dur = Math.max(2600, Math.min(5200, s.time * 55))
+    const dur = Math.max(8000, Math.min(18000, s.time * 180))
     const t = setTimeout(() => {
       if (step + 1 >= total) setStage('complete')
       else setStep(step + 1)
@@ -689,28 +723,25 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
 
           <div className="mx-card flush">
             <div className="mx-h"><I n="ti-route" /> Repair plan<span className="tag">{total} steps</span></div>
-            <div className="mx-flow">
+            <div className="mx-flow" ref={flowRef}>
               {steps.map((s, i) => {
                 const st = stage === 'complete' || i < step ? 'done' : (stage === 'repair' && i === step) ? 'active' : ''
+                const isFocused = detailStep === i
                 return (
-                  <div key={i} className={`mx-fnode ${st}`} onClick={() => goStep(i)}>
+                  <div key={i} ref={el => { nodeRefs.current[i] = el }}
+                    className={`mx-fnode ${st} ${isFocused ? 'viewing' : ''}`}
+                    onClick={() => { if (st === 'active') { setViewStep(null); return } setViewStep(v => v === i ? null : i); setPlaying(false) }}>
                     <div className="rail">
                       <div className="bead">{st === 'done' ? '✓' : s.safety ? '!' : i + 1}</div>
                       <div className="wire" />
                     </div>
                     <div className="body">
-                      <div className="ftitle">{s.t}{s.safety && <span className="safety">SAFETY</span>}</div>
-                      {st === 'active' ? (
-                        <div className="mx-detail">
-                          <div className="fsub" style={{ marginBottom: 8 }}>{s.d}</div>
-                          <div className="mx-meta">
-                            <div><span>Tool</span><br /><b>{s.tool}</b></div>
-                            <div><span>Est. time</span><br /><b>{mmss(s.time)}</b></div>
-                            <div><span>Difficulty</span><br /><b>{s.diff}</b></div>
-                            <div><span>Component</span><br /><b>{domMeta[s.f || plan.focusSub || domOrder[0]]?.label || '—'}</b></div>
-                          </div>
-                        </div>
-                      ) : <div className="fsub">{s.d}</div>}
+                      <div className="ftitle">
+                        {s.t}
+                        {s.safety && <span className="safety">SAFETY</span>}
+                        <span className="chev">{isFocused ? '▾' : '›'}</span>
+                      </div>
+                      <div className="fsub">{s.d}</div>
                     </div>
                   </div>
                 )
@@ -719,20 +750,29 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
           </div>
         </div>
 
-        {/* CENTER — the 3-D twin (AI controls the camera) */}
+        {/* CENTER — the 3-D twin. Shows the actual reconstructed GLB when the
+            twin has one, else the procedural domain scene. */}
         <div className="mx-center">
-          <div ref={hostRef} className="mx-canvas hero3d scene3d-host" />
+          {useGlb
+            ? <div className="mx-canvas" style={{ position: 'absolute', inset: 0 }}>
+                <ModelViewer url={modelUrl} height="100%" autoRotate={stage !== 'repair'}
+                  badge={<><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> <b>{machineName}</b>
+                    {focusSub && domMeta[focusSub] ? ` · ${domMeta[focusSub].label}` : ''}</>} />
+              </div>
+            : <div ref={hostRef} className="mx-canvas hero3d scene3d-host" />}
           <div className={`mx-scan ${scan ? 'on' : ''}`}><i /><b /></div>
-          {/* glued component callout */}
-          <div ref={calloutRef} className={`mx-callout ${stage === 'repair' || stage === 'complete' ? 'repair' : ''}`} style={{ opacity: 0 }}>
-            <div className="lab">
-              <div className="nm"><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> {domMeta[focusSub]?.label || ''}</div>
-              {focusTele.length > 0 && <div className="mm">
-                {focusTele.map(x => <span key={x.key}>{x.meta.label}<b>{fmt(cur(x))}{x.meta.unit ? ' ' + x.meta.unit : ''}</b></span>)}
-              </div>}
+          {/* glued component callout (procedural scene only) */}
+          {!useGlb && (
+            <div ref={calloutRef} className={`mx-callout ${stage === 'repair' || stage === 'complete' ? 'repair' : ''}`} style={{ opacity: 0 }}>
+              <div className="lab">
+                <div className="nm"><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> {domMeta[focusSub]?.label || ''}</div>
+                {focusTele.length > 0 && <div className="mm">
+                  {focusTele.map(x => <span key={x.key}>{x.meta.label}<b>{fmt(cur(x))}{x.meta.unit ? ' ' + x.meta.unit : ''}</b></span>)}
+                </div>}
+              </div>
+              <div className="stem" /><div className="ring" />
             </div>
-            <div className="stem" /><div className="ring" />
-          </div>
+          )}
         </div>
 
         {/* RIGHT rail — health + telemetry */}
@@ -795,13 +835,56 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
             <div className="mx-ctrls">
               <div className={`mx-btn ${voice ? 'on' : ''}`} title="Voice narration" onClick={() => setVoice(v => !v)}><I n={voice ? 'ti-volume' : 'ti-volume-off'} /></div>
               <div className="mx-btn" title="Previous step" onClick={() => goStep(step - 1)} disabled={stage !== 'repair' || step === 0}><I n="ti-player-track-prev" /></div>
-              <div className="mx-btn play" title={playing ? 'Pause' : 'Play'} onClick={() => { if (stage === 'complete') return; if (stage !== 'repair') setStage('repair'); setPlaying(p => !p) }}>
+              <div className="mx-btn" title={playing ? 'Pause auto-play' : 'Auto-play steps'} onClick={() => { if (stage === 'complete') return; if (stage !== 'repair') setStage('repair'); setPlaying(p => !p) }}>
                 <I n={playing && stage === 'repair' ? 'ti-player-pause' : 'ti-player-play'} /></div>
-              <div className="mx-btn" title="Next step" onClick={() => (step + 1 >= total ? setStage('complete') : goStep(step + 1))} disabled={stage === 'complete'}><I n="ti-player-track-next" /></div>
+              {/* Primary manual action — the user advances at their own pace */}
+              <button className="mx-next" disabled={stage === 'complete'}
+                onClick={() => {
+                  if (stage === 'complete') return
+                  if (stage === 'intro' || stage === 'scan' || stage === 'diagnose') { setStage('repair'); setStep(0); return }
+                  if (step + 1 >= total) setStage('complete'); else goStep(step + 1)
+                }}>
+                {stage === 'complete' ? 'Done'
+                  : stage !== 'repair' ? <>Start repair <I n="ti-player-track-next" /></>
+                  : step + 1 >= total ? <>Finish <I n="ti-check" /></>
+                  : <>Next step <I n="ti-player-track-next" /></>}
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── floating step-detail window (anchored beside its flow node) ── */}
+      {detailStep != null && steps[detailStep] && anchor && (() => {
+        const s = steps[detailStep]
+        const diffColor = s.diff === 'High' ? 'var(--mx-red)' : s.diff === 'Medium' ? 'var(--mx-amber)' : 'var(--mx-green)'
+        const compLabel = domMeta[s.f || plan.focusSub || domOrder[0]]?.label || '—'
+        const isActive = stage === 'repair' && detailStep === step
+        return (
+          <div className="mx-stepdetail" style={{ top: anchor.top, left: anchor.left }}>
+            <div className="sd-head">
+              <span className="sd-idx">{isActive ? 'NOW' : `STEP ${detailStep + 1}`}</span>
+              <span className="sd-title">{s.t}</span>
+              {viewStep != null && <span className="sd-x" onClick={() => setViewStep(null)}><I n="ti-x" /></span>}
+            </div>
+            {s.safety && (
+              <div className="sd-safety"><I n="ti-alert-triangle" /> SAFETY HOLD — apply Lockout/Tagout first</div>
+            )}
+            <div className="sd-desc">{s.d}</div>
+            <div className="sd-meta">
+              <div><span>Tool required</span><b style={{ color: 'var(--mx-cyan)' }}>{s.tool}</b></div>
+              <div><span>Est. duration</span><b>{mmss(s.time)}</b></div>
+              <div><span>Difficulty</span><b style={{ color: diffColor }}>{s.diff}</b></div>
+              <div><span>Component</span><b style={{ color: 'var(--mx-violet)' }}>{compLabel}</b></div>
+            </div>
+            {!isActive && (
+              <button className="sd-jump" onClick={() => { setViewStep(null); goStep(detailStep) }}>
+                <I n="ti-player-play" /> Jump to this step
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── completion ── */}
       {stage === 'complete' && (

@@ -20,6 +20,7 @@ export const api = {
   // real-time turbine twin
   twinState: (tenant) => req(`/twin/${tenant}/state`),
   step: (body) => req('/twin/step', { method: 'POST', body: JSON.stringify(body) }),
+  setTwinRunning: (tenant, running) => req(`/twin/${tenant}/running`, { method: 'POST', body: JSON.stringify({ running }) }),
 
   // scenario builder
   scenarioLibrary: () => req('/scenarios/library'),
@@ -66,6 +67,8 @@ export const api = {
   // build a twin: conversational agent + Tripo/RunPod image->3D
   buildTwinMessage: (body) => req('/build-twin/message', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinGenerate: (body) => req('/build-twin/generate', { method: 'POST', body: JSON.stringify(body) }),
+  buildTwinModel: (body) => req('/build-twin/model', { method: 'POST', body: JSON.stringify(body) }),
+  buildTwinCreate: (body) => req('/build-twin/create', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinStatus: (taskId) => req(`/build-twin/status/${taskId}`),
   modelUrl: (tenant) => `/api/model/${tenant}.glb`,
 }

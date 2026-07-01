@@ -7,6 +7,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+import shutil
+
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
@@ -106,6 +108,80 @@ def build_twin_generate(req: TwinGenerateRequest):
             "domain": req.domain, "assets": built.get("assets", []),
             "task_id": task_id, "tripo": gen_status,
             "provider": provider, "quality": req.quality}
+
+
+# ── Stepped Build-a-Twin: (1) generate model → preview → (2) create twin ──
+class ModelGenRequest(BaseModel):
+    image_b64: str | None = None
+    filename: str = "asset.png"
+    quality: str = "fast"                 # "fast" (256) or "high" (512)
+
+
+@router.post("/build-twin/model")
+def build_twin_model(req: ModelGenRequest):
+    """Generate ONLY the 3D model from the image (no twin yet). The GLB is stored
+    under its task id so the UI can preview it and confirm before we wire a twin."""
+    provider = config.model_3d_provider   # "runpod", "tripo", or "none"
+    if provider == "none":
+        return {"task_id": None, "status": "no_key", "provider": provider}
+    if not req.image_b64:
+        return {"task_id": None, "status": "no_image", "provider": provider}
+    mc_res = 512 if req.quality == "high" else 256
+    if provider == "runpod":
+        task_id, err = runpod_3d.start_image_task(
+            runpod_3d.b64_to_bytes(req.image_b64), req.filename, mc_resolution=mc_res)
+        mod = runpod_3d
+    else:  # tripo
+        tripo.log_balance("before generation")
+        task_id, err = tripo.start_image_task(tripo.b64_to_bytes(req.image_b64), req.filename)
+        mod = tripo
+    if not task_id:
+        return {"task_id": None, "status": f"error: {err or 'unknown'}", "provider": provider}
+    mod.register_job(task_id, task_id)     # keyed by task id (temp, pre-twin)
+    return {"task_id": task_id, "status": "running", "provider": provider}
+
+
+class TwinCreateRequest(BaseModel):
+    machine: str = "New Twin"
+    domain: str = "edm-machine"
+    model_task_id: str | None = None       # attach a previewed model to the new twin
+
+
+@router.post("/build-twin/create")
+def build_twin_create(req: TwinCreateRequest):
+    """Confirm step — build the live twin (physics + behaviours + sensors) and
+    attach the already-generated 3D model to it."""
+    if req.domain == "turbine-engine":
+        built = nextxr.build_turbine(req.machine)
+    else:
+        built = nextxr.build_domain(req.machine, req.domain)
+    tenant = built.get("tenant")
+    try:
+        nextxr.simulate_step(tenant, throttle=0.9)
+    except Exception:  # noqa: BLE001
+        pass
+    model_url = None
+    if req.model_task_id:
+        src = runpod_3d.model_path(req.model_task_id)   # _models/<task_id>.glb (shared dir)
+        if src.exists():
+            try:
+                shutil.copy(src, runpod_3d.model_path(tenant))
+                model_url = f"/api/model/{tenant}.glb"
+            except Exception:  # noqa: BLE001
+                pass
+    return {"tenant": tenant, "machine": built.get("machine"), "domain": req.domain,
+            "assets": built.get("assets", []), "model_url": model_url}
+
+
+class RunningRequest(BaseModel):
+    running: bool = True
+
+
+@router.post("/twin/{tenant}/running")
+def set_twin_running(tenant: str, req: RunningRequest):
+    """Start/stop the live twin — freezes or resumes its physics ticker."""
+    ok = nextxr.set_running(tenant, req.running)
+    return {"tenant": tenant, "running": req.running, "ok": ok}
 
 
 @router.get("/tripo/balance")

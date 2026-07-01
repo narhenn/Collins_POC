@@ -111,6 +111,16 @@ def project(tenant: str, fault: str, severity: float = 0.85, throttle=None,
                        horizon_min=horizon_min)
 
 
+def set_running(tenant: str, running: bool) -> bool:
+    """Start/stop a live twin — the engine ticker only advances twins with
+    live=True, so this truly freezes/resumes the simulation."""
+    tw = get_engine().twin(tenant)
+    if not tw:
+        return False
+    tw.live = bool(running)
+    return True
+
+
 def simulate_step(tenant: str, throttle=None, fault=None, severity: float = 0.6) -> dict:
     tw = get_engine().twin(tenant)
     if not tw:

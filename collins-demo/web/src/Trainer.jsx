@@ -6,12 +6,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import api from './api'
 import { Icon, hColor, pct } from './lib.jsx'
+import { stubProcedure } from './aiStubs.js'
 import Markdown from './Markdown.jsx'
 import Chat from './Chat.jsx'
 
 const START_HEALTH = 0.42
 
-export default function Trainer({ machine, domain, fault, title, context }) {
+export default function Trainer({ machine, domain, fault, title, context, aiMode = 'stub' }) {
+  const stub = aiMode !== 'agent'
   const [proc, setProc] = useState(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState(null)
@@ -26,11 +28,20 @@ export default function Trainer({ machine, domain, fault, title, context }) {
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight }, [log])
 
   async function load() {
-    setLoading(true); setErr(null); reset()
+    setErr(null); reset()
+    // stub mode: build a full interactive procedure locally — instant, works for
+    // EVERY domain (the backend procedure agent was EDM-centric).
+    if (stub) {
+      setProc(stubProcedure({ domain, machineName: machine, fault, title })); setLoading(false); return
+    }
+    setLoading(true)
     try {
       const r = await api.procedure({ machine, domain, fault: fault || 'none', title, context })
       setProc(r.procedure)
-    } catch (e) { setErr(String(e.message || e)) }
+    } catch (e) {
+      // fall back to the local procedure so the teach flow never dead-ends
+      setProc(stubProcedure({ domain, machineName: machine, fault, title }))
+    }
     setLoading(false)
   }
   function reset() { setApplied([]); setHealth(START_HEALTH); setLog([]); setViolations(0); setSkips(0) }
@@ -81,8 +92,23 @@ export default function Trainer({ machine, domain, fault, title, context }) {
     steps: steps.map(s => ({ id: s.id, title: s.title, requires: s.requires, safety: s.safety })),
     completed_steps: applied, machine_health: Math.round(health * 100) + '%',
   }
-  const coachSend = (messages) =>
-    api.scenarioChat({ machine, messages, context: coachContext }).then(r => r.reply)
+  const coachSend = (messages) => {
+    if (stub) {
+      const q = ([...messages].reverse().find(m => m.role === 'user')?.content || '').toLowerCase()
+      const safetyStep = steps.find(s => s.safety)
+      let reply
+      if (/skip|isolation|loto|safety/.test(q))
+        reply = `Skipping the safety isolation${safetyStep ? ` (**${safetyStep.title}**)` : ''} is the riskiest mistake here — you'd be working on a live machine, risking injury and secondary damage. Always isolate before any physical work.`
+      else if (/order|why|sequence|before|after/.test(q))
+        reply = `The order matters: diagnose first so you target the right part, isolate before you open anything, inspect to confirm the failure mode, then repair → recalibrate → test → sign off. Each step depends on the one before it.`
+      else if (/riskiest|worst|dangerous|mistake/.test(q))
+        reply = `The two costly mistakes are (1) opening the machine before lockout/tagout, and (2) replacing a part before inspection confirms the actual failure mode — you fix the wrong thing and the fault returns.`
+      else
+        reply = `Work the steps top-to-bottom for **${proc?.title || 'this repair'}**. Perform the safety isolation early, confirm the failure by inspection before replacing anything, and finish with a functional test. Ask me "what if I skip X?" to explore consequences. _(Local coach — switch to Agent for full Claude coaching.)_`
+      return Promise.resolve(reply)
+    }
+    return api.scenarioChat({ machine, messages, context: coachContext }).then(r => r.reply)
+  }
 
   if (loading) return (
     <div className="card"><div className="empty" style={{ padding: '50px 20px' }}>

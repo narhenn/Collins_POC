@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import api from './api'
 import Markdown from './Markdown.jsx'
 import { Icon, pct, hColor, statusColor, fmt, sevClass, SIG, domainMeta } from './lib.jsx'
+import { stubDiagnosis, stubAnalysis } from './aiStubs.js'
 
 /* ── tiny helpers ──────────────────────────────────────────────────── */
 function HealthBar({ name, type, health, status }) {
@@ -100,7 +101,8 @@ function ChatBubble({ from, text }) {
 }
 
 /* ── main component ───────────────────────────────────────────────── */
-export default function Intelligence({ tenant, machineName, domain, isLive = true, twin }) {
+export default function Intelligence({ tenant, machineName, domain, isLive = true, twin, aiMode = 'stub' }) {
+  const stub = aiMode !== 'agent'
   const [tab, setTab] = useState('diagnosis')
   const [diag, setDiag] = useState(null)
   const [analysis, setAnalysis] = useState(null)
@@ -122,7 +124,10 @@ export default function Intelligence({ tenant, machineName, domain, isLive = tru
 
   /* ── agent runners ──────────────────────────────────────────────── */
   async function runDiag() {
-    setBusy('diag'); setErr(null)
+    setErr(null)
+    // stub mode: instant local diagnosis, no tokens
+    if (stub) { setDiag(stubDiagnosis({ domain, machineName, twin })); return }
+    setBusy('diag')
     try {
       if (isLive) { setDiag(await api.runDiagnosis({ tenant, machine: machineName })) }
       else {
@@ -135,7 +140,9 @@ export default function Intelligence({ tenant, machineName, domain, isLive = tru
   }
 
   async function runAnalysis() {
-    setBusy('analysis'); setErr(null)
+    setErr(null)
+    if (stub) { setAnalysis(stubAnalysis({ domain, machineName, twin })); return }
+    setBusy('analysis')
     try {
       if (isLive) { const a = await api.runAnalysis({ tenant, machine: machineName, horizon_label: '6 hours' }); setAnalysis({ report: a.report }) }
       else { const r = await api.forecastSnapshot({ machine: machineName, domain, latest: twin?.latest || {}, horizon_label: '6 hours' }); setAnalysis({ report: r.report }) }
@@ -152,7 +159,7 @@ export default function Intelligence({ tenant, machineName, domain, isLive = tru
       const r = await api.troubleshoot({ tenant, machine: machineName, history: newHistory, message: msg })
       setTsResult(r)
       setTsHistory(prev => [...prev, { role: 'assistant', content: r.reply || r.message }])
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+      setTimeout(() => { const el = chatEndRef.current?.parentElement; if (el) el.scrollTop = el.scrollHeight }, 100)
     } catch (e) { setErr(String(e.message || e)) }
     setBusy(null)
   }

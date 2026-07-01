@@ -1,33 +1,44 @@
 import React, { useEffect, useRef, useState } from 'react'
 import api from './api'
-import { Icon, DOMAINS, domainMeta } from './lib.jsx'
-import TurbineModel from './TurbineModel.jsx'
-import Scene3D from './Scene3D.jsx'
+import { Icon } from './lib.jsx'
+import ModelViewer from './ModelViewer.jsx'
 
 // Domains available for "Build from image" — live-physics domains that make sense
 const BUILD_DOMAINS = [
-  { key: 'turbine-engine', icon: 'ti-engine', label: 'Gas Turbine', tag: 'Aerospace MRO', color: '#2563eb' },
   { key: 'edm-machine', icon: 'ti-grill', label: 'Wire EDM', tag: 'Precision Machining', color: '#7c3aed' },
+  { key: 'turbine-engine', icon: 'ti-engine', label: 'Gas Turbine', tag: 'Aerospace MRO', color: '#2563eb' },
   { key: 'datacenter', icon: 'ti-server-2', label: 'Data Center', tag: 'IT Infrastructure', color: '#0ea5e9' },
   { key: 'hospital', icon: 'ti-building-hospital', label: 'Hospital', tag: 'Healthcare', color: '#14b8a6' },
   { key: 'manufacturing', icon: 'ti-building-factory-2', label: 'Manufacturing', tag: 'Industrial', color: '#f59e0b' },
 ]
 
-export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, setModelUrl }) {
+// Build-a-Twin is now a clear 3-step flow:
+//   1. reconstruct the 3-D model from the photo  →  preview it
+//   2. CONFIRM (or regenerate) the model
+//   3. wire the digital twin (physics + behaviours + sensors) around the model
+export default function BuildTwin({ machine, domain: initialDomain, onBuilt, onSave, goDashboard }) {
   const [history, setHistory] = useState([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [machineName, setMachineName] = useState('')
-  const [ready, setReady] = useState(false)
   const [image, setImage] = useState(null)
   const [drag, setDrag] = useState(false)
-  const [building, setBuilding] = useState(false)
-  const [log, setLog] = useState([])
-  const [err, setErr] = useState(null)
-  const [domain, setDomain] = useState('turbine-engine')
+  const [domain, setDomain] = useState(initialDomain || 'edm-machine')
   const [quality, setQuality] = useState('fast')
   const [provider, setProvider] = useState(null)
-  const [builtDomain, setBuiltDomain] = useState(null)
+  const [log, setLog] = useState([])
+  const [err, setErr] = useState(null)
+
+  // ── model reconstruction (step 1-2) ──
+  const [modelStage, setModelStage] = useState('idle')     // idle | generating | ready | failed
+  const [modelTaskId, setModelTaskId] = useState(null)
+  const [modelPreview, setModelPreview] = useState(null)   // GLB url for the preview
+
+  // ── twin creation (step 3) ──
+  const [creating, setCreating] = useState(false)
+  const [created, setCreated] = useState(null)             // {tenant, machine, modelUrl}
+  const [savedOk, setSavedOk] = useState(false)
+
   const fileRef = useRef(null)
   const pollRef = useRef(null)
   const msgsRef = useRef(null)
@@ -36,10 +47,14 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
     api.buildTwinMessage({ history: [], message: '' }).then(r => {
       setHistory([{ role: 'assistant', content: r.reply }])
     }).catch(() => setHistory([{ role: 'assistant', content:
-      "Hi! I'm the Twin Builder. Tell me about the machine or equipment you want to twin." }]))
+      "Hi! I'm the Twin Builder. Tell me about the machine or equipment you want to twin, then upload a photo." }]))
   }, [])
   useEffect(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight }, [history, thinking])
   useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const domInfo = BUILD_DOMAINS.find(d => d.key === domain) || BUILD_DOMAINS[0]
+  const nameOf = () => machineName || machine?.name || domInfo.label
+  const addLog = (entry) => setLog(l => [...l, entry])
 
   async function send() {
     const m = input.trim(); if (!m) return
@@ -48,7 +63,6 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
     try {
       const r = await api.buildTwinMessage({ history, message: m })
       setHistory([...h, { role: 'assistant', content: r.reply }])
-      if (r.ready) setReady(true)
       if (r.machine_name) setMachineName(r.machine_name)
     } catch (e) { setHistory([...h, { role: 'assistant', content: 'Error: ' + e.message }]) }
     setThinking(false)
@@ -61,69 +75,83 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
     r.readAsDataURL(f)
   }
 
-  async function build() {
+  // ── Step 1: reconstruct the 3-D model (no twin yet) ──
+  async function generateModel() {
     if (!image) { setErr('Drop a photo of the asset first.'); return }
-    setBuilding(true); setErr(null)
-    setLog([{ t: `> domain: ${domainMeta(domain).label}  quality: ${quality}`, acc: true }])
-    setLog(l => [...l, { t: '> uploading image…' }])
+    setErr(null); setModelStage('generating'); setModelPreview(null); setModelTaskId(null)
+    setCreated(null); setSavedOk(false)
+    setLog([{ t: `> reconstructing 3D model — quality: ${quality}`, acc: true }])
     try {
-      const r = await api.buildTwinGenerate({
-        machine: machineName || machine?.name || domainMeta(domain).label,
-        domain,
-        image_b64: image.b64,
-        filename: image.name || 'machine.png',
-        quality,
-      })
+      const r = await api.buildTwinModel({ image_b64: image.b64, filename: image.name || 'asset.png', quality })
       setProvider(r.provider || null)
-      setBuiltDomain(domain)
-      onBuilt(r.tenant, r.machine)
-      setLog(l => [...l,
-        { t: `✓ live ${domainMeta(domain).label} twin built — sensors streaming`, ok: true },
-        { t: `  provider: ${r.provider || 'none'}  quality: ${r.quality || quality}`, acc: true },
-      ])
-      if (r.tripo === 'running' && r.task_id) {
-        const pName = r.provider === 'runpod' ? 'RunPod' : 'Tripo'
-        setLog(l => [...l, { t: `${pName}: reconstructing 3D model from image…`, acc: true }])
-        pollStatus(r.task_id, r.tenant, pName)
-      } else if (r.tripo === 'no_key') {
-        setLog(l => [...l, { t: '⚠ No 3D provider configured (set RUNPOD_API_KEY or TRIPO_API_KEY in .env)', warn: true }])
-        setBuilding(false)
-      } else {
-        setLog(l => [...l, { t: '3D generation: ' + r.tripo, warn: true }]); setBuilding(false)
+      if (r.status === 'no_key') {
+        addLog({ t: '⚠ No 3D provider configured (set RUNPOD_API_KEY or TRIPO_API_KEY in .env)', warn: true })
+        setModelStage('failed'); return
       }
-    } catch (e) { setErr(String(e.message || e)); setBuilding(false) }
+      if (!r.task_id) { addLog({ t: '3D generation: ' + r.status, warn: true }); setModelStage('failed'); return }
+      const pName = r.provider === 'runpod' ? 'RunPod · TRELLIS' : 'Tripo'
+      addLog({ t: `${pName}: reconstructing from your photo (first run can take ~2 min on a cold GPU)…`, acc: true })
+      pollModel(r.task_id, pName)
+    } catch (e) { setErr(String(e.message || e)); setModelStage('failed') }
   }
 
-  function pollStatus(taskId, tnt, pName) {
+  function pollModel(taskId, pName) {
     let n = 0
+    clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
       n++
       try {
         const s = await api.buildTwinStatus(taskId)
-        if (s.progress != null && n % 2 === 0)
-          setLog(l => [...l, { t: `${pName}: ${s.status} ${s.progress || 0}%` }])
+        if (s.progress != null && n % 3 === 0) addLog({ t: `${pName}: ${s.status} ${s.progress || 0}%` })
         if (s.status === 'success' && s.model_url) {
           clearInterval(pollRef.current)
-          setModelUrl(api.modelUrl(tnt))
-          setLog(l => [...l, { t: `✓ 3D model ready (${pName})`, ok: true }])
-          setBuilding(false)
+          setModelTaskId(taskId); setModelPreview(api.modelUrl(taskId))
+          setModelStage('ready')
+          addLog({ t: `✓ 3D model reconstructed — review it, then confirm`, ok: true })
         } else if (s.status === 'failed' || s.status === 'error') {
           clearInterval(pollRef.current)
-          setLog(l => [...l, { t: `${pName} failed: ${s.detail || s.status}`, warn: true }])
-          setBuilding(false)
+          addLog({ t: `${pName} failed: ${s.detail || s.status}`, warn: true }); setModelStage('failed')
         }
       } catch { /* keep polling */ }
-      if (n > 120) { clearInterval(pollRef.current); setBuilding(false) }
+      if (n > 160) { clearInterval(pollRef.current); setModelStage('failed'); addLog({ t: 'timed out', warn: true }) }
     }, 2500)
   }
 
-  const domInfo = BUILD_DOMAINS.find(d => d.key === domain) || BUILD_DOMAINS[0]
+  function regenerate() {
+    clearInterval(pollRef.current)
+    setModelStage('idle'); setModelPreview(null); setModelTaskId(null)
+  }
+
+  // ── Step 3: confirm → wire the live twin around the model ──
+  async function confirmModel() {
+    setCreating(true); setErr(null)
+    addLog({ t: `> wiring digital twin: physics · behaviours · sensors`, acc: true })
+    try {
+      const r = await api.buildTwinCreate({ machine: nameOf(), domain, model_task_id: modelTaskId })
+      const modelUrl = r.model_url || (modelTaskId ? api.modelUrl(modelTaskId) : null)
+      const rec = { tenant: r.tenant, machine: r.machine, modelUrl }
+      setCreated(rec)
+      addLog({ t: `✓ live ${domInfo.label} twin created — sensors streaming`, ok: true })
+      onBuilt && onBuilt(r.tenant, r.machine, domain, modelUrl)
+      // auto-save so the twin appears in the library immediately
+      onSave && onSave({ id: r.tenant, name: nameOf(), domain, modelUrl, createdAt: Date.now() })
+      setSavedOk(true)
+    } catch (e) { setErr(String(e.message || e)) }
+    setCreating(false)
+  }
+
+  function saveTwin() {
+    if (!created) return
+    onSave && onSave({ id: created.tenant, name: nameOf(), domain,
+      modelUrl: created.modelUrl, createdAt: Date.now() })
+    setSavedOk(true)
+  }
 
   return (
     <div className="panel">
       <div className="panel-header">
         <div><div className="panel-title">Build a Twin</div>
-          <div className="panel-subtitle">Pick a domain, drop a photo of your asset, and the platform builds a live digital twin with 3D model, sensors, and AI agents.</div></div>
+          <div className="panel-subtitle">Drop a photo → we reconstruct the 3D model → you confirm it → we wire a live digital twin (physics, sensors & AI agents) around it.</div></div>
       </div>
       {err && <div className="card" style={{ borderColor: 'rgba(225,29,72,.4)', color: 'var(--accent-red)', marginBottom: 16 }}>{err}</div>}
 
@@ -143,12 +171,11 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
       </div>
 
       <div className="grid-2">
-        {/* ── Left: chat + upload + controls ── */}
+        {/* ── Left: chat + upload + generate ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Chat */}
           <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div className="card-title"><Icon n="ti-sparkles" /> 2. Describe Your Asset <span className="pill pill-purple">agent</span></div>
-            <div ref={msgsRef} style={{ flex: 1, minHeight: 180, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: '2px' }}>
+            <div ref={msgsRef} style={{ flex: 1, minHeight: 150, maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: '2px' }}>
               {history.map((m, i) => (
                 <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%',
                   padding: '10px 13px', borderRadius: 14, fontSize: 12.5, lineHeight: 1.55,
@@ -194,56 +221,79 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
             </div>
           </div>
 
-          {/* Quality + Build */}
+          {/* Quality + Reconstruct */}
           <div className="card">
-            <div className="card-title"><Icon n="ti-wand" /> 4. Generate 3D Twin</div>
+            <div className="card-title"><Icon n="ti-wand" /> 4. Reconstruct 3D Model</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <div className="card-label" style={{ alignSelf: 'center', marginBottom: 0 }}>Quality:</div>
-              <button className={`btn ${quality === 'fast' ? 'btn-primary' : ''}`} onClick={() => setQuality('fast')}
-                style={{ fontSize: 11 }}>
-                <Icon n="ti-bolt" /> Fast <span className="hint" style={{ fontSize: 9 }}>~20s</span>
-              </button>
-              <button className={`btn ${quality === 'high' ? 'btn-primary' : ''}`} onClick={() => setQuality('high')}
-                style={{ fontSize: 11 }}>
-                <Icon n="ti-diamond" /> High Quality <span className="hint" style={{ fontSize: 9 }}>~40s</span>
-              </button>
+              <button className={`btn ${quality === 'fast' ? 'btn-primary' : ''}`} onClick={() => setQuality('fast')} style={{ fontSize: 11 }}>
+                <Icon n="ti-bolt" /> Fast</button>
+              <button className={`btn ${quality === 'high' ? 'btn-primary' : ''}`} onClick={() => setQuality('high')} style={{ fontSize: 11 }}>
+                <Icon n="ti-diamond" /> High Quality</button>
             </div>
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 0' }}
-              onClick={build} disabled={building || !image}>
-              {building
-                ? <><span className="spinner" /> Building {domInfo.label} Twin…</>
-                : <><Icon n="ti-wand" /> Build 3D Twin — {domInfo.label}</>}
+              onClick={generateModel} disabled={modelStage === 'generating' || creating || !image}>
+              {modelStage === 'generating'
+                ? <><span className="spinner" /> Reconstructing 3D model…</>
+                : <><Icon n="ti-cube-3d-sphere" /> Reconstruct 3D Model</>}
             </button>
           </div>
         </div>
 
-        {/* ── Right: 3D result + log ── */}
+        {/* ── Right: 3D preview + confirm/regenerate → create ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="card">
             <div className="card-title">
               <Icon n="ti-cube" /> Reconstructed 3D Model
-              {tenant && <span className="pill pill-green">live</span>}
-              {provider && <span className="pill pill-blue" style={{ fontSize: 9 }}>{provider === 'runpod' ? 'RunPod GPU' : provider}</span>}
+              {provider && <span className="pill pill-blue" style={{ fontSize: 9 }}>{provider === 'runpod' ? 'RunPod · TRELLIS' : provider}</span>}
+              {modelStage === 'ready' && <span className="pill pill-green" style={{ marginLeft: 'auto' }}>ready</span>}
             </div>
-            {modelUrl
-              ? (builtDomain === 'turbine-engine'
-                  ? <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} />
-                  : <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'var(--surface2)', borderRadius: 14, overflow: 'hidden' }}>
-                      <TurbineModel url={modelUrl} latest={twin?.latest || {}} height={320} />
-                    </div>)
-              : <div className="hero3d" style={{ height: 320 }}>
+
+            {modelStage === 'ready' && modelPreview
+              ? <ModelViewer url={modelPreview} height={340} badge={<><Icon n="ti-cube" /> drag to orbit</>} />
+              : <div className="hero3d" style={{ height: 340 }}>
                   <div className="lbl">
                     <div className="big" style={{ fontSize: 24 }}><Icon n={domInfo.icon} /></div>
-                    <div className="big">{domInfo.label} Twin</div>
-                    {building
-                      ? <div style={{ marginTop: 8 }}>
-                          <span className="spinner" style={{ borderTopColor: '#7c3aed' }} />
-                          <span style={{ marginLeft: 8 }}>Generating 3D model from your photo…</span>
-                        </div>
-                      : <div style={{ marginTop: 6 }}>Select domain, upload photo, and hit Build</div>}
+                    <div className="big">{domInfo.label}</div>
+                    {modelStage === 'generating'
+                      ? <div style={{ marginTop: 8 }}><span className="spinner" style={{ borderTopColor: '#7c3aed' }} />
+                          <span style={{ marginLeft: 8 }}>Reconstructing the 3D model from your photo…</span></div>
+                      : modelStage === 'failed'
+                        ? <div style={{ marginTop: 6, color: '#f0a' }}>Reconstruction failed — check the build log and retry.</div>
+                        : <div style={{ marginTop: 6 }}>Upload a photo and hit <b>Reconstruct 3D Model</b></div>}
                   </div>
                 </div>}
+
+            {/* Confirm / regenerate the reconstructed model */}
+            {modelStage === 'ready' && !created && (
+              <div style={{ marginTop: 12 }}>
+                <div className="hint" style={{ fontSize: 12, marginBottom: 8 }}>
+                  Happy with the reconstruction? Confirm to wire a live twin around it — or regenerate.
+                </div>
+                <div className="row" style={{ gap: 8 }}>
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={confirmModel} disabled={creating}>
+                    {creating ? <><span className="spinner" /> Building twin…</> : <><Icon n="ti-check" /> Confirm &amp; build twin</>}
+                  </button>
+                  <button className="btn" onClick={regenerate} disabled={creating}><Icon n="ti-refresh" /> Regenerate</button>
+                </div>
+              </div>
+            )}
+
+            {/* Twin created — open / save */}
+            {created && (
+              <div className="card" style={{ marginTop: 12, borderColor: 'rgba(22,163,74,.4)', background: 'rgba(22,163,74,.06)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--accent-green)' }}><Icon n="ti-circle-check" /> Live {domInfo.label} twin created</div>
+                <div style={{ fontSize: 12.5, marginTop: 4, color: 'var(--muted)' }}>
+                  Physics, behaviours and sensor telemetry are wired to the reconstructed model and streaming now.
+                </div>
+                <div className="row" style={{ gap: 8, marginTop: 12 }}>
+                  <button className="btn btn-primary" onClick={goDashboard}><Icon n="ti-layout-dashboard" /> Open live dashboard</button>
+                  <button className="btn" onClick={saveTwin} disabled={savedOk}>
+                    {savedOk ? <><Icon n="ti-check" /> Saved</> : <><Icon n="ti-device-floppy" /> Save twin</>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Build log */}
@@ -252,7 +302,7 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
               <div className="card-title"><Icon n="ti-terminal-2" /> Build Log
                 {provider && <span className="pill pill-surface" style={{ fontSize: 9 }}>{provider}</span>}
               </div>
-              <div className="mono" style={{ fontSize: 11, maxHeight: 200, overflowY: 'auto', lineHeight: 1.8 }}>
+              <div className="mono" style={{ fontSize: 11, maxHeight: 180, overflowY: 'auto', lineHeight: 1.8 }}>
                 {log.map((l, i) => (
                   <div key={i} style={{ color: l.ok ? 'var(--accent-green)' : l.warn ? 'var(--accent-amber)' : l.acc ? 'var(--brand)' : 'var(--muted)',
                     animation: 'fadeIn .3s ease', padding: '1px 0' }}>{l.t}</div>
@@ -262,14 +312,14 @@ export default function BuildTwin({ tenant, machine, twin, modelUrl, onBuilt, se
           )}
 
           {/* How it works */}
-          {!building && !modelUrl && (
+          {modelStage === 'idle' && !created && (
             <div className="card" style={{ background: 'var(--brand-softer)', border: '1px solid var(--brand-ring)' }}>
               <div className="card-title" style={{ fontSize: 12 }}><Icon n="ti-info-circle" /> How it works</div>
               <div style={{ fontSize: 11.5, lineHeight: 1.7, color: 'var(--muted)' }}>
-                <div style={{ marginBottom: 6 }}><b>1.</b> Pick the domain type for your equipment</div>
-                <div style={{ marginBottom: 6 }}><b>2.</b> Chat with the AI to describe the asset (optional)</div>
-                <div style={{ marginBottom: 6 }}><b>3.</b> Upload a photo from any angle</div>
-                <div><b>4.</b> The platform creates a live digital twin with the 3D model, wired to physics simulation, sensor telemetry, and 12 AI agents</div>
+                <div style={{ marginBottom: 6 }}><b>1.</b> Pick the domain and (optionally) describe the asset</div>
+                <div style={{ marginBottom: 6 }}><b>2.</b> Upload a photo — we reconstruct a 3D model on a GPU (RunPod · TRELLIS)</div>
+                <div style={{ marginBottom: 6 }}><b>3.</b> Preview &amp; confirm the model (or regenerate)</div>
+                <div><b>4.</b> We wire a live digital twin around it — physics, sensor telemetry & AI agents</div>
               </div>
             </div>
           )}

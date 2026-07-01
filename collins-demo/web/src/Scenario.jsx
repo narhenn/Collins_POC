@@ -4,11 +4,13 @@ import Chart from './Chart.jsx'
 import Markdown from './Markdown.jsx'
 import Trainer from './Trainer.jsx'
 import { Icon, fmt, pct, hColor, predictCharts, simTrajectory, signalsAtRisk } from './lib.jsx'
+import { stubScenarioSpec, stubScenarioNarrative } from './aiStubs.js'
 
 const HORIZONS = ['1 hour', '2 hours', '6 hours', '24 hours', '3 days', '1 week']
 const HMIN = { '1 hour': 60, '2 hours': 120, '6 hours': 360, '24 hours': 1440, '3 days': 4320, '1 week': 10080 }
 
-export default function Scenario({ tenant, machineName, domain, isLive = true, twin, setSimFault }) {
+export default function Scenario({ tenant, machineName, domain, isLive = true, twin, setSimFault, aiMode = 'stub' }) {
+  const stub = aiMode !== 'agent'
   const [tab, setTab] = useState('scenario')           // 'scenario' | 'fault'
   const [scenarios, setScenarios] = useState([])
   const [faults, setFaults] = useState([])
@@ -33,6 +35,11 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
   async function author() {
     if (!desc.trim()) return
     setAuthoring(true); setErr(null); setResult(null)
+    // stub mode: author a runnable spec locally, instantly, no tokens
+    if (stub) {
+      setSpec(stubScenarioSpec({ kind: tab, description: desc, faults, horizonMin: HMIN[horizon] || 120 }))
+      setAuthoring(false); return
+    }
     try {
       const r = await api.simAuthor({ tenant, machine: machineName, domain, kind: tab, description: desc, horizon_label: horizon })
       setSpec(r.spec)
@@ -49,19 +56,23 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
     if (!spec) return
     setRunning(true); setErr(null); setResult(null)
     try {
-      if (isLive) {
+      if (isLive && !stub) {
         const r = await api.simRun({ tenant, machine: machineName, domain, fault: spec.fault, severity: spec.severity,
           control: spec.control, horizon_min: spec.horizon_min, title: spec.title })
         setResult({ ...r, sim: false })
       } else {
-        // simulated twin: frontend trajectory + AI outcome (no physics engine)
+        // stub / simulated twin: frontend trajectory + local (or AI) outcome
         const fault = spec.fault === 'none' ? null : spec.fault
         const traj = simTrajectory(domain, spec.horizon_min, 60, fault, spec.severity ?? 1)
         const last = traj[traj.length - 1]
         const severity = last.health < 0.4 ? 'critical' : last.health < 0.7 ? 'warning' : 'nominal'
-        const context = `Assume this situation is in effect: ${spec.title}. ${spec.rationale || ''} Severity ~${Math.round((spec.severity || 0) * 100)}%.`
-        let narrative = null
-        try { const f = await api.forecastSnapshot({ machine: machineName, domain, latest: last, horizon_label: `${Math.round(spec.horizon_min)} min`, context }); narrative = f?.report } catch {}
+        let narrative
+        if (stub) {
+          narrative = stubScenarioNarrative({ domain, machineName, last, spec })
+        } else {
+          const context = `Assume this situation is in effect: ${spec.title}. ${spec.rationale || ''} Severity ~${Math.round((spec.severity || 0) * 100)}%.`
+          try { const f = await api.forecastSnapshot({ machine: machineName, domain, latest: last, horizon_label: `${Math.round(spec.horizon_min)} min`, context }); narrative = f?.report } catch {}
+        }
         setResult({ projection: { trajectory: traj, severity, rul: [], events: [] }, narrative, sim: true, atRisk: signalsAtRisk(domain, last) })
       }
     } catch (e) { setErr(String(e.message || e)) }
@@ -278,7 +289,7 @@ export default function Scenario({ tenant, machineName, domain, isLive = true, t
       {/* Interactive maintenance trainer (full width) */}
       {mode === 'train' && spec && spec.fault && spec.fault !== 'none' && (
         <div className="section-gap" style={{ marginTop: 16 }}>
-          <Trainer machine={machineName} domain={domain} fault={spec.fault} title={spec.title}
+          <Trainer machine={machineName} domain={domain} fault={spec.fault} title={spec.title} aiMode={aiMode}
             context={[spec.rationale, spec.expected_outcome].filter(Boolean).join(' ')} />
         </div>
       )}

@@ -3,12 +3,14 @@ import api from './api'
 import { Logo, Icon, SIG, sevClass, fmt, pct, hColor, statusColor,
   DOMAINS, domainMeta, tilesFor, simTwin,
   useCountUp, HealthRing, Sparkline } from './lib.jsx'
+import { stubNarration, stubChatReply } from './aiStubs.js'
 import Scenario from './Scenario.jsx'
 import Intelligence, { StepFlow } from './Intelligence.jsx'
 import Prediction from './Prediction.jsx'
 import BuildTwin from './BuildTwin.jsx'
 import TurbineModel from './TurbineModel.jsx'
 import Scene3D from './Scene3D.jsx'
+import ModelViewer from './ModelViewer.jsx'
 import Chat from './Chat.jsx'
 import Markdown from './Markdown.jsx'
 import Maintenance from './Maintenance.jsx'
@@ -40,6 +42,16 @@ export default function App() {
   const [err, setErr] = useState(null)
   const [simFault, setSimFault] = useState(null)      // active fault on a simulated twin
   const [maint, setMaint] = useState(false)          // AI Maintenance Director overlay
+  const [running, setRunning] = useState(true)        // live twin start/stop
+  // AI mode: 'stub' runs everything locally (no tokens, instant) — 'agent' calls Claude.
+  // Default stub so the always-on co-pilot doesn't burn tokens while monitoring.
+  const [aiMode, setAiMode] = useState(() => localStorage.getItem('gc_ai_mode') || 'stub')
+  const toggleAiMode = () => setAiMode(m => { const n = m === 'agent' ? 'stub' : 'agent'; try { localStorage.setItem('gc_ai_mode', n) } catch {} return n })
+  const [saved, setSaved] = useState(() => {          // user-saved twins (localStorage)
+    try { return JSON.parse(localStorage.getItem('gc_saved_twins') || '[]') } catch { return [] } })
+  const persistSaved = (list) => { setSaved(list); try { localStorage.setItem('gc_saved_twins', JSON.stringify(list)) } catch {} }
+  const saveTwin = (entry) => persistSaved([entry, ...saved.filter(s => s.id !== entry.id)].slice(0, 24))
+  const removeSaved = (id) => persistSaved(saved.filter(s => s.id !== id))
   const [cmdPalette, setCmdPalette] = useState(false)
   const [auditEntries, setAuditEntries] = useState([])
   const addAudit = (type, summary, detail, agent) => setAuditEntries(prev => [...prev,
@@ -66,33 +78,43 @@ export default function App() {
   }, [])
 
   // Live polling (backend) or local simulation, depending on the active twin.
+  // Paused when `running` is false (start/stop the twin).
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current)
     if (source === 'live' && tenant) {
-      poll(tenant)
-      pollRef.current = setInterval(() => poll(tenant), 1000)
+      poll(tenant)                                    // always read current state once
+      if (running) pollRef.current = setInterval(() => poll(tenant), 1000)
     } else if (source === 'sim') {
-      simPhase.current = 0; faultMag.current = 0
-      const tick = () => {
-        simPhase.current = Math.min(1, simPhase.current + 0.02)
-        // ramp an injected fault in (and back out when cleared)
-        faultMag.current = Math.max(0, Math.min(1, faultMag.current + (simFaultRef.current ? 0.15 : -0.3)))
-        setTwin(simTwin(domain, simPhase.current, simFaultRef.current, faultMag.current))
+      if (running) {
+        const tick = () => {
+          simPhase.current = Math.min(1, simPhase.current + 0.02)
+          // ramp an injected fault in (and back out when cleared)
+          faultMag.current = Math.max(0, Math.min(1, faultMag.current + (simFaultRef.current ? 0.15 : -0.3)))
+          setTwin(simTwin(domain, simPhase.current, simFaultRef.current, faultMag.current))
+        }
+        tick()
+        pollRef.current = setInterval(tick, 1500)
       }
-      tick()
-      pollRef.current = setInterval(tick, 1500)
     }
     return () => pollRef.current && clearInterval(pollRef.current)
-  }, [tenant, source, domain, poll])
+  }, [tenant, source, domain, poll, running])
+
+  // Start/stop the live twin — freezes the backend ticker too, for live twins.
+  async function toggleRunning() {
+    const next = !running
+    setRunning(next)
+    if (source === 'live' && tenant) { try { await api.setTwinRunning(tenant, next) } catch {} }
+  }
 
   // Open a real backend twin (seeds the graph; physics + agents come alive).
-  async function openLive(dom, name) {
+  // `mUrl` attaches a previously-reconstructed GLB (saved twins).
+  async function openLive(dom, name, mUrl = null) {
     setBuilding(dom); setErr(null); setSimFault(null)
     try {
       const r = await api.createTwin({ name: name || domainMeta(dom).label, domain: dom })
       setTenant(r.tenant); setDomain(dom); setSource('live')
-      setMachine(r.machine || { name: domainMeta(dom).label }); setModelUrl(null)
-      setTwin(null); setRoute('dashboard')
+      setMachine(r.machine || { name: domainMeta(dom).label }); setModelUrl(mUrl)
+      setTwin(null); setRunning(true); setRoute('dashboard')
     } catch (e) { setErr(String(e.message || e)) }
     setBuilding(null)
   }
@@ -101,14 +123,19 @@ export default function App() {
   function openSim(dom) {
     setTenant(null); setDomain(dom); setSource('sim'); setSimFault(null)
     setMachine({ name: domainMeta(dom).label }); setModelUrl(null)
-    setTwin(simTwin(dom, 0)); setRoute('dashboard')
+    simPhase.current = 0; faultMag.current = 0
+    setTwin(simTwin(dom, 0)); setRunning(true); setRoute('dashboard')
   }
 
-  // The turbine "Build a Twin" image→3D flow lands here.
-  function onBuilt(t, m) {
-    setTenant(t); setDomain('turbine-engine'); setSource('live')
-    setMachine(m); setModelUrl(null); setRoute('dashboard')
+  // Build-a-Twin "confirm" lands here — set the active live twin + its 3D model,
+  // WITHOUT navigating (Build-a-Twin shows a success card with "Open dashboard").
+  function onBuilt(t, m, dom, mUrl) {
+    setTenant(t); setDomain(dom || 'turbine-engine'); setSource('live')
+    setMachine(m); setModelUrl(mUrl || null); setTwin(null); setRunning(true)
   }
+
+  // Reopen a saved twin: recreate a fresh live twin and reattach its saved model.
+  function openSaved(s) { openLive(s.domain, s.name, s.modelUrl || null) }
 
   async function stepLive(throttle) {
     if (source !== 'live' || !tenant) return
@@ -126,6 +153,7 @@ export default function App() {
 
   const ctx = { tenant, domain, source, isLive, meta, machine, machineName, twin, claudeOn,
     stepLive, modelUrl, simFault, setSimFault, openMaint: () => setMaint(true),
+    running, toggleRunning, saveTwin, aiMode, setAiMode, toggleAiMode,
     goBuild: () => setRoute('build'), goTwins: () => setRoute('twins') }
 
   return (
@@ -140,8 +168,12 @@ export default function App() {
         <div className="crumb">{source
           ? <><b>{machineName}</b> · {meta.tag} · live twin</>
           : 'Pick a twin from the Twins library to begin'}</div>
-        <div className="topstat"><span className={`status-dot ${claudeOn ? 'live' : ''}`} style={{ background: claudeOn ? 'var(--brand)' : 'var(--hint)' }} />
-          Agent <b>{claudeOn ? (health?.claude?.model || 'Claude') : 'stub'}</b></div>
+        <div className="topstat" onClick={toggleAiMode} title="Toggle between local Stub (no tokens, instant) and the Claude Agent"
+          style={{ cursor: 'pointer', userSelect: 'none' }}>
+          <span className={`status-dot ${aiMode === 'agent' && claudeOn ? 'live' : ''}`} style={{ background: aiMode === 'agent' && claudeOn ? 'var(--brand)' : 'var(--hint)' }} />
+          AI <b>{aiMode === 'agent' ? (claudeOn ? (health?.claude?.model || 'Claude') : 'Claude (off)') : 'Stub'}</b>
+          <span style={{ marginLeft: 4, fontSize: 12, opacity: 0.6 }}><Icon n="ti-switch-horizontal" /></span>
+        </div>
         {source && <div className="topstat">
           <span className={`status-dot ${liveHealth == null ? '' : liveHealth > 0.7 ? 'green' : liveHealth > 0.4 ? 'amber' : 'red'}`} />
           Health <b>{liveHealth == null ? '—' : pct(liveHealth)}</b></div>}
@@ -180,24 +212,25 @@ export default function App() {
         <div className="content">
           {err && <div className="card" style={{ borderColor: 'rgba(225,29,72,.4)', color: 'var(--accent-red)', marginBottom: 16 }}>{err}</div>}
           {route === 'twins' && <TwinsLibrary building={building} active={source ? domain : null}
-            onLive={openLive} onSim={openSim} goBuild={() => setRoute('build')} />}
+            onLive={openLive} onSim={openSim} goBuild={() => setRoute('build')}
+            saved={saved} onOpenSaved={openSaved} onRemoveSaved={removeSaved} />}
           {route === 'dashboard' && (source
             ? <Dashboard key={domain + ':' + (tenant || 'sim')} ctx={ctx} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
-          {route === 'build' && <BuildTwin tenant={tenant} machine={machine} twin={twin}
-            modelUrl={modelUrl} onBuilt={onBuilt} setModelUrl={setModelUrl} />}
-          {route === 'scenario' && (source ? <Scenario tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} setSimFault={setSimFault} simFault={simFault} />
+          {route === 'build' && <BuildTwin machine={machine} domain={domain}
+            onBuilt={onBuilt} onSave={saveTwin} goDashboard={() => setRoute('dashboard')} />}
+          {route === 'scenario' && (source ? <Scenario tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} setSimFault={setSimFault} simFault={simFault} aiMode={aiMode} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'predict' && (source ? <Prediction tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
-          {route === 'agents' && (source ? <Intelligence tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} />
+          {route === 'agents' && (source ? <Intelligence tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} aiMode={aiMode} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'audit' && <AuditLog entries={auditEntries} />}
         </div>
       </div>
 
       {maint && source && (
-        <Maintenance domain={domain} machineName={machineName} twin={twin}
+        <Maintenance domain={domain} machineName={machineName} twin={twin} modelUrl={modelUrl}
           claudeOn={claudeOn} onExit={() => setMaint(false)} />
       )}
 
@@ -252,7 +285,7 @@ function NeedLive({ onPick, feature }) {
 }
 
 // ── Twins library ────────────────────────────────────────────────────
-function TwinsLibrary({ building, active, onLive, onSim, goBuild }) {
+function TwinsLibrary({ building, active, onLive, onSim, goBuild, saved = [], onOpenSaved, onRemoveSaved }) {
   const keys = Object.keys(DOMAINS).filter(k => DOMAINS[k].library !== false)
   return (
     <div className="panel">
@@ -265,6 +298,43 @@ function TwinsLibrary({ building, active, onLive, onSim, goBuild }) {
           <button className="btn btn-primary" onClick={goBuild}><Icon n="ti-sparkles" /> Build from image</button>
         </div>
       </div>
+
+      {/* My saved twins (built from photos) */}
+      {saved.length > 0 && (
+        <div className="section-gap">
+          <div className="card-label" style={{ marginBottom: 10 }}><Icon n="ti-device-floppy" /> My Twins</div>
+          <div className="grid-3">
+            {saved.map(s => {
+              const d = DOMAINS[s.domain] || {}
+              const busy = building === s.domain
+              return (
+                <div key={s.id} className="card twin-card" style={{ position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, borderRadius: '16px 16px 0 0',
+                    background: `linear-gradient(90deg, ${d.accent || '#7c3aed'}, ${d.accent || '#2563eb'}88)` }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, marginTop: 4 }}>
+                    <div className="agent-icon" style={{ background: `${d.accent || '#7c3aed'}18`, color: d.accent || 'var(--brand)' }}>
+                      <Icon n={d.icon || 'ti-cube'} /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{d.label || s.domain}</div>
+                    </div>
+                    <span title="Remove" onClick={() => onRemoveSaved(s.id)}
+                      style={{ cursor: 'pointer', color: 'var(--hint)', fontSize: 15 }}><Icon n="ti-trash" /></span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {s.modelUrl && <span className="pill pill-blue">3D model</span>}
+                    <span className="pill pill-surface">saved {new Date(s.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <button className="btn btn-primary" style={{ width: '100%' }} disabled={!!building}
+                    onClick={() => onOpenSaved(s)}>
+                    {busy ? <><span className="spinner" /> Opening…</> : <><Icon n="ti-bolt" /> Open twin</>}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       <div className="grid-3 section-gap">
         {keys.map(k => {
           const d = DOMAINS[k]
@@ -366,13 +436,38 @@ function WorkflowPipeline({ findings, incidents, health, wo, cascade, onMaint })
 }
 
 // ── Generic, domain-aware dashboard ──────────────────────────────────
+// Preset hotspot anchor points around a normalized (~3-unit) model.
+const HOTSPOT_POS = [[1.1, 0.2, 0], [-1.1, 0, 0], [0, 1.1, 0.2], [0.2, -0.9, 0.4], [-0.4, -0.4, -1.0], [0.4, 0.3, 1.0]]
+const hotspotsFor = (domain) => tilesFor(domain).slice(0, 6).map((s, i) => [s, HOTSPOT_POS[i]])
+
 function Dashboard({ ctx }) {
-  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint, setSimFault } = ctx
+  const { tenant, domain, source, isLive, meta, machineName, twin, stepLive, modelUrl, claudeOn, openMaint, setSimFault,
+    running, toggleRunning, aiMode, toggleAiMode } = ctx
   const live = twin?.latest || {}
   const h = twin?.health
-  const findings = twin?.findings || []
+  const backendFindings = twin?.findings || []
   const incidents = twin?.incidents || []
   const tiles = tilesFor(domain)
+  // supplement backend findings with client-derived ones from live telemetry —
+  // this ensures findings appear for live twins whose backend hasn't yet surfaced them,
+  // and for sim twins at any health level when sensors breach warn/crit thresholds
+  const existingSigs = new Set(backendFindings.map(f => f.signal).filter(Boolean))
+  const findings = [
+    ...backendFindings,
+    ...tiles
+      .filter(s => live[s] != null && !existingSigs.has(s))
+      .map(s => {
+        const sev = sevClass(s, live[s]); if (!sev) return null
+        const m = SIG[s]
+        return {
+          displayName: `${m.label} ${sev === 'crit' ? 'out of limits' : 'drifting out of band'}`,
+          severity: sev === 'crit' ? 'critical' : 'warning',
+          message: `${m.label} at ${fmt(live[s])}${m.unit ? ' ' + m.unit : ''} — ${sev === 'crit' ? 'breached threshold' : 'approaching limit'}.`,
+          signal: s,
+        }
+      })
+      .filter(Boolean),
+  ]
   const headlineSig = tiles[0]
   const headline = SIG[headlineSig]
   const risk = h == null ? null : Math.round((1 - h) * 100)
@@ -401,12 +496,19 @@ function Dashboard({ ctx }) {
   const [copilotBusy, setCopilotBusy] = useState(false)
   const copilotEndRef = useRef(null)
 
-  // auto-narrate every 10s — appears as AI messages in the chat
+  // auto-narrate — appears as AI messages in the chat. In stub mode this is a
+  // local, zero-token observation (and runs less often); agent mode calls Claude.
   useEffect(() => {
     if (!source) return
+    const stub = aiMode !== 'agent'
     const tick = async () => {
       const tw = twinRef.current
       if (!tw || !tw.latest) return
+      if (stub) {
+        const text = stubNarration({ domain, machineName, latest: tw.latest, findings: tw.findings || [], health: tw.health })
+        setCopilotMsgs(prev => [...prev, { role: 'auto', text, ts: new Date().toLocaleTimeString() }].slice(-20))
+        return
+      }
       try {
         const r = await api.narrateSnapshot({ machine: machineName, latest: tw.latest,
           findings: tw.findings || [], health: tw.health })
@@ -414,18 +516,27 @@ function Dashboard({ ctx }) {
       } catch {}
     }
     tick()
-    const t = setInterval(tick, 10000)
+    const t = setInterval(tick, stub ? 20000 : 10000)
     return () => clearInterval(t)
-  }, [source, domain, machineName])
+  }, [source, domain, machineName, aiMode])
 
-  // scroll to bottom on new messages
-  useEffect(() => { copilotEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [copilotMsgs])
+  // scroll within the chat container only — scrollIntoView scrolls the whole page
+  useEffect(() => {
+    const el = copilotEndRef.current?.parentElement
+    if (el) el.scrollTop = el.scrollHeight
+  }, [copilotMsgs])
 
   async function sendCopilotMsg() {
     const msg = copilotInput.trim()
     if (!msg) return
     setCopilotMsgs(prev => [...prev, { role: 'user', text: msg, ts: new Date().toLocaleTimeString() }])
     setCopilotInput('')
+    // stub mode: instant local answer, no tokens
+    if (aiMode !== 'agent') {
+      const text = stubChatReply(msg, { domain, machineName, latest: live, findings, health: h })
+      setCopilotMsgs(prev => [...prev, { role: 'assistant', text, ts: new Date().toLocaleTimeString() }])
+      return
+    }
     setCopilotBusy(true)
     try {
       const history = copilotMsgs.filter(m => m.role !== 'auto').map(m => ({
@@ -505,11 +616,15 @@ function Dashboard({ ctx }) {
           <div className="panel-subtitle">{machineName} · streaming sensor telemetry in real time</div>
         </div>
         <div className="panel-actions">
+          <button className={`btn ${running ? '' : 'btn-primary'}`} onClick={toggleRunning}
+            title={running ? 'Stop the twin (freeze telemetry)' : 'Start the twin'}>
+            <Icon n={running ? 'ti-player-pause' : 'ti-player-play'} /> {running ? 'Stop twin' : 'Start twin'}
+          </button>
           <button className="btn btn-primary repair-cta" onClick={openMaint}
             title="Enter AI Maintenance Director">
             <Icon n="ti-robot" /> Repair with AI
           </button>
-          {isLive && <>
+          {isLive && running && <>
             <span className="hint" style={{ alignSelf: 'center' }}>{throttleLabel}:</span>
             <button className="btn" onClick={() => stepLive(0.5)}>Low</button>
             <button className="btn" onClick={() => stepLive(0.75)}>Mid</button>
@@ -551,17 +666,21 @@ function Dashboard({ ctx }) {
       <WorkflowPipeline findings={findings} incidents={incidents} health={h}
         wo={wo} cascade={cascade} onMaint={openMaint} />
 
-      {/* 3D twin scene */}
+      {/* 3D twin scene — the reconstructed GLB (Build-a-Twin) takes priority,
+          else the turbine model, else the procedural domain scene. */}
       <div className="section-gap">
-        {domain === 'turbine-engine'
-          ? (modelUrl
-              ? <TurbineModel url={modelUrl} latest={live} height={380} />
-              : <div className="hero3d" style={{ height: 380 }}>
-                  <div className="v-chip"><Icon n="ti-engine" /> <b>{machineName}</b></div>
-                  <div className="lbl"><div className="big">⬡ Gas Turbine</div>
-                    Generating the 3D model from your image — <a style={{ color: '#c4b5fd', cursor: 'pointer' }} onClick={ctx.goBuild}>open Build a Twin</a>.</div>
-                </div>)
-          : <Scene3D domain={domain} machine={machineName} live={live} height={380} />}
+        {modelUrl
+          ? (domain === 'turbine-engine'
+              ? <TurbineModel url={modelUrl} latest={live} height={380} health={h} />
+              : <ModelViewer url={modelUrl} latest={live} hotspots={hotspotsFor(domain)} height={380}
+                  badge={<><Icon n={meta.icon || 'ti-cube'} /> <b>{machineName}</b> · reconstructed</>} />)
+          : domain === 'turbine-engine'
+            ? <div className="hero3d" style={{ height: 380 }}>
+                <div className="v-chip"><Icon n="ti-engine" /> <b>{machineName}</b></div>
+                <div className="lbl"><div className="big">⬡ Gas Turbine</div>
+                  Generating the 3D model from your image — <a style={{ color: '#c4b5fd', cursor: 'pointer' }} onClick={ctx.goBuild}>open Build a Twin</a>.</div>
+              </div>
+            : <Scene3D domain={domain} machine={machineName} live={live} height={380} />}
       </div>
 
       {/* Predictive alert banner (live) */}
@@ -576,8 +695,14 @@ function Dashboard({ ctx }) {
       {source && (
         <div className="card section-gap" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="card-title"><Icon n="ti-message-chatbot" /> AI Co-Pilot
-            <span className="pill pill-purple" style={{ fontSize: 9 }}>{claudeOn ? 'Claude' : 'stub'}</span>
             <span className="pill pill-green" style={{ fontSize: 9 }}>live</span>
+            {/* Stub ↔ Agent toggle — stub never spends tokens while monitoring */}
+            <div className="ai-toggle" style={{ marginLeft: 'auto' }} title="Stub = local, no tokens · Agent = Claude">
+              <button className={aiMode !== 'agent' ? 'on' : ''} onClick={() => aiMode === 'agent' && toggleAiMode()}>
+                <Icon n="ti-cpu" /> Stub</button>
+              <button className={aiMode === 'agent' ? 'on' : ''} onClick={() => aiMode !== 'agent' && toggleAiMode()}>
+                <Icon n="ti-sparkles" /> Agent</button>
+            </div>
           </div>
 
           {/* chat messages */}
@@ -666,15 +791,23 @@ function Dashboard({ ctx }) {
       <div className="grid-2">
         <div className="card">
           <div className="card-title"><Icon n="ti-alert-triangle" /> Active Findings
-            <span className="pill pill-surface">{findings.length}</span></div>
+            <span className={`pill ${findings.length > 0 ? 'pill-red' : 'pill-surface'}`}>{findings.length}</span></div>
           {findings.length === 0
             ? <div className="empty">No findings — within limits.</div>
-            : <div className="event-list">{findings.slice(0, 6).map((f, i) => (
-                <div key={i} className="event-item" style={{ '--i': i }}>
-                  <div className={`event-icon ${f.severity === 'critical' ? 'ev-crit' : 'ev-warn'}`}><Icon n="ti-alert-triangle" /></div>
-                  <div className="event-body"><div className="event-title">{f.displayName || f.behaviorId || 'finding'}</div>
-                    <div className="event-meta">{f.message}</div></div>
-                </div>))}</div>}
+            : <>
+                <div className="event-list">{findings.slice(0, 6).map((f, i) => (
+                  <div key={i} className="event-item" style={{ '--i': i }}>
+                    <div className={`event-icon ${f.severity === 'critical' ? 'ev-crit' : 'ev-warn'}`}><Icon n="ti-alert-triangle" /></div>
+                    <div className="event-body"><div className="event-title">{f.displayName || f.behaviorId || 'finding'}</div>
+                      <div className="event-meta">{f.message}</div></div>
+                  </div>))}</div>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <button className="btn btn-primary repair-cta" style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={openMaint}>
+                    <Icon n="ti-robot" /> Launch AI Repair Session
+                  </button>
+                </div>
+              </>}
         </div>
         <div className="card">
           <div className="card-title"><Icon n="ti-git-merge" /> Incidents
