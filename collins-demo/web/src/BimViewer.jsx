@@ -10,12 +10,35 @@
 //   • click any element → inspector (class, storey, discipline, GUID)
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { OrbitControls, PointerLockControls, useGLTF, Html, Environment } from '@react-three/drei'
+import { OrbitControls, PointerLockControls, useGLTF, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { Icon } from './lib.jsx'
 import api from './api.js'
 
 const SHELL = new Set(['architecture', 'structure', 'site'])
+
+// A mesh material may be a single Material or an array (multi-material); this
+// normalises both to an array so we never call .clone() on a bare Array.
+const asMats = (m) => (Array.isArray(m) ? m : [m]).filter(Boolean)
+
+// Error boundary so a bad GLB / three.js hiccup shows a message instead of
+// white-screening the whole app.
+class SceneBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null } }
+  static getDerivedStateFromError(err) { return { err } }
+  componentDidCatch(err) { console.warn('BIM scene error:', err) }
+  render() {
+    if (this.state.err) {
+      return <div style={{ height: '100%', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: '#aab0e0', fontSize: 13, textAlign: 'center', padding: 24 }}>
+        <div><div style={{ fontSize: 22, marginBottom: 8 }}>⬡</div>
+          Couldn't render this building's 3D layers.<br />
+          <span style={{ fontSize: 11, color: '#7a80a8' }}>{String(this.state.err?.message || this.state.err)}</span>
+        </div></div>
+    }
+    return this.props.children
+  }
+}
 
 // ── one discipline layer ──────────────────────────────────────────────
 function Layer({ url, disc, color, visible, opacity, xray, storey, storeyOf, onPick }) {
@@ -24,8 +47,12 @@ function Layer({ url, disc, color, visible, opacity, xray, storey, storeyOf, onP
     const s = scene.clone(true)
     s.traverse(o => {
       if (!o.isMesh) return
-      o.material = o.material.clone()
-      o.material.side = THREE.DoubleSide
+      o.material = asMats(o.material).map(mm => {
+        const c = mm.clone()
+        c.side = THREE.DoubleSide
+        return c
+      })
+      if (o.material.length === 1) o.material = o.material[0]  // keep single-mat meshes simple
       o.userData.disc = disc
     })
     return s
@@ -36,23 +63,25 @@ function Layer({ url, disc, color, visible, opacity, xray, storey, storeyOf, onP
     const shell = SHELL.has(disc)
     root.traverse(o => {
       if (!o.isMesh) return
-      const m = o.material
-      if (xray && shell) {
-        m.transparent = true
-        m.opacity = 0.13 * opacity
-        m.depthWrite = false
-      } else {
-        m.transparent = opacity < 0.999
-        m.opacity = opacity
-        m.depthWrite = opacity > 0.35
+      for (const m of asMats(o.material)) {
+        if (xray && shell) {
+          m.transparent = true
+          m.opacity = 0.13 * opacity
+          m.depthWrite = false
+        } else {
+          m.transparent = opacity < 0.999
+          m.opacity = opacity
+          m.depthWrite = opacity > 0.35
+        }
+        if (xray && !shell) {
+          if (!m.emissive) m.emissive = new THREE.Color()
+          m.emissive.setRGB(color[0], color[1], color[2])
+          m.emissiveIntensity = 0.35
+        } else if (m.emissive) {
+          m.emissiveIntensity = 0
+        }
+        m.needsUpdate = true
       }
-      if (xray && !shell) {
-        m.emissive = new THREE.Color(color[0], color[1], color[2])
-        m.emissiveIntensity = 0.35
-      } else if (m.emissive) {
-        m.emissiveIntensity = 0
-      }
-      m.needsUpdate = true
     })
   }, [root, xray, opacity, disc, color])
 
@@ -319,12 +348,14 @@ export default function BimViewer() {
 
           {/* scene */}
           <div style={{ height: 640, borderRadius: 16, overflow: 'hidden', background: '#0b0d18', position: 'relative' }}>
+           <SceneBoundary>
             <Canvas camera={{ position: [center[0] + size * 0.9, center[1] + size * 0.7, center[2] + size * 0.9], fov: 50, near: 0.1, far: 500 }} dpr={[1, 2]}>
               <color attach="background" args={['#0b0d18']} />
-              <ambientLight intensity={0.75} />
+              {/* local lights only — no CDN environment map, so the viewer is fully offline-safe */}
+              <hemisphereLight args={['#dfe6ff', '#20263c', 0.9]} />
+              <ambientLight intensity={0.35} />
               <directionalLight position={[20, 30, 15]} intensity={1.1} />
               <directionalLight position={[-15, 10, -10]} intensity={0.35} color="#9ec9ff" />
-              <Environment preset="city" background={false} />
               <SectionCut enabled={cut} height={cutH} />
               <Suspense fallback={<Loading />}>
                 {/* IFC is Z-up → rotate into three's Y-up world */}
@@ -343,6 +374,7 @@ export default function BimViewer() {
                 ? <WalkRig eye={eye} />
                 : <OrbitControls target={center} enableDamping makeDefault />}
             </Canvas>
+           </SceneBoundary>
             <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(12,14,28,.72)',
               border: '1px solid rgba(124,58,237,.4)', color: '#dfe3ff', fontFamily: 'var(--mono)',
               fontSize: 11, padding: '6px 12px', borderRadius: 999, display: 'flex', gap: 6, alignItems: 'center' }}>

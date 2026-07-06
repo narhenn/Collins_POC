@@ -25,7 +25,6 @@ const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
   { id: 'dashboard', label: 'Live Dashboard', icon: 'ti-layout-dashboard' },
   { id: 'build', label: 'Build a Twin', icon: 'ti-sparkles' },
-  { id: 'bim', label: 'BIM X-Ray', icon: 'ti-building' },
   { id: 'scenario', label: 'Scenario & Faults', icon: 'ti-urgent' },
   { id: 'predict', label: 'Prediction', icon: 'ti-chart-histogram' },
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },

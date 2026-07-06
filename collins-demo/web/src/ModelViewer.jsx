@@ -3,7 +3,7 @@
 // controls, studio lighting, and optional live sensor hotspots pinned around it.
 import React, { Suspense, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html, Bounds, ContactShadows, Environment } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, Bounds, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
 import { SIG, sevClass, fmt } from './lib.jsx'
 
@@ -60,10 +60,11 @@ export default function ModelViewer({ url, height = 320, autoRotate = true, hots
     <div style={{ height, borderRadius: 18, overflow: 'hidden', background: '#0b0d18', position: 'relative' }}>
       <Canvas shadows camera={{ position: [3.2, 2, 3.6], fov: 46 }} dpr={[1, 2]}>
         <color attach="background" args={['#0b0d18']} />
-        <ambientLight intensity={0.6} />
+        {/* local lights only — no CDN environment map, so the viewer is fully offline-safe */}
+        <hemisphereLight args={['#e6ecff', '#1a2038', 0.7]} />
+        <ambientLight intensity={0.5} />
         <directionalLight position={[5, 8, 5]} intensity={1.25} castShadow />
         <directionalLight position={[-5, 3, -4]} intensity={0.4} color="#9ec9ff" />
-        <Environment preset="city" background={false} />
         <Suspense fallback={<Fallback label="Loading 3D model…" />}>
           <Bounds fit clip observe margin={1.2}>
             <Model url={url} />

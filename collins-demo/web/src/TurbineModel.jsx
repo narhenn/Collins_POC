@@ -1,6 +1,6 @@
 import React, { Suspense, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html, Bounds, ContactShadows, Environment } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, Bounds, ContactShadows } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SIG, sevClass, fmt } from './lib.jsx'
@@ -84,10 +84,11 @@ export default function TurbineModel({ url, latest = {}, height = 300, health = 
     <div style={{ height, borderRadius: 18, overflow: 'hidden', background: '#0b0d18', position: 'relative' }}>
       <Canvas shadows camera={{ position: [4, 2.5, 4.5], fov: 48 }} dpr={[1, 2]}>
         <color attach="background" args={['#0b0d18']} />
-        <ambientLight intensity={0.5} />
+        {/* local lights only — no CDN environment map, so the viewer is fully offline-safe */}
+        <hemisphereLight args={['#e6ecff', '#1a2038', 0.7]} />
+        <ambientLight intensity={0.4} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
         <directionalLight position={[-5, 3, -4]} intensity={0.4} color="#9ec9ff" />
-        <Environment preset="city" background={false} />
         <Suspense fallback={<Fallback label="Loading 3D model…" />}>
           <Bounds fit clip observe margin={1.2}>
             <Model url={url} health={health} />

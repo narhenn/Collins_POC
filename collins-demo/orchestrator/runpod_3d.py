@@ -25,9 +25,37 @@ from pathlib import Path
 import httpx
 
 from config import config
-from pipeline3d import preset, prepare_image, validate_glb, mesh_stats
 
 logger = logging.getLogger("orchestrator.runpod_3d")
+
+# The production pipeline layer needs Pillow/numpy/trimesh. Keep it OPTIONAL so
+# the orchestrator (and the live-twin demo) always boots even if those aren't
+# installed — generation then runs without the preprocess/validation extras.
+try:
+    from pipeline3d import preset, prepare_image, validate_glb, mesh_stats
+    _PIPELINE_OK = True
+except Exception as _e:  # noqa: BLE001
+    _PIPELINE_OK = False
+    logger.warning("pipeline3d unavailable (%s) — 3D generation runs without "
+                   "preprocess/validation. Install: pip install pillow numpy trimesh", _e)
+
+    def preset(quality):                              # minimal stand-in
+        class _P:
+            def payload(self):
+                return {"texture_size": 1024, "output_format": "glb"}
+        return _P()
+
+    def prepare_image(data, remove_background: bool = True):
+        return data, {"warnings": ["pipeline3d not installed — image sent as-is"],
+                      "server_preprocess": True, "steps": []}
+
+    def validate_glb(data):
+        ok = len(data) > 20 and data[:4] == b"glTF"
+        return {"ok": ok, "errors": [] if ok else ["not a binary glTF"],
+                "size": len(data)}
+
+    def mesh_stats(path):
+        return {"available": False}
 
 MODEL_DIR = Path(__file__).resolve().parent / "_models"
 MODEL_DIR.mkdir(exist_ok=True)
