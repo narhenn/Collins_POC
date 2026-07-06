@@ -1,10 +1,15 @@
 """
-runpod_3d.py — RunPod serverless image-to-3D client.
+runpod_3d.py — RunPod serverless TRELLIS image-to-3D client, driving the full
+production pipeline:
 
-Drop-in alternative to Tripo. Sends a base64 image to a RunPod endpoint
-running TripoSR (or similar), polls for the GLB result, and saves it
-locally. The rest of the pipeline (routes, frontend polling, GLB serving)
-is provider-agnostic and works unchanged.
+    upload → pipeline3d.preprocess (quality gate, enhancement, bg removal,
+    subject framing) → TRELLIS on RunPod with REAL sampler parameters
+    (pipeline3d.params quality presets; multi-image supported) →
+    pipeline3d.postprocess (GLB validation + mesh stats) → serve.
+
+The worker ignores unknown input fields, so the full-parameter payload is safe
+against the legacy worker; deploy apps/trellis-worker to actually honour the
+sampler settings, multi-image conditioning and metadata echo.
 
 Env vars:
     RUNPOD_API_KEY      — RunPod API key (rpa_...)
@@ -20,6 +25,7 @@ from pathlib import Path
 import httpx
 
 from config import config
+from pipeline3d import preset, prepare_image, validate_glb, mesh_stats
 
 logger = logging.getLogger("orchestrator.runpod_3d")
 
@@ -40,24 +46,47 @@ def _url(path: str) -> str:
 
 # ── Generation ────────────────────────────────────────────────────────
 
-def start_image_task(image_bytes: bytes, filename: str = "machine.png",
-                     mc_resolution: int = 256,
-                     foreground_ratio: float = 0.85) -> tuple[str | None, str | None]:
-    """Send image to RunPod endpoint. Returns (job_id, error).
+# preprocess reports parked here until register_job() claims them
+_pending_reports: dict[str, dict] = {}
 
-    The endpoint expects {"input": {"image": "<base64>"}} and returns
-    {"id": "<job_id>", "status": "IN_QUEUE"}.
+
+def start_image_task(image_bytes: bytes, filename: str = "machine.png",
+                     quality: str = "standard",
+                     extra_images: list[bytes] | None = None,
+                     mc_resolution: int | None = None,          # legacy, ignored
+                     foreground_ratio: float | None = None      # legacy, ignored
+                     ) -> tuple[str | None, str | None]:
+    """Run the input layer locally, then send the conditioning image(s) plus the
+    full TRELLIS parameter set to the RunPod endpoint. Returns (job_id, error).
+
+    quality: draft|standard|ultra (legacy fast/high map to draft/standard).
+    extra_images: optional additional views of the SAME object — the new worker
+    runs multi-image conditioning, a large accuracy win on complex objects.
     """
-    image_b64 = base64.b64encode(image_bytes).decode()
-    payload = {
-        "input": {
-            "image": image_b64,
-            "mc_resolution": mc_resolution,
-            "foreground_ratio": foreground_ratio,
-        }
-    }
+    params = preset(quality)
     try:
-        with httpx.Client(timeout=30.0) as c:
+        prepped, report = prepare_image(image_bytes)
+    except Exception as e:  # noqa: BLE001 — never block generation on the gate
+        prepped, report = image_bytes, {"warnings": [f"preprocess failed: {e}"],
+                                        "server_preprocess": True, "steps": []}
+    images_b64 = [base64.b64encode(prepped).decode()]
+    for extra in (extra_images or [])[:3]:
+        try:
+            p2, _ = prepare_image(extra)
+            images_b64.append(base64.b64encode(p2).decode())
+        except Exception:  # noqa: BLE001
+            images_b64.append(base64.b64encode(extra).decode())
+
+    p = params.payload()
+    p["preprocess"] = bool(report.get("server_preprocess", True))
+    payload = {"input": {
+        # legacy worker reads "image"; new worker prefers "images"
+        "image": images_b64[0],
+        "images": images_b64,
+        **p,
+    }}
+    try:
+        with httpx.Client(timeout=60.0) as c:
             r = c.post(_url("/run"), headers=_headers(), json=payload)
             if r.status_code != 200:
                 return None, f"RunPod HTTP {r.status_code}: {r.text[:200]}"
@@ -65,7 +94,12 @@ def start_image_task(image_bytes: bytes, filename: str = "machine.png",
             job_id = j.get("id")
             if not job_id:
                 return None, f"RunPod returned no job ID: {j}"
-            logger.info("RunPod job started: %s", job_id)
+            _pending_reports[job_id] = {
+                "preprocess": report, "quality": quality,
+                "params": p, "views": len(images_b64)}
+            logger.info("RunPod job started: %s (quality=%s, views=%d, prep=%s)",
+                        job_id, quality, len(images_b64),
+                        "; ".join(report.get("steps", [])) or "none")
             return job_id, None
     except Exception as e:  # noqa: BLE001
         return None, str(e)
@@ -93,13 +127,14 @@ def get_task(task_id: str) -> dict:
     # map RunPod status → our status
     if rp_status == "COMPLETED":
         output = j.get("output", {})
-        glb_b64 = None
+        glb_b64, meta = None, None
         if isinstance(output, dict):
             glb_b64 = output.get("glb") or output.get("model") or output.get("output")
+            meta = output.get("metadata")          # new worker echoes params + timings
         elif isinstance(output, str):
             glb_b64 = output
         return {"status": "success", "progress": 100,
-                "glb_b64": glb_b64,
+                "glb_b64": glb_b64, "metadata": meta,
                 "exec_ms": j.get("executionTime")}
     elif rp_status == "FAILED":
         return {"status": "failed", "progress": 0,
@@ -112,17 +147,24 @@ def get_task(task_id: str) -> dict:
         return {"status": "queued", "progress": 10}
 
 
-def save_glb(glb_b64: str, tenant: str) -> str | None:
-    """Decode base64 GLB and save to _models/{tenant}.glb.
-    Returns the local serve path on success."""
+def save_glb(glb_b64: str, tenant: str) -> tuple[str | None, dict]:
+    """Decode, VALIDATE and save the GLB to _models/{tenant}.glb.
+    Returns (serve_path | None, delivery_report)."""
     dest = MODEL_DIR / f"{tenant}.glb"
     try:
-        dest.write_bytes(base64.b64decode(glb_b64))
-        logger.info("GLB saved: %s (%d bytes)", dest, dest.stat().st_size)
-        return f"/api/model/{tenant}.glb"
+        data = base64.b64decode(glb_b64)
+        check = validate_glb(data)
+        if not check["ok"]:
+            logger.warning("GLB failed validation: %s", check["errors"])
+            return None, {"validation": check}
+        dest.write_bytes(data)
+        stats = mesh_stats(dest)
+        logger.info("GLB saved: %s (%d bytes, %s verts)", dest, len(data),
+                    stats.get("vertices", "?"))
+        return f"/api/model/{tenant}.glb", {"validation": check, "mesh": stats}
     except Exception as e:  # noqa: BLE001
         logger.warning("GLB save failed: %s", e)
-        return None
+        return None, {"error": str(e)}
 
 
 def model_path(tenant: str) -> Path:
@@ -136,7 +178,8 @@ _jobs: dict[str, dict] = {}
 
 def register_job(task_id: str, tenant: str) -> None:
     _jobs[task_id] = {"tenant": tenant, "status": "queued",
-                      "progress": 0, "model_url": None}
+                      "progress": 0, "model_url": None,
+                      "pipeline": _pending_reports.pop(task_id, {})}
 
 
 def job_status(task_id: str) -> dict:
@@ -153,11 +196,18 @@ def job_status(task_id: str) -> dict:
     if t.get("detail"):
         job["detail"] = t["detail"]
 
-    # on success, decode the GLB and save locally
+    # on success, decode + validate the GLB and save locally
     if t["status"] == "success" and t.get("glb_b64"):
-        local = save_glb(t["glb_b64"], job["tenant"])
+        local, delivery = save_glb(t["glb_b64"], job["tenant"])
         job["model_url"] = local
+        job.setdefault("pipeline", {})["delivery"] = delivery
+        if t.get("metadata"):
+            job["pipeline"]["worker"] = t["metadata"]
         job["status"] = "success" if local else "error"
+        if not local:
+            job["detail"] = "GLB failed validation: " + "; ".join(
+                delivery.get("validation", {}).get("errors", []) or
+                [delivery.get("error", "unknown")])
         if t.get("exec_ms"):
             logger.info("RunPod generation took %dms", t["exec_ms"])
     elif t["status"] == "success" and not t.get("glb_b64"):

@@ -1,0 +1,84 @@
+@prefix fleet: <https://ontology.nextxr.io/v3/fleet#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+#  FLEET / TRAM-NETWORK SHACL SHAPES
+#
+#  Fleet classes inherit all required validation from the platform
+#  base shapes (nxr:PhysicalAssetShape for equipment/sensors,
+#  nxr:SpaceShape for network locations). This file only adds
+#  OPTIONAL, advisory property shapes — no new hard requirements,
+#  so a network seeds with just displayName + status like every
+#  other twin.
+#################################################################
+
+fleet:TramShape a sh:NodeShape ;
+    sh:targetClass fleet:Tram ;
+    sh:property [
+        sh:path fleet:vehicleClass ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:description "Rolling-stock class (e.g. E, D2, C1, B2, A, W8)." ;
+        sh:severity sh:Info ;
+    ] ;
+    sh:property [
+        sh:path fleet:capacity ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:description "Nominal passenger capacity." ;
+        sh:severity sh:Info ;
+    ] ;
+    sh:property [
+        sh:path fleet:lowFloor ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:description "Level-boarding accessible vehicle." ;
+        sh:severity sh:Info ;
+    ] .
+
+fleet:TramRouteShape a sh:NodeShape ;
+    sh:targetClass fleet:TramRoute ;
+    sh:property [
+        sh:path fleet:routeNumber ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:description "Public route number (e.g. '96')." ;
+        sh:severity sh:Info ;
+    ] ;
+    sh:property [
+        sh:path fleet:lengthKm ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:description "One-way route length in km." ;
+        sh:severity sh:Info ;
+    ] ;
+    sh:property [
+        sh:path fleet:routeColor ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:description "Map colour (hex)." ;
+        sh:severity sh:Info ;
+    ] .
+
+fleet:TractionSubstationShape a sh:NodeShape ;
+    sh:targetClass fleet:TractionSubstation ;
+    sh:property [
+        sh:path fleet:capacityMW ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:description "Rectifier capacity in MW." ;
+        sh:severity sh:Info ;
+    ] .
+
+fleet:TramStopShape a sh:NodeShape ;
+    sh:targetClass fleet:TramStop ;
+    sh:property [
+        sh:path fleet:stopKind ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:in ( "stop" "terminus" "junction" "interchange" ) ;
+        sh:description "Stop role in the network graph." ;
+        sh:severity sh:Info ;
+    ] .

@@ -37,6 +37,7 @@ export const api = {
   twinTemplates: () => req('/twins/templates'),
   createTwin: (body) => req('/twins/create', { method: 'POST', body: JSON.stringify(body) }),
   twinFaults: (domain) => req(`/twins/faults?domain=${encodeURIComponent(domain || 'edm-machine')}`),
+  twinNetwork: (tenant) => req(`/twins/${encodeURIComponent(tenant)}/network`),
   twinScenarios: (domain) => req(`/twins/scenarios?domain=${encodeURIComponent(domain || 'edm-machine')}`),
   simAuthor: (body) => req('/agents/sim/author', { method: 'POST', body: JSON.stringify(body) }),
   simRun: (body) => req('/agents/sim/run', { method: 'POST', body: JSON.stringify(body) }),
@@ -71,6 +72,20 @@ export const api = {
   buildTwinCreate: (body) => req('/build-twin/create', { method: 'POST', body: JSON.stringify(body) }),
   buildTwinStatus: (taskId) => req(`/build-twin/status/${taskId}`),
   modelUrl: (tenant) => `/api/model/${tenant}.glb`,
+
+  // BIM: IFC → discipline layers → X-ray viewer
+  bimBuildings: () => req('/bim/buildings'),
+  bimSample: (id) => req(`/bim/sample/${encodeURIComponent(id)}`, { method: 'POST' }),
+  bimStatus: (bid) => req(`/bim/${encodeURIComponent(bid)}/status`),
+  bimFileJson: (bid, name) => req(`/bim/${encodeURIComponent(bid)}/file/${encodeURIComponent(name)}`),
+  bimFileUrl: (bid, name) => `/api/bim/${encodeURIComponent(bid)}/file/${encodeURIComponent(name)}`,
+  bimUpload: async (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`${BASE}/bim/upload`, { method: 'POST', body: fd })
+    if (!res.ok) throw new Error((await res.text()).slice(0, 200))
+    return res.json()
+  },
 }
 
 export default api

@@ -349,3 +349,29 @@ table.tbl td{padding:6px 0;border-bottom:1px solid var(--border)}
   .card-title{font-size:13pt}.card-label{font-size:9pt}
   .kpibox{border:1px solid #ccc !important;background:#f8f8f8 !important}
 }
+
+/* ── NetworkMap (fleet twins: live schematic transit map) ─────────── */
+.netmap{background:linear-gradient(180deg,#fbfcff 0%,#f2f5fb 100%);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.netmap svg text{user-select:none}
+.netmap-head{position:absolute;top:10px;left:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.netmap-head .v-chip{pointer-events:auto}
+.netmap-stat{font-size:11px;color:var(--hint);background:rgba(255,255,255,.85);border:1px solid var(--border);border-radius:99px;padding:3px 10px;display:inline-flex;gap:5px;align-items:center}
+.netmap-rail{position:absolute;bottom:8px;left:10px;right:10px;display:flex;gap:4px;flex-wrap:wrap}
+.netmap-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;font-family:var(--mono,monospace);padding:2px 7px;border-radius:99px;border:1px solid var(--border);background:rgba(255,255,255,.92);cursor:pointer;color:var(--text);position:relative}
+.netmap-chip i{width:8px;height:8px;border-radius:3px;display:inline-block}
+.netmap-chip.on{outline:2px solid var(--c);outline-offset:1px}
+.netmap-chip .dot{width:7px;height:7px;border-radius:99px;display:inline-block;animation:netmapPulse 1.2s ease-in-out infinite}
+.netmap-inspect{position:absolute;top:12px;right:12px;width:230px;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px rgba(20,25,60,.12);font-size:12px}
+.netmap-inspect .t{font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.netmap-inspect .t i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.netmap-inspect .r{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-top:1px dashed var(--border)}
+.netmap-inspect .r span{color:var(--hint)}
+.netmap-inspect .x{position:absolute;top:6px;right:9px;border:none;background:none;font-size:15px;color:var(--hint);cursor:pointer}
+.netmap-pulse{animation:netmapPulse 1.1s ease-in-out infinite}
+.netmap-flash{animation:netmapFlash 1.6s linear infinite}
+@keyframes netmapPulse{0%,100%{opacity:.9}50%{opacity:.25}}
+@keyframes netmapFlash{to{stroke-dashoffset:-6.4}}
+[data-theme="dark"] .netmap{background:linear-gradient(180deg,#0d1122 0%,#0a0e1c 100%)}
+[data-theme="dark"] .netmap-stat,[data-theme="dark"] .netmap-chip{background:rgba(15,19,37,.9);color:#e9edff}
+[data-theme="dark"] .netmap-inspect{background:rgba(15,19,37,.97);color:#e9edff}
+[data-theme="dark"] .netmap svg{--netmap-infra:#1a2138}

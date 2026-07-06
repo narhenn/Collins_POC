@@ -44,6 +44,11 @@ from turbine.physics import TurbinePhysics, SIGNALS as TRB_SIG, UNITS as TRB_UNI
 from turbine.predict import component_health as trb_ch, predict as trb_predict  # noqa: E402
 from turbine.ingest import build_turbine_registry         # noqa: E402
 
+# ── Fleet / tram-network domain wiring ───────────────────────────────
+from fleet.physics import FleetPhysics, SIGNALS as FLT_SIG, UNITS as FLT_UNITS, redlines as FLT_RED  # noqa: E402
+from fleet.predict import component_health as flt_ch, predict as flt_predict  # noqa: E402
+from behaviors.fleet import build_fleet_registry           # noqa: E402
+
 
 def _local(sig: str) -> str:
     return sig.split("#")[-1].split(":")[-1]
@@ -73,6 +78,20 @@ TRB_SENSORS = {
     TRB_SIG["oil_temp"]: ("Oil Temperature", "C"), TRB_SIG["oil_press"]: ("Oil Pressure", "PSI"),
 }
 
+FLT_SENSORS = {
+    FLT_SIG["otp"]: ("On-Time Performance", "%"), FLT_SIG["headway"]: ("Headway Adherence", "%"),
+    FLT_SIG["avg_speed"]: ("Network Speed", "km/h"), FLT_SIG["fleet_avail"]: ("Fleet Availability", "%"),
+    FLT_SIG["in_service"]: ("Trams In Service", ""), FLT_SIG["pax_load"]: ("Passenger Load", "%"),
+    FLT_SIG["dwell"]: ("Avg Dwell Time", "s"), FLT_SIG["energy"]: ("Traction Power", "MW"),
+    FLT_SIG["regen"]: ("Regen Share", "%"), FLT_SIG["ohl_v"]: ("Overhead Voltage", "V"),
+    FLT_SIG["sub_load"]: ("Substation Load", "%"), FLT_SIG["track_temp"]: ("Rail Temperature", "C"),
+    FLT_SIG["switch_faults"]: ("Switch Faults", ""), FLT_SIG["signal_faults"]: ("Signal Faults", ""),
+    FLT_SIG["door_faults"]: ("Door Faults", ""), FLT_SIG["brake_wear"]: ("Brake Wear", "%"),
+    FLT_SIG["panto_wear"]: ("Pantograph Wear", "%"), FLT_SIG["traction_temp"]: ("Traction Motor Temp", "C"),
+    FLT_SIG["vib"]: ("Bogie Vibration", "g"), FLT_SIG["delay"]: ("Network Delay", "min"),
+    FLT_SIG["incidents"]: ("Active Incidents", ""), FLT_SIG["hvac_load"]: ("HVAC Load", "%"),
+}
+
 DOMAINS = {
     "edm-machine": {
         "label": "Wire EDM Machine", "control": "intensity",
@@ -91,6 +110,30 @@ DOMAINS = {
                    ("turbine", "Turbine"), ("bearings", "Rotor & Bearings"),
                    ("lubrication", "Lubrication System")],
     },
+    "tram-network": {
+        "label": "Tram Fleet Network", "control": "service_level",
+        "physics": FleetPhysics, "ch": flt_ch, "predict": flt_predict,
+        "registry": build_fleet_registry, "sig": FLT_SIG, "units": FLT_UNITS,
+        "sensors": FLT_SENSORS,
+        "subsys": [("rolling_stock", "Rolling Stock"), ("power", "Traction Power"),
+                   ("track", "Track & Points"), ("signalling", "Signalling & Control"),
+                   ("operations", "Operations & Service")],
+        # sensor status thresholds for the diagnostics surface
+        "checks": {
+            FLT_SIG["otp"]: (FLT_RED.otp_min, "below"),
+            FLT_SIG["headway"]: (FLT_RED.headway_min, "below"),
+            FLT_SIG["ohl_v"]: (FLT_RED.ohl_v_min, "below"),
+            FLT_SIG["sub_load"]: (FLT_RED.sub_load_max, "above"),
+            FLT_SIG["track_temp"]: (FLT_RED.track_temp_max, "above"),
+            FLT_SIG["vib"]: (FLT_RED.vib_max, "above"),
+            FLT_SIG["brake_wear"]: (FLT_RED.brake_wear_max, "above"),
+            FLT_SIG["panto_wear"]: (FLT_RED.panto_wear_max, "above"),
+            FLT_SIG["door_faults"]: (FLT_RED.door_faults_max, "above"),
+            FLT_SIG["signal_faults"]: (FLT_RED.signal_faults_max, "above"),
+            FLT_SIG["fleet_avail"]: (FLT_RED.fleet_avail_min, "below"),
+            FLT_SIG["delay"]: (FLT_RED.delay_max, "above"),
+        },
+    },
 }
 
 
@@ -105,11 +148,13 @@ class _Query:
 
 
 class LiveTwin:
-    def __init__(self, tenant: str, domain: str, name: str):
+    def __init__(self, tenant: str, domain: str, name: str, options: dict | None = None):
         cfg = DOMAINS[domain]
         self.tenant, self.domain, self.name = tenant, domain, name
         self.cfg = cfg
-        self.physics = cfg["physics"]()
+        # options are domain-specific physics kwargs — e.g. the fleet domain
+        # takes {"network": <spec dict|id>} so ANY fed-in network becomes a twin.
+        self.physics = cfg["physics"](**(options or {}))
         self.state = self.physics.init_state()
         self.registry = cfg["registry"]()
         self.latest: dict = {}
@@ -205,20 +250,48 @@ class LiveTwin:
             self.physics.inject(st, fault, float(severity))
         return self.cfg["predict"](st, horizon_min=horizon_min, points=points, physics=self.physics)
 
+    def network(self) -> dict | None:
+        """Live network-map payload (fleet-domain twins only): geometry +
+        vehicles + per-route status. None for domains without a network."""
+        if not hasattr(self.physics, "network_state"):
+            return None
+        with self.lock:
+            payload = self.physics.network_state(self.state)
+            frame = dict(self.latest)
+        payload["latest"] = frame
+        # ship the (static) geometry once per call — the frontend caches it
+        net = self.physics.net
+        payload["geometry"] = {
+            "nodes": net["nodes"], "routes": [
+                {k: r[k] for k in ("id", "name", "color", "path", "points",
+                                   "length_km", "via", "loop") if k in r}
+                for r in net["routes"]],
+            "depots": net.get("depots", []),
+            "substations": net.get("substations", []),
+            "fleet": net.get("fleet", []),
+            "route_km": net.get("route_km"),
+            "fleet_size": net.get("fleet_size"),
+        }
+        return payload
+
 
 def _status_for(domain: str, sig: str, v) -> str:
     if v is None:
         return "unknown"
-    red = EDM_RED if domain == "edm-machine" else TRB_RED
-    s = EDM_SIG if domain == "edm-machine" else TRB_SIG
-    if domain == "edm-machine":
-        checks = {s["short_rate"]: (red.short_rate, "above"), s["break_risk"]: (red.break_risk, "above"),
-                  s["die_temp"]: (red.die_temp, "above"), s["die_cond"]: (red.die_cond, "above"),
-                  s["die_press"]: (red.die_press_min, "below"), s["wire_tension"]: (red.wire_tension_min, "below"),
-                  s["gap_v"]: (red.gap_v_min, "below")}
-    else:
-        checks = {s["egt"]: (red.egt, "above"), s["oil_temp"]: (red.oil_temp, "above"),
-                  s["oil_press"]: (red.oil_press_min, "below"), s["vib"]: (red.vib, "above")}
+    # Domains can declare their thresholds in DOMAINS[domain]["checks"];
+    # EDM/turbine keep their original hardcoded maps.
+    checks = DOMAINS.get(domain, {}).get("checks")
+    if checks is None:
+        red = EDM_RED if domain == "edm-machine" else TRB_RED
+        s = EDM_SIG if domain == "edm-machine" else TRB_SIG
+        if domain == "edm-machine":
+            checks = {s["short_rate"]: (red.short_rate, "above"), s["break_risk"]: (red.break_risk, "above"),
+                      s["die_temp"]: (red.die_temp, "above"), s["die_cond"]: (red.die_cond, "above"),
+                      s["die_press"]: (red.die_press_min, "below"), s["wire_tension"]: (red.wire_tension_min, "below"),
+                      s["gap_v"]: (red.gap_v_min, "below")}
+        else:
+            checks = {s["egt"]: (red.egt, "above"), s["oil_temp"]: (red.oil_temp, "above"),
+                      s["oil_press"]: (red.oil_press_min, "below"), s["vib"]: (red.vib, "above")}
     if sig in checks:
         lim, d = checks[sig]
         if d == "above":
@@ -244,12 +317,13 @@ class Engine:
                     try: t.simulate(dt=2.0)
                     except Exception: pass  # noqa: BLE001 — never kill the ticker
 
-    def build(self, domain: str, name: str) -> dict:
+    def build(self, domain: str, name: str, options: dict | None = None) -> dict:
         if domain not in DOMAINS:
             domain = "edm-machine"
         tenant = _slug(name or DOMAINS[domain]["label"])
         with self._lock:
-            self._twins[tenant] = LiveTwin(tenant, domain, name or DOMAINS[domain]["label"])
+            self._twins[tenant] = LiveTwin(tenant, domain, name or DOMAINS[domain]["label"],
+                                           options=options)
         return {"tenant": tenant, "domain": domain,
                 "machine": {"id": tenant, "name": name or DOMAINS[domain]["label"]}, "assets": []}
 

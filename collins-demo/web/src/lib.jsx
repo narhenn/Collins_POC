@@ -114,6 +114,30 @@ export const SIG = {
   'edm:wireFeedRate': { label: 'Wire Feed', unit: 'm/min', icon: 'ti-arrow-bar-to-down' },
   'edm:wireWear': { label: 'Wire Wear', unit: '%', warn: 60, crit: 85, icon: 'ti-circle-dashed' },
 
+  // ── Tram fleet network — mirrors fleet/physics.py redlines ──
+  'fleet:onTimePerformance': { label: 'On-Time Performance', unit: '%', warnLow: 75, critLow: 65, icon: 'ti-clock-check' },
+  'fleet:headwayAdherence': { label: 'Headway Adherence', unit: '%', warnLow: 80, critLow: 70, icon: 'ti-arrows-horizontal' },
+  'fleet:networkSpeed': { label: 'Network Speed', unit: 'km/h', warnLow: 11, critLow: 8, icon: 'ti-gauge' },
+  'fleet:fleetAvailability': { label: 'Fleet Availability', unit: '%', warnLow: 85, critLow: 78, icon: 'ti-bus' },
+  'fleet:tramsInService': { label: 'Trams In Service', unit: '', icon: 'ti-train' },
+  'fleet:passengerLoad': { label: 'Passenger Load', unit: '%', warn: 90, crit: 110, icon: 'ti-users' },
+  'fleet:avgDwellTime': { label: 'Avg Dwell', unit: 's', warn: 40, crit: 55, icon: 'ti-hourglass' },
+  'fleet:tractionPower': { label: 'Traction Power', unit: 'MW', warn: 32, crit: 40, icon: 'ti-bolt' },
+  'fleet:regenShare': { label: 'Regen Share', unit: '%', warnLow: 14, critLow: 8, icon: 'ti-recycle' },
+  'fleet:overheadVoltage': { label: 'OHL Voltage', unit: 'V', warnLow: 555, critLow: 520, icon: 'ti-bolt' },
+  'fleet:substationLoad': { label: 'Substation Load', unit: '%', warn: 85, crit: 95, icon: 'ti-building-factory' },
+  'fleet:railTemperature': { label: 'Rail Temp', unit: '°C', warn: 42, crit: 47, icon: 'ti-temperature' },
+  'fleet:switchFaults': { label: 'Switch Faults', unit: '', warn: 4, crit: 8, icon: 'ti-arrows-split' },
+  'fleet:signalFaults': { label: 'Signal Faults', unit: '', warn: 3, crit: 5, icon: 'ti-traffic-lights' },
+  'fleet:doorFaults': { label: 'Door Faults', unit: '', warn: 7, crit: 10, icon: 'ti-door' },
+  'fleet:brakeWear': { label: 'Brake Wear', unit: '%', warn: 55, crit: 70, icon: 'ti-circle-dashed' },
+  'fleet:pantographWear': { label: 'Pantograph Wear', unit: '%', warn: 60, crit: 75, icon: 'ti-antenna' },
+  'fleet:tractionMotorTemp': { label: 'Traction Motor', unit: '°C', warn: 95, crit: 105, icon: 'ti-engine' },
+  'fleet:bogieVibration': { label: 'Bogie Vibration', unit: 'g', warn: 0.9, crit: 1.2, icon: 'ti-activity' },
+  'fleet:networkDelay': { label: 'Network Delay', unit: 'min', warn: 60, crit: 120, icon: 'ti-clock-exclamation' },
+  'fleet:activeIncidents': { label: 'Incidents', unit: '', warn: 2, crit: 4, icon: 'ti-urgent' },
+  'fleet:hvacLoad': { label: 'HVAC Load', unit: '%', warn: 80, crit: 92, icon: 'ti-air-conditioning' },
+
   // ── Data center (simulated example) ──
   'dc:rackLoad': { label: 'Rack Load', unit: '%', warn: 85, crit: 95, icon: 'ti-server' },
   'dc:inletTemp': { label: 'Inlet Temp', unit: '°C', warn: 27, crit: 32, icon: 'ti-temperature' },
@@ -171,6 +195,19 @@ export const DOMAINS = {
     blurb: 'A two-spool gas turbine on an MRO test rig: compressor / combustor / turbine modules with EGT, shaft speed, fuel flow, vibration and oil monitoring.',
     tiles: TILE_ORDER,
     all: TILE_ORDER,
+  },
+  'tram-network': {
+    label: 'Melbourne Tram Network', tag: 'Fleet & Transit', icon: 'ti-train',
+    accent: '#78be20', source: 'live', hero: 'network', detailed: true,
+    blurb: 'The world\'s largest tram network as a live fleet twin: 24 routes, 400+ trams, traction power, track & points, signalling and service operations — with per-vehicle live positions. Feed any network spec to twin any fleet.',
+    tiles: ['fleet:onTimePerformance', 'fleet:headwayAdherence', 'fleet:networkSpeed', 'fleet:fleetAvailability',
+      'fleet:overheadVoltage', 'fleet:substationLoad', 'fleet:railTemperature', 'fleet:networkDelay'],
+    all: ['fleet:onTimePerformance', 'fleet:headwayAdherence', 'fleet:networkSpeed', 'fleet:fleetAvailability',
+      'fleet:tramsInService', 'fleet:passengerLoad', 'fleet:avgDwellTime', 'fleet:tractionPower',
+      'fleet:regenShare', 'fleet:overheadVoltage', 'fleet:substationLoad', 'fleet:railTemperature',
+      'fleet:switchFaults', 'fleet:signalFaults', 'fleet:doorFaults', 'fleet:brakeWear',
+      'fleet:pantographWear', 'fleet:tractionMotorTemp', 'fleet:bogieVibration', 'fleet:networkDelay',
+      'fleet:activeIncidents', 'fleet:hvacLoad'],
   },
   'datacenter': {
     label: 'Helix Data Center', tag: 'Data Center', icon: 'ti-server-2',
@@ -231,6 +268,12 @@ export const PREDICT_CHARTS = {
     { title: 'Oil (°C · PSI)', series: [{ key: 'oil_temp', label: 'Oil temp', color: '#0d9488' }, { key: 'oil_press', label: 'Oil press', color: '#2563eb' }] },
     { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'turbine_h', label: 'Turbine', color: '#e11d48' }, { key: 'compressor_h', label: 'Compressor', color: '#2563eb' }, { key: 'bearings_h', label: 'Bearings', color: '#d97706' }, { key: 'lubrication_h', label: 'Lubrication', color: '#7c3aed' }] },
   ],
+  'tram-network': [
+    { title: 'Service performance (%)', series: [{ key: 'otp', label: 'On-time', color: '#16a34a' }, { key: 'headway', label: 'Headway', color: '#2563eb' }] },
+    { title: 'Overhead voltage (V)', redline: 520, series: [{ key: 'ohl_v', label: 'OHL voltage', color: '#d97706' }] },
+    { title: 'Track & disruption', series: [{ key: 'track_temp', label: 'Rail °C', color: '#e11d48' }, { key: 'delay', label: 'Delay min', color: '#7c3aed' }] },
+    { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'rolling_stock_h', label: 'Rolling stock', color: '#d97706' }, { key: 'power_h', label: 'Power', color: '#e11d48' }, { key: 'track_h', label: 'Track', color: '#2563eb' }, { key: 'signalling_h', label: 'Signalling', color: '#7c3aed' }, { key: 'operations_h', label: 'Operations', color: '#16a34a' }] },
+  ],
   'datacenter': [
     { title: 'Rack load & inlet temp', series: [{ key: 'dc:rackLoad', label: 'Rack load %', color: '#e11d48' }, { key: 'dc:inletTemp', label: 'Inlet °C', color: '#d97706' }] },
     { title: 'Cooling & power', series: [{ key: 'dc:coolingCOP', label: 'Cooling COP', color: '#0d9488' }, { key: 'dc:upsCharge', label: 'UPS %', color: '#2563eb' }] },
@@ -250,6 +293,7 @@ export const PREDICT_CHARTS = {
 export const SUBSYS = {
   'edm-machine': [{ key: 'generator', label: 'Generator' }, { key: 'dielectric', label: 'Dielectric' }, { key: 'wire_system', label: 'Wire system' }, { key: 'guides_axes', label: 'Guides & axes' }],
   'turbine-engine': [{ key: 'compressor', label: 'Compressor' }, { key: 'turbine', label: 'Turbine' }, { key: 'bearings', label: 'Bearings' }, { key: 'lubrication', label: 'Lubrication' }],
+  'tram-network': [{ key: 'rolling_stock', label: 'Rolling stock' }, { key: 'power', label: 'Traction power' }, { key: 'track', label: 'Track & points' }, { key: 'signalling', label: 'Signalling' }, { key: 'operations', label: 'Operations' }],
 }
 export const predictCharts = (domain) => PREDICT_CHARTS[domain] || PREDICT_CHARTS['turbine-engine']
 export const subsysFor = (domain) => SUBSYS[domain] || SUBSYS['turbine-engine']

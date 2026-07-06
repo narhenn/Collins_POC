@@ -27,8 +27,8 @@ def health() -> dict:
 
 
 # ── Twin creation ────────────────────────────────────────────────────
-def _build(domain: str, name: str) -> dict:
-    b = get_engine().build(domain, name)
+def _build(domain: str, name: str, options: dict | None = None) -> dict:
+    b = get_engine().build(domain, name, options=options)
     return {"tenant": b["tenant"], "domain": b["domain"],
             "twin": {"tenant_id": b["tenant"], "domain": b["domain"]},
             "machine": b["machine"], "assets": b["assets"]}
@@ -43,14 +43,15 @@ def build_turbine(name: str) -> dict:
     return _build("turbine-engine", name or "Turbine Engine")
 
 
-def build_domain(name: str, domain: str) -> dict:
-    return _build(domain, name)
+def build_domain(name: str, domain: str, options: dict | None = None) -> dict:
+    return _build(domain, name, options=options)
 
 
 def list_templates() -> list[dict]:
     return [
         {"key": "edm-machine", "label": "Wire EDM Machine"},
         {"key": "turbine-engine", "label": "Gas Turbine Engine"},
+        {"key": "tram-network", "label": "Tram Fleet Network"},
     ]
 
 
@@ -109,6 +110,15 @@ def project(tenant: str, fault: str, severity: float = 0.85, throttle=None,
     """Legacy turbine what-if — mapped onto the generic projection."""
     return project_sim(tenant, fault=fault, severity=severity, control=throttle,
                        horizon_min=horizon_min)
+
+
+def network_state(tenant: str) -> dict:
+    """Live network-map payload for fleet-domain twins (geometry + vehicles +
+    per-route status); {} for twins without a network."""
+    tw = get_engine().twin(tenant)
+    if not tw:
+        return {}
+    return tw.network() or {}
 
 
 def set_running(tenant: str, running: bool) -> bool:

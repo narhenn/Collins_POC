@@ -1,0 +1,401 @@
+@prefix fleet: <https://ontology.nextxr.io/v3/fleet#> .
+@prefix cfp:  <https://ontology.nextxr.io/v3/cfp#> .
+@prefix nxr:  <https://ontology.nextxr.io/v3/core#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix quantitykind: <http://qudt.org/vocab/quantitykind/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+
+#################################################################
+#  FLEET / TRAM-NETWORK DOMAIN PACK  v1.0
+#
+#  Extension layer for street-running rail fleets (trams / light
+#  rail; the same classes generalise to metro and bus fleets).
+#  Adds the network (routes, stops, track segments, junctions),
+#  rolling stock and its six subsystems (traction / braking /
+#  pantograph / doors / HVAC / bogies), traction power (overhead
+#  line sections + substations), signalling, depots, and the
+#  operations-level observable suite (OTP, headway, dwell, load).
+#
+#  Ontology stack position:
+#    BFO -> SOSA -> platform -> CFP -> FLEET
+#
+#  Extends CFP downward only. Never edits layers 1-4.
+#################################################################
+
+<https://ontology.nextxr.io/v3/fleet> a owl:Ontology ;
+    dct:title "NextXR Fleet / Tram-Network Pack" ;
+    owl:versionInfo "1.0.0" ;
+    dct:description "Domain pack for tram / light-rail fleet networks: routes, stops, track, junctions, rolling stock and subsystems, traction power, signalling, depots, and the operations sensor suite." ;
+    owl:imports <https://ontology.nextxr.io/v3/cfp> .
+
+
+#################################################################
+#  RELATIONSHIP PREDICATES
+#################################################################
+
+fleet:hasSubsystem a owl:ObjectProperty ;
+    rdfs:subPropertyOf nxr:hasPart ;
+    rdfs:label "has subsystem" ;
+    skos:definition "A tram is composed of on-board subsystems (traction, braking, pantograph, doors, HVAC, bogies)." ;
+    rdfs:domain fleet:Tram ;
+    rdfs:range fleet:TramSubsystem .
+
+fleet:operatesOnRoute a owl:ObjectProperty ;
+    rdfs:label "operates on route" ;
+    skos:definition "The route a vehicle is currently rostered to." ;
+    rdfs:domain fleet:Tram ;
+    rdfs:range fleet:TramRoute .
+
+fleet:servesStop a owl:ObjectProperty ;
+    rdfs:label "serves stop" ;
+    skos:definition "A route calls at a stop." ;
+    rdfs:domain fleet:TramRoute ;
+    rdfs:range fleet:TramStop .
+
+fleet:runsOverSegment a owl:ObjectProperty ;
+    rdfs:label "runs over segment" ;
+    skos:definition "A route traverses a track segment. Segments shared by many routes are the congestion-critical corridors." ;
+    rdfs:domain fleet:TramRoute ;
+    rdfs:range fleet:TrackSegment .
+
+fleet:connectsTo a owl:ObjectProperty ;
+    rdfs:label "connects to" ;
+    skos:definition "Physical track connectivity between segments, stops and junctions." ;
+    rdfs:domain nxr:PhysicalEntity ;
+    rdfs:range nxr:PhysicalEntity .
+
+fleet:feedsSection a owl:ObjectProperty ;
+    rdfs:label "feeds section" ;
+    skos:definition "A traction substation electrically feeds an overhead-line section." ;
+    rdfs:domain fleet:TractionSubstation ;
+    rdfs:range fleet:OverheadLineSection .
+
+fleet:energises a owl:ObjectProperty ;
+    rdfs:label "energises" ;
+    skos:definition "An overhead-line section energises the track segments beneath it." ;
+    rdfs:domain fleet:OverheadLineSection ;
+    rdfs:range fleet:TrackSegment .
+
+fleet:stabledAt a owl:ObjectProperty ;
+    rdfs:label "stabled at" ;
+    skos:definition "The depot where a vehicle is stabled and maintained." ;
+    rdfs:domain fleet:Tram ;
+    rdfs:range fleet:TramDepot .
+
+fleet:controlledBy a owl:ObjectProperty ;
+    rdfs:label "controlled by" ;
+    skos:definition "A junction's points are controlled by an interlocking / signalling system." ;
+    rdfs:domain fleet:TramJunction ;
+    rdfs:range fleet:SignallingSystem .
+
+fleet:partOfNetwork a owl:ObjectProperty ;
+    rdfs:subPropertyOf nxr:isPartOf ;
+    rdfs:label "part of network" ;
+    skos:definition "Every route, stop, segment, substation, depot and vehicle belongs to a fleet network." ;
+    rdfs:range fleet:FleetNetwork .
+
+
+#################################################################
+#  CUSTOM QUDT UNITS (declared so observable properties resolve)
+#################################################################
+
+unit:KM-PER-HR a qudt:Unit ; rdfs:label "kilometre per hour" .
+unit:MegaW a qudt:Unit ; rdfs:label "megawatt" .
+unit:VOLT a qudt:Unit ; rdfs:label "volt" .
+unit:PERCENT a qudt:Unit ; rdfs:label "percent" .
+unit:SEC a qudt:Unit ; rdfs:label "second" .
+unit:MIN a qudt:Unit ; rdfs:label "minute" .
+unit:COUNT a qudt:Unit ; rdfs:label "count" .
+unit:G a qudt:Unit ; rdfs:label "g (acceleration)" .
+
+
+#################################################################
+#  OBSERVABLE PROPERTIES (the live telemetry channels)
+#################################################################
+
+# ── operations ──
+fleet:onTimePerformance a sosa:ObservableProperty ;
+    rdfs:label "On-Time Performance" ;
+    skos:definition "Percentage of services running within the punctuality band (Melbourne: 59 s early to 4:59 late)." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:headwayAdherence a sosa:ObservableProperty ;
+    rdfs:label "Headway Adherence" ;
+    skos:definition "Percentage of headways within the target band — the anti-bunching measure riders actually feel." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:networkSpeed a sosa:ObservableProperty ;
+    rdfs:label "Network Commercial Speed" ;
+    skos:definition "Fleet-average commercial speed including stops and traffic delay." ;
+    nxr:expectedUnit unit:KM-PER-HR ; nxr:expectedQuantityKind quantitykind:Speed .
+
+fleet:fleetAvailability a sosa:ObservableProperty ;
+    rdfs:label "Fleet Availability" ;
+    skos:definition "Percentage of the fleet serviceable and available to operate." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:tramsInService a sosa:ObservableProperty ;
+    rdfs:label "Trams In Service" ;
+    skos:definition "Vehicles currently operating revenue service." ;
+    nxr:expectedUnit unit:COUNT .
+
+fleet:passengerLoad a sosa:ObservableProperty ;
+    rdfs:label "Passenger Load Factor" ;
+    skos:definition "Average on-board load as a percentage of nominal capacity." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:avgDwellTime a sosa:ObservableProperty ;
+    rdfs:label "Average Dwell Time" ;
+    skos:definition "Average stop dwell — boarding/alighting plus door cycles; blows out with crowding and door faults." ;
+    nxr:expectedUnit unit:SEC ; nxr:expectedQuantityKind quantitykind:Time .
+
+fleet:networkDelay a sosa:ObservableProperty ;
+    rdfs:label "Accumulated Network Delay" ;
+    skos:definition "Total accumulated service delay across the network; grows with disruption, recovers with regulation." ;
+    nxr:expectedUnit unit:MIN .
+
+fleet:activeIncidents a sosa:ObservableProperty ;
+    rdfs:label "Active Incidents" ;
+    skos:definition "Open operational incidents (blockages, failures, emergency responses)." ;
+    nxr:expectedUnit unit:COUNT .
+
+# ── traction power ──
+fleet:tractionPower a sosa:ObservableProperty ;
+    rdfs:label "Network Traction Power" ;
+    skos:definition "Total traction power drawn from the substations by the fleet." ;
+    nxr:expectedUnit unit:MegaW ; nxr:expectedQuantityKind quantitykind:Power .
+
+fleet:regenShare a sosa:ObservableProperty ;
+    rdfs:label "Regenerated Energy Share" ;
+    skos:definition "Share of braking energy recovered to the overhead line; falls as friction braking takes over from worn systems." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:overheadVoltage a sosa:ObservableProperty ;
+    rdfs:label "Overhead-Line Voltage" ;
+    skos:definition "DC voltage at the worst-fed overhead section (600 V nominal in Melbourne)." ;
+    nxr:expectedUnit unit:VOLT ; nxr:expectedQuantityKind quantitykind:Voltage .
+
+fleet:substationLoad a sosa:ObservableProperty ;
+    rdfs:label "Substation Load" ;
+    skos:definition "Worst traction-substation loading as a percentage of rectifier capacity." ;
+    nxr:expectedUnit unit:PERCENT .
+
+# ── track & points ──
+fleet:railTemperature a sosa:ObservableProperty ;
+    rdfs:label "Rail Temperature" ;
+    skos:definition "Worst exposed rail temperature — the heat speed-restriction and buckling-risk driver." ;
+    nxr:expectedUnit unit:DEG_C ; nxr:expectedQuantityKind quantitykind:Temperature .
+
+fleet:switchFaults a sosa:ObservableProperty ;
+    rdfs:label "Points / Switch Faults" ;
+    skos:definition "Count of points machines in a degraded or failed state." ;
+    nxr:expectedUnit unit:COUNT .
+
+fleet:bogieVibration a sosa:ObservableProperty ;
+    rdfs:label "Bogie Vibration" ;
+    skos:definition "Fleet-average bogie vibration — wheel flats and track defects hammer this upward." ;
+    nxr:expectedUnit unit:G .
+
+# ── signalling ──
+fleet:signalFaults a sosa:ObservableProperty ;
+    rdfs:label "Signal Faults" ;
+    skos:definition "Count of active signalling faults; junctions on manual working collapse throughput." ;
+    nxr:expectedUnit unit:COUNT .
+
+# ── rolling stock ──
+fleet:doorFaults a sosa:ObservableProperty ;
+    rdfs:label "Door Faults" ;
+    skos:definition "Count of vehicles operating with door-system faults." ;
+    nxr:expectedUnit unit:COUNT .
+
+fleet:brakeWear a sosa:ObservableProperty ;
+    rdfs:label "Fleet Brake Wear" ;
+    skos:definition "Fleet-average brake pad/shoe wear index." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:pantographWear a sosa:ObservableProperty ;
+    rdfs:label "Pantograph Carbon Wear" ;
+    skos:definition "Fleet-average pantograph carbon-strip wear; worn carbons arc and risk de-wirement." ;
+    nxr:expectedUnit unit:PERCENT .
+
+fleet:tractionMotorTemp a sosa:ObservableProperty ;
+    rdfs:label "Traction Motor Temperature" ;
+    skos:definition "Fleet-average traction motor temperature; sustained highs derate traction." ;
+    nxr:expectedUnit unit:DEG_C ; nxr:expectedQuantityKind quantitykind:Temperature .
+
+fleet:hvacLoad a sosa:ObservableProperty ;
+    rdfs:label "Saloon HVAC Load" ;
+    skos:definition "Average saloon HVAC duty — a major auxiliary power draw on hot days." ;
+    nxr:expectedUnit unit:PERCENT .
+
+
+#################################################################
+#  1 - NETWORK / SPATIAL CLASSES
+#################################################################
+
+fleet:FleetNetwork a owl:Class ;
+    rdfs:subClassOf cfp:Site ;
+    rdfs:label "Fleet Network" ;
+    skos:definition "A whole transit network operated as one system: routes, stops, track, traction power, signalling, depots and the vehicle fleet." ;
+    nxr:taxonomyCategory "Location" .
+
+fleet:TramRoute a owl:Class ;
+    rdfs:subClassOf nxr:PhysicalEntity ;
+    rdfs:label "Tram Route" ;
+    skos:definition "A numbered service pattern (e.g. Route 96 East Brunswick – St Kilda Beach) over an ordered sequence of stops and track segments." ;
+    nxr:taxonomyCategory "Location" .
+
+fleet:TramStop a owl:Class ;
+    rdfs:subClassOf nxr:PhysicalEntity ;
+    rdfs:label "Tram Stop" ;
+    skos:definition "A passenger boarding point — kerbside, safety-zone or platform stop; interchange stops connect multiple routes or modes." ;
+    nxr:taxonomyCategory "Location" .
+
+fleet:TrackSegment a owl:Class ;
+    rdfs:subClassOf nxr:PhysicalEntity ;
+    rdfs:label "Track Segment" ;
+    skos:definition "A stretch of paired running rail between two nodes, with its geometry, condition and speed profile." ;
+    nxr:taxonomyCategory "Location" .
+
+fleet:TramJunction a owl:Class ;
+    rdfs:subClassOf nxr:PhysicalEntity ;
+    rdfs:label "Tram Junction" ;
+    skos:definition "A track junction where routes diverge/merge through points; the network's throughput chokepoints." ;
+    nxr:taxonomyCategory "Location" .
+
+fleet:TramDepot a owl:Class ;
+    rdfs:subClassOf cfp:Building ;
+    rdfs:label "Tram Depot" ;
+    skos:definition "Stabling, cleaning and maintenance facility for a share of the fleet." ;
+    nxr:taxonomyCategory "Location" .
+
+
+#################################################################
+#  2 - EQUIPMENT CLASSES (vehicles + subsystems + infrastructure)
+#################################################################
+
+fleet:Tram a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Tram (Rolling Stock)" ;
+    skos:definition "A revenue tram / light-rail vehicle. Classes differ by length, sections, capacity and floor height (e.g. Melbourne A, B2, C1, C2, D1, D2, E, W8)." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:TramSubsystem a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Tram Subsystem" ;
+    skos:definition "An on-board subsystem of a tram." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:TractionSystem a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Traction System" ;
+    skos:definition "Traction inverters and motors converting 600 V DC overhead supply into tractive effort; thermal headroom governs performance derating." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:BrakingSystem a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Braking System" ;
+    skos:definition "Blended regenerative + friction (disc/track) braking. Pad wear shifts the blend toward friction, cutting regen recovery and stopping margin." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:PantographAssembly a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Pantograph Assembly" ;
+    skos:definition "Roof-mounted current collector; carbon strip wear and contact-force drift cause arcing and, ultimately, de-wirement." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:DoorSystem a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Door System" ;
+    skos:definition "Passenger doors with obstacle detection; faults force manual release cycles that blow out dwell time or pull cars from service." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:HVACSystem a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Saloon HVAC" ;
+    skos:definition "Saloon heating/cooling; the dominant auxiliary electrical load on temperature extremes." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:Bogie a owl:Class ;
+    rdfs:subClassOf fleet:TramSubsystem ;
+    rdfs:label "Bogie" ;
+    skos:definition "Wheelset, suspension and gear assembly; wheel flats and track defects appear here first as vibration." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:OverheadLineSection a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Overhead Line Section" ;
+    skos:definition "An electrically isolated section of 600 V DC contact wire with its supports, feeders and section insulators." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:TractionSubstation a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Traction Substation" ;
+    skos:definition "AC-to-DC rectifier substation feeding one or more overhead sections; loading beyond capacity trips protection and de-energises sections." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:PointsMachine a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Points Machine" ;
+    skos:definition "The electro-mechanical drive that throws and locks junction points; failures force manual operation and collapse junction throughput." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:SignallingSystem a owl:Class ;
+    rdfs:subClassOf cfp:FacilityEquipment ;
+    rdfs:label "Signalling / Interlocking" ;
+    skos:definition "Junction interlockings, tram signals and detection that sequence conflicting movements." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+
+#################################################################
+#  3 - SENSOR CLASSES
+#################################################################
+
+fleet:FleetSensor a owl:Class ;
+    rdfs:subClassOf cfp:FacilitySensor ;
+    rdfs:label "Fleet Sensor" ;
+    skos:definition "Any physical or virtual sensor feeding the fleet-network twin." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:AVLSensor a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "AVL / Position Sensor" ;
+    skos:definition "Automatic vehicle location — position, speed and schedule deviation per tram; the source of OTP and headway measures." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:EnergyMeter a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "Traction Energy Meter" ;
+    skos:definition "Substation and on-board energy metering (draw, regen, section voltage)." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:RailTemperatureSensor a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "Rail Temperature Sensor" ;
+    skos:definition "Trackside rail-temperature probes on exposed, buckling-prone track." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:VibrationSensor a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "Bogie Vibration Sensor" ;
+    skos:definition "On-board accelerometers detecting wheel flats and track defects." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:PassengerCounter a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "Automatic Passenger Counter" ;
+    skos:definition "Door-mounted counters producing boarding/alighting and load-factor data." ;
+    nxr:taxonomyCategory "PhysicalAsset" .
+
+fleet:PointsConditionSensor a owl:Class ;
+    rdfs:subClassOf fleet:FleetSensor ;
+    rdfs:label "Points Condition Monitor" ;
+    skos:definition "Throw-force / swing-time monitoring on points machines — the early-warning channel for junction failures." ;
+    nxr:taxonomyCategory "PhysicalAsset" .

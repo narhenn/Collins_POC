@@ -11,6 +11,8 @@ import BuildTwin from './BuildTwin.jsx'
 import TurbineModel from './TurbineModel.jsx'
 import Scene3D from './Scene3D.jsx'
 import ModelViewer from './ModelViewer.jsx'
+import NetworkMap from './NetworkMap.jsx'
+import BimViewer from './BimViewer.jsx'
 import Chat from './Chat.jsx'
 import Markdown from './Markdown.jsx'
 import Maintenance from './Maintenance.jsx'
@@ -23,6 +25,7 @@ const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
   { id: 'dashboard', label: 'Live Dashboard', icon: 'ti-layout-dashboard' },
   { id: 'build', label: 'Build a Twin', icon: 'ti-sparkles' },
+  { id: 'bim', label: 'BIM X-Ray', icon: 'ti-building' },
   { id: 'scenario', label: 'Scenario & Faults', icon: 'ti-urgent' },
   { id: 'predict', label: 'Prediction', icon: 'ti-chart-histogram' },
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
@@ -225,6 +228,7 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'agents' && (source ? <Intelligence tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} aiMode={aiMode} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
+          {route === 'bim' && <BimViewer />}
           {route === 'audit' && <AuditLog entries={auditEntries} />}
         </div>
       </div>
@@ -666,10 +670,13 @@ function Dashboard({ ctx }) {
       <WorkflowPipeline findings={findings} incidents={incidents} health={h}
         wo={wo} cascade={cascade} onMaint={openMaint} />
 
-      {/* 3D twin scene — the reconstructed GLB (Build-a-Twin) takes priority,
-          else the turbine model, else the procedural domain scene. */}
+      {/* Twin scene — fleet twins get the live network map; otherwise the
+          reconstructed GLB (Build-a-Twin) takes priority, else the turbine
+          model, else the procedural domain scene. */}
       <div className="section-gap">
-        {modelUrl
+        {domain === 'tram-network' && isLive
+          ? <NetworkMap tenant={tenant} height={460} running={running} />
+          : modelUrl
           ? (domain === 'turbine-engine'
               ? <TurbineModel url={modelUrl} latest={live} height={380} health={h} />
               : <ModelViewer url={modelUrl} latest={live} hotspots={hotspotsFor(domain)} height={380}

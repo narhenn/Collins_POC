@@ -4,7 +4,11 @@ the web app never talks to the platforms directly.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+import re
+import time
+from pathlib import Path
+
+from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel
 
 import shutil
@@ -18,6 +22,7 @@ import automind
 import scenarios
 import tripo
 import runpod_3d
+import bim_ifc
 from claude_client import (
     vision_to_twin_spec, scenario_brief, author_scenario, analyze_outcome,
     diagnosis_agent, analysis_agent, build_twin_reply,
@@ -79,13 +84,11 @@ def build_twin_generate(req: TwinGenerateRequest):
     task_id = None
     provider = config.model_3d_provider  # "runpod", "tripo", or "none"
     gen_status = "disabled"
-    mc_res = 512 if req.quality == "high" else 256
 
     if provider == "runpod" and req.image_b64:
         image_bytes = runpod_3d.b64_to_bytes(req.image_b64)
         task_id, err = runpod_3d.start_image_task(
-            image_bytes, req.filename,
-            mc_resolution=mc_res, foreground_ratio=0.85)
+            image_bytes, req.filename, quality=req.quality)
         if task_id:
             runpod_3d.register_job(task_id, tenant)
             gen_status = "running"
@@ -114,7 +117,8 @@ def build_twin_generate(req: TwinGenerateRequest):
 class ModelGenRequest(BaseModel):
     image_b64: str | None = None
     filename: str = "asset.png"
-    quality: str = "fast"                 # "fast" (256) or "high" (512)
+    quality: str = "fast"                 # draft|standard|ultra (fast/high = legacy aliases)
+    extra_images_b64: list[str] = []      # more views of the SAME object (multi-image)
 
 
 @router.post("/build-twin/model")
@@ -126,10 +130,11 @@ def build_twin_model(req: ModelGenRequest):
         return {"task_id": None, "status": "no_key", "provider": provider}
     if not req.image_b64:
         return {"task_id": None, "status": "no_image", "provider": provider}
-    mc_res = 512 if req.quality == "high" else 256
     if provider == "runpod":
+        extras = [runpod_3d.b64_to_bytes(b) for b in (req.extra_images_b64 or [])[:3]]
         task_id, err = runpod_3d.start_image_task(
-            runpod_3d.b64_to_bytes(req.image_b64), req.filename, mc_resolution=mc_res)
+            runpod_3d.b64_to_bytes(req.image_b64), req.filename,
+            quality=req.quality, extra_images=extras)
         mod = runpod_3d
     else:  # tripo
         tripo.log_balance("before generation")
@@ -205,6 +210,57 @@ def serve_model(tenant: str):
     if not p.exists():
         raise HTTPException(404, "model not generated yet")
     return FileResponse(p, media_type="model/gltf-binary")
+
+
+# ── BIM: IFC → discipline layers → X-ray viewer ──────────────────────
+
+@router.get("/bim/buildings")
+def bim_buildings():
+    """Ingested buildings + available bundled samples."""
+    return {"buildings": bim_ifc.list_buildings(),
+            "samples": [{"id": k, "name": v["name"],
+                         "available": all(Path(p).exists() for p in v["files"])}
+                        for k, v in bim_ifc.SAMPLES.items()]}
+
+
+@router.post("/bim/sample/{sample_id}")
+def bim_ingest_sample(sample_id: str):
+    """Ingest one of the bundled sample IFC sets (background; poll status)."""
+    s = bim_ifc.SAMPLES.get(sample_id)
+    if not s:
+        raise HTTPException(404, f"unknown sample '{sample_id}'")
+    return bim_ifc.start(sample_id, s["files"], name=s["name"])
+
+
+@router.post("/bim/upload")
+async def bim_upload(file: UploadFile = File(...)):
+    """Upload an IFC file → background ingest into discipline layers."""
+    if not (file.filename or "").lower().endswith(".ifc"):
+        raise HTTPException(400, "expected an .ifc file")
+    bid = re.sub(r"[^a-z0-9]+", "-", Path(file.filename).stem.lower()).strip("-") \
+        or f"bldg-{int(time.time())}"
+    dest = bim_ifc.building_dir(bid)
+    dest.mkdir(parents=True, exist_ok=True)
+    src = dest / "source.ifc"
+    src.write_bytes(await file.read())
+    return bim_ifc.start(bid, [src], name=Path(file.filename).stem, force=True)
+
+
+@router.get("/bim/{bid}/status")
+def bim_status(bid: str):
+    return bim_ifc.status(bid)
+
+
+@router.get("/bim/{bid}/file/{name}")
+def bim_file(bid: str, name: str):
+    """Serve a layer GLB / elements.json / manifest.json for a building."""
+    if "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(400, "bad filename")
+    p = bim_ifc.building_dir(bid) / name
+    if not p.exists():
+        raise HTTPException(404, f"{name} not found for '{bid}'")
+    media = "model/gltf-binary" if name.endswith(".glb") else "application/json"
+    return FileResponse(p, media_type=media)
 
 
 @router.get("/health")
@@ -353,14 +409,27 @@ def twins_templates():
 class CreateTwinReq(BaseModel):
     name: str = "Twin"
     domain: str = "edm-machine"
+    # fleet domain: optional network spec — an id ("melbourne-tram") or a full
+    # custom network dict (nodes/routes/fleet…) so ANY fleet becomes a twin.
+    network: dict | str | None = None
 
 
 @router.post("/twins/create")
 def twins_create(req: CreateTwinReq):
     """Create + seed a twin of any domain (e.g. 'edm-machine', 'turbine-engine',
-    'generic-facility'). Returns tenant + primary machine + assets; the live
+    'tram-network'). Returns tenant + primary machine + assets; the live
     feed and every Claude agent then work against it unchanged."""
-    return nextxr.build_domain(req.name, req.domain)
+    options = None
+    if req.domain == "tram-network" and req.network is not None:
+        options = {"network": req.network}
+    return nextxr.build_domain(req.name, req.domain, options=options)
+
+
+@router.get("/twins/{tenant}/network")
+def twin_network(tenant: str):
+    """Live network map payload for fleet twins: geometry (nodes/routes/depots/
+    substations), per-route status, and every vehicle's position."""
+    return nextxr.network_state(tenant)
 
 
 # Static fault catalogue per machine domain, so the Scenario panel can offer
@@ -399,6 +468,18 @@ TWIN_FAULTS = {
         {"id": "robot_overload", "label": "Robot joint overload"},
         {"id": "conveyor_jam", "label": "Conveyor jam / overload"},
         {"id": "compressor_fault", "label": "Compressed-air failure"},
+    ],
+    "tram-network": [
+        {"id": "ohl_damage", "label": "Overhead line damage"},
+        {"id": "substation_overload", "label": "Substation overload"},
+        {"id": "track_buckling", "label": "Track buckling (heat)"},
+        {"id": "switch_failure", "label": "Points / switch failure"},
+        {"id": "signal_failure", "label": "Signalling failure"},
+        {"id": "brake_degradation", "label": "Fleet brake degradation"},
+        {"id": "pantograph_wear", "label": "Pantograph carbon wear"},
+        {"id": "door_system_fault", "label": "Door system faults"},
+        {"id": "wheel_flats", "label": "Wheel flats"},
+        {"id": "demand_surge", "label": "Passenger demand surge"},
     ],
 }
 
@@ -440,6 +521,12 @@ SCENARIO_PRESETS = {
         {"title": "Summer heat in the plant", "description": "High ambient temperature stresses motors, compressors and robotics."},
         {"title": "Skipped maintenance window", "description": "A planned lubrication/maintenance window is skipped under schedule pressure."},
         {"title": "Material hardness spike", "description": "A harder-than-spec material batch increases tool and spindle load."},
+    ],
+    "tram-network": [
+        {"title": "40 °C heatwave afternoon", "description": "Extreme heat drives rail temperature toward the buckling limit while saloon HVAC load peaks the traction substations."},
+        {"title": "Stadium event crowd surge", "description": "80,000 spectators leave the ground within 40 minutes — the event corridor loads spike and dwell times blow out."},
+        {"title": "CBD signalling outage in the peak", "description": "An interlocking fault puts the core CBD junctions on manual working during the evening peak."},
+        {"title": "Storm damage to the overhead", "description": "A storm brings a tree limb through the contact wire on one corridor; sections isolate and services divert."},
     ],
 }
 
