@@ -66,6 +66,7 @@ class TwinGenerateRequest(BaseModel):
     quality: str = "fast"              # "fast" (256) or "high" (512)
 
 
+
 @router.post("/build-twin/generate")
 def build_twin_generate(req: TwinGenerateRequest):
     """Build a live twin of any domain, and kick off image->3D generation.
