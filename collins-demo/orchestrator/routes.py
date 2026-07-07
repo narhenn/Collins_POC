@@ -280,14 +280,45 @@ def health():
                 out[k] = f.result(timeout=6)
             except Exception as e:  # noqa: BLE001
                 out[k] = {"ok": False, "error": str(e)}
+    # Knowledge store stats
+    try:
+        from claude_client import knowledge_stats
+        kb_stats = knowledge_stats()
+    except Exception:  # noqa: BLE001
+        kb_stats = {}
     return {
         "orchestrator": "ok",
         "claude": {"enabled": config.claude_enabled, "model": config.CLAUDE_MODEL},
         "tripo": {"enabled": config.tripo_enabled},
         "model_3d": {"provider": config.model_3d_provider,
                      "runpod": config.runpod_enabled, "tripo": config.tripo_enabled},
+        "knowledge": kb_stats,
         **out,
     }
+
+
+# ── Knowledge search API ──────────────────────────────────────────────
+
+@router.get("/knowledge/search")
+def knowledge_search(query: str, domain: str | None = None,
+                     category: str | None = None, top_k: int = 5):
+    """Semantic search over the agent knowledge base (fault library,
+    compliance rules, past incidents)."""
+    try:
+        from knowledge import get_knowledge_store
+        kb = get_knowledge_store()
+        results = kb.search(query, domain=domain, category=category, top_k=top_k)
+        return {"query": query, "results": results, "total": len(results)}
+    except Exception as e:  # noqa: BLE001
+        return {"query": query, "results": [], "error": str(e)}
+
+
+@router.post("/knowledge/remember")
+def knowledge_remember(domain: str, title: str, diagnosis: str, resolution: str):
+    """Store a resolved incident in the knowledge base for future agent retrieval."""
+    from claude_client import remember_resolution
+    entry_id = remember_resolution(domain, title, diagnosis, resolution)
+    return {"stored": bool(entry_id), "entry_id": entry_id}
 
 
 # ── 1+2. Build the twin from an image + description ──────────────────
@@ -482,6 +513,36 @@ TWIN_FAULTS = {
         {"id": "wheel_flats", "label": "Wheel flats"},
         {"id": "demand_surge", "label": "Passenger demand surge"},
     ],
+    "mrt-line": [
+        {"id": "signal_failure", "label": "CBTC signal failure"},
+        {"id": "door_malfunction", "label": "Train door malfunction"},
+        {"id": "traction_undervoltage", "label": "Third rail undervoltage"},
+        {"id": "tunnel_overheat", "label": "Tunnel HVAC failure"},
+        {"id": "track_intrusion", "label": "Track intrusion detected"},
+        {"id": "flooding", "label": "Station flooding"},
+        {"id": "psd_desync", "label": "PSD-train door desync"},
+        {"id": "escalator_fault", "label": "Escalator motor fault"},
+    ],
+    "ev-network": [
+        {"id": "thermal_runaway", "label": "Battery thermal runaway precursor"},
+        {"id": "grid_overload", "label": "Grid transformer overload"},
+        {"id": "charger_fault", "label": "EVSE communication fault"},
+        {"id": "battery_degradation", "label": "Accelerated SoH decline"},
+        {"id": "connector_stuck", "label": "CCS2 connector locked"},
+        {"id": "insulation_fault", "label": "HV insulation degradation"},
+        {"id": "solar_hotcell", "label": "Solar panel hot cell"},
+        {"id": "v2g_failure", "label": "V2G discharge fault"},
+    ],
+    "defence-base": [
+        {"id": "perimeter_breach", "label": "Perimeter breach detected"},
+        {"id": "radar_degradation", "label": "Radar TX power loss"},
+        {"id": "ship_flooding", "label": "Ship compartment flooding"},
+        {"id": "fuel_contamination", "label": "Fuel water contamination"},
+        {"id": "uas_threat", "label": "Hostile UAS inbound"},
+        {"id": "ammo_overheat", "label": "Ammunition storage overheat"},
+        {"id": "comms_degradation", "label": "C4ISR link degradation"},
+        {"id": "nbc_detection", "label": "NBC agent detected"},
+    ],
 }
 
 
@@ -528,6 +589,24 @@ SCENARIO_PRESETS = {
         {"title": "Stadium event crowd surge", "description": "80,000 spectators leave the ground within 40 minutes — the event corridor loads spike and dwell times blow out."},
         {"title": "CBD signalling outage in the peak", "description": "An interlocking fault puts the core CBD junctions on manual working during the evening peak."},
         {"title": "Storm damage to the overhead", "description": "A storm brings a tree limb through the contact wire on one corridor; sections isolate and services divert."},
+    ],
+    "mrt-line": [
+        {"title": "Peak-hour CBTC failure on NSL", "description": "Zone controller hardware fault causes communications loss for a 3-station section during evening rush. OCC must manage manual train movements."},
+        {"title": "Flash flood entering Orchard station", "description": "70mm/hr rainfall overwhelms surface drainage. Water enters via escalator shaft to B2 level. Sump pumps at capacity."},
+        {"title": "Tunnel fire smoke detection", "description": "Smoke detector alarm in tunnel between Bishan and Ang Mo Kio. Cause unknown — brake overheating vs actual fire. Ventilation direction critical."},
+        {"title": "Mass event at Stadium MRT", "description": "NDP rehearsal ends — 45,000 spectators flood Stadium and Mountbatten stations simultaneously. Platform density approaching LOS E."},
+    ],
+    "ev-network": [
+        {"title": "Battery thermal runaway at depot", "description": "Bus battery pack cell 47 temperature spiking. Off-gas H2 sensor triggered. Adjacent vehicles at risk if propagation begins."},
+        {"title": "Grid overload during peak EV charging", "description": "30% EV penetration suburb. All residents plug in after work. Distribution transformer approaching 140°C hot-spot in 45 minutes."},
+        {"title": "Charger fire at highway rest stop", "description": "350kW ultra-fast charger arcing fault. Cooling hose failure soaked power modules. OCPP connection lost. Adjacent vehicles at risk."},
+        {"title": "V2G bidding during price spike", "description": "Wholesale electricity price spikes to 5x normal. 40 V2G-capable vehicles available for grid discharge. Optimise revenue vs battery health."},
+    ],
+    "defence-base": [
+        {"title": "Coordinated base perimeter breach", "description": "Simultaneous sensor triggers at two sectors. 3 dismounted unknowns at Alpha, 1 vehicle at Bravo. Mortar impact on fuel point. SCADA anomaly on base utilities."},
+        {"title": "Torpedo hit — ship damage control", "description": "Torpedo impact amidships. Flooding spaces 2-200-3-L through 2-200-3-R at 200 tonnes/minute. Fire in engine room. DCA must manage stability and DC."},
+        {"title": "Drone swarm inbound — 24 UAVs", "description": "24 commercial quadrotors detected 3km out approaching from multiple vectors at 15 m/s. 4 minutes to perimeter. C-UAS engagement decision required."},
+        {"title": "NBC agent release at vehicle gate", "description": "Chemical agent (VX) release at vehicle access point. 7 personnel potentially contaminated. Wind 5kt from 270°. MOPP level and decon site decisions needed."},
     ],
 }
 

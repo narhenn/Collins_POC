@@ -23,6 +23,59 @@ from config import config
 
 logger = logging.getLogger("orchestrator.claude")
 
+# -- domain-aware compliance and context for multi-vertical agents --
+DOMAIN_CONTEXT = {
+    'edm-machine': {
+        'industry': 'precision machining',
+        'compliance': 'ISO 9001 quality management',
+        'role': 'manufacturing process engineer',
+    },
+    'turbine-engine': {
+        'industry': 'aerospace MRO',
+        'compliance': 'AS9100D / EASA Part 145 / FAA Part 43',
+        'role': 'aerospace MRO reliability engineer',
+    },
+    'tram-network': {
+        'industry': 'rail transit operations',
+        'compliance': 'EN 50126/50128/50129, LTA Railway Safety Directive',
+        'role': 'railway operations engineer',
+    },
+    'hospital': {
+        'industry': 'healthcare facility management',
+        'compliance': 'JCI accreditation, NFPA 99, ASHRAE 170, MOH Singapore',
+        'role': 'hospital facilities engineer',
+    },
+    'mrt-line': {
+        'industry': 'rail transit operations (Singapore MRT)',
+        'compliance': 'LTA Railway Safety Directive, SFSRTS 2000, EN 50126/50128/50129',
+        'role': 'railway operations and signalling engineer',
+    },
+    'ev-network': {
+        'industry': 'EV charging infrastructure and fleet management',
+        'compliance': 'IEC 61851, ISO 15118, OCPP 2.0.1, NFPA 855, UN ECE R100',
+        'role': 'EV charging and battery management engineer',
+    },
+    'defence-base': {
+        'industry': 'military base and naval operations',
+        'compliance': 'MIL-STD-882E, NATO STANAGs, NIST SP 800-171',
+        'role': 'defence operations and readiness engineer',
+    },
+    'datacenter': {
+        'industry': 'data center operations',
+        'compliance': 'Uptime Institute Tier standards, ASHRAE TC 9.9',
+        'role': 'data center operations engineer',
+    },
+    'manufacturing': {
+        'industry': 'discrete manufacturing',
+        'compliance': 'ISO 9001, OEE standards',
+        'role': 'manufacturing operations engineer',
+    },
+}
+
+def _domain_ctx(domain: str) -> dict:
+    """Return domain context dict, defaulting to turbine-engine."""
+    return DOMAIN_CONTEXT.get(domain, DOMAIN_CONTEXT['turbine-engine'])
+
 # NextXR's aerospace-MRO feed emits these signals. Mapping a sensor to one of
 # these keys means its 3D hotspot lights up from real live telemetry. Anything
 # else still renders, just without a live binding.
@@ -134,9 +187,10 @@ def vision_to_twin_spec(image_b64: Optional[str], description: str,
     media_type, data = _data_uri(image_b64, filename)
     signal_hint = ", ".join(KNOWN_SIGNALS.keys())
     system = (
-        "You are the Vision Agent for an aerospace MRO digital-twin platform. "
-        "Given a photo of a machine and a short description, identify the machine "
-        "and the sensors a maintenance team would monitor on it. Map each sensor "
+        "You are the Vision Agent for a multi-vertical digital-twin platform "
+        "(aerospace MRO, rail transit, EV, hospital facilities, defence). "
+        "Given a photo of a machine or facility and a short description, identify "
+        "it and the sensors a maintenance team would monitor. Map each sensor "
         "to one of these live telemetry signal keys when it fits "
         f"({signal_hint}); otherwise invent a short key like 'turbine:bearingVibration'. "
         "Give each sensor an approximate 3D hotspot position on the machine as "
@@ -233,12 +287,12 @@ def build_twin_reply(history: list[dict], message: str) -> TwinBuilderReply:
         msgs = [{"role": h["role"], "content": h["content"]} for h in history[-8:]]
         msgs.append({"role": "user", "content": message})
         system = (
-            "You are the Twin Builder agent for an aerospace MRO digital-twin "
-            "platform. Converse warmly and briefly to learn what machine the user "
-            "wants to twin (a gas turbine / jet engine for this demo). Once they've "
-            "named/described it, set ready=true and tell them to upload a 2D IMAGE of "
-            "the machine, then hit Build — you'll reconstruct the 3D model from the "
-            "image and wire up live sensors + physics. Image only (no text prompt). "
+            "You are the Twin Builder agent for a multi-vertical digital-twin "
+            "platform covering aerospace, rail transit, EV charging, hospitals and "
+            "defence. Converse warmly and briefly to learn what machine or facility "
+            "the user wants to twin. Once they've named/described it, set ready=true "
+            "and tell them to upload a 2D IMAGE, then hit Build — you'll reconstruct "
+            "the 3D model from the image and wire up live sensors + physics. "
             "Keep replies to 1-3 sentences.")
         resp = _anthropic().messages.parse(
             model=config.CLAUDE_MODEL, max_tokens=400, system=system,
@@ -251,17 +305,56 @@ def build_twin_reply(history: list[dict], message: str) -> TwinBuilderReply:
 
 # ── Turbine scenario builder (agent authors a runnable what-if) ───────
 
-# The fault catalogue the projection engine understands.
-FAULT_CATALOG = {
-    "blade_erosion": "Turbine blade erosion — hot-section efficiency loss, EGT climbs to redline.",
-    "nozzle_coking": "Fuel-nozzle coking — uneven combustion, local hot streak.",
-    "compressor_fouling": "Compressor fouling — reduced airflow, EGT creep.",
-    "bearing_wear": "Bearing wear — rising vibration and N1 droop.",
-    "oil_starvation": "Oil leak / starvation — oil temp up, oil pressure down.",
-    "surge": "Compressor surge / stall — N1 collapse with EGT spike.",
-    "sensor_failure": "EGT sensor failure — reading freezes while the engine keeps "
-                      "degrading underneath (the twin flies blind).",
+# -- domain-specific fault catalogs --
+FAULT_CATALOGS = {
+    'turbine-engine': {
+        "blade_erosion": "Turbine blade erosion — hot-section efficiency loss, EGT climbs to redline.",
+        "nozzle_coking": "Fuel-nozzle coking — uneven combustion, local hot streak.",
+        "compressor_fouling": "Compressor fouling — reduced airflow, EGT creep.",
+        "bearing_wear": "Bearing wear — rising vibration and N1 droop.",
+        "oil_starvation": "Oil leak / starvation — oil temp up, oil pressure down.",
+        "surge": "Compressor surge / stall — N1 collapse with EGT spike.",
+        "sensor_failure": "EGT sensor failure — reading freezes while engine keeps degrading.",
+    },
+    'mrt-line': {
+        "signal_failure": "CBTC signal failure — zone controller comms loss, trains held.",
+        "door_malfunction": "Train door fails to close — ATO prevents departure, dwell extends.",
+        "traction_undervoltage": "Third rail voltage drop — train traction capability reduced.",
+        "tunnel_overheat": "Underground station HVAC failure — tunnel temperature rising.",
+        "track_intrusion": "Person detected on track — platform edge sensor triggered.",
+        "flooding": "Heavy rain — surface water entering underground station via escalator shaft.",
+        "psd_desync": "PSD-train door misalignment — gap safety risk at platform edge.",
+    },
+    'ev-network': {
+        "thermal_runaway": "Battery cell thermal runaway precursor — cell temp spiking, off-gas risk.",
+        "grid_overload": "Transformer thermal limit — EV charging demand exceeding grid contract.",
+        "charger_fault": "EVSE communication fault — CP pilot signal lost, session aborted.",
+        "battery_degradation": "Accelerated SoH decline — capacity fade rate above warranty curve.",
+        "connector_stuck": "CCS2 connector locked — mechanical latch solenoid failure.",
+        "insulation_fault": "HV insulation degradation — IMD reading dropping below 100kΩ threshold.",
+    },
+    'hospital': {
+        "laminar_loss": "OR positive pressure loss — HVAC AHU fan failure, contamination ingress risk.",
+        "medgas_drop": "Medical gas O₂ zone pressure dropping — manifold switchover or pipeline fault.",
+        "coldchain_excursion": "Blood bank fridge temp rising above 6°C — compressor or door seal failure.",
+        "power_failure": "Generator fail-to-start — UPS on battery, runtime draining.",
+        "hvac_fault": "Isolation room negative pressure lost — airborne pathogen containment breach.",
+        "legionella_risk": "Hot water return temp below 50°C — Legionella growth window entered.",
+    },
+    'defence-base': {
+        "perimeter_breach": "Multi-sensor perimeter breach — radar + FLIR co-fire on sector Alpha.",
+        "radar_degradation": "Surveillance radar TX power loss — detection range shrinking.",
+        "ship_flooding": "Compartment flooding — watertight door failure, list angle increasing.",
+        "fuel_contamination": "Fuel water content rising — filter blockage risk for gas turbine.",
+        "uas_threat": "Hostile UAS detected — RF + acoustic + radar track inbound.",
+        "ammo_overheat": "Ammunition storage temperature exceeding IM safe limit.",
+    },
 }
+# backward compat: old code references FAULT_CATALOG directly
+FAULT_CATALOG = FAULT_CATALOGS['turbine-engine']
+
+def _fault_catalog_for(domain: str) -> dict:
+    return FAULT_CATALOGS.get(domain, FAULT_CATALOG)
 
 
 class AuthoredScenario(BaseModel):
@@ -296,13 +389,16 @@ def _author_stub(prompt: str) -> AuthoredScenario:
         expected_outcome=FAULT_CATALOG.get(fault, ""))
 
 
-def author_scenario(prompt: str, machine: str, sensors: list[str]) -> AuthoredScenario:
+def author_scenario(prompt: str, machine: str, sensors: list[str],
+                    domain: str = 'turbine-engine') -> AuthoredScenario:
     """Agent: turn a natural-language request into a runnable scenario spec."""
     if not config.claude_enabled:
         return _author_stub(prompt)
-    catalog = "\n".join(f"  - {k}: {v}" for k, v in FAULT_CATALOG.items())
+    fc = _fault_catalog_for(domain)
+    ctx = _domain_ctx(domain)
+    catalog = "\n".join(f"  - {k}: {v}" for k, v in fc.items())
     system = (
-        "You are the Scenario Builder agent for an aerospace turbine digital twin. "
+        f"You are the Scenario Builder agent for a {ctx['industry']} digital twin. "
         "Turn the operator's request into a runnable what-if scenario by choosing "
         "the single best-matching fault from this catalogue and sensible parameters:\n"
         f"{catalog}\n"
@@ -317,7 +413,7 @@ def author_scenario(prompt: str, machine: str, sensors: list[str]) -> AuthoredSc
                 f"Request: {prompt}"}],
             output_format=AuthoredScenario)
         spec = resp.parsed_output or _author_stub(prompt)
-        if spec.fault not in FAULT_CATALOG:
+        if spec.fault not in fc:
             spec.fault = _author_stub(prompt).fault
         return spec
     except Exception as e:  # noqa: BLE001
@@ -380,7 +476,7 @@ def analyze_outcome(scenario: dict, projection: dict, machine: str) -> str:
 
 # ── Diagnosis agent (detailed component/sensor report of the live twin) ──
 
-def diagnosis_agent(diagnostics: dict, machine: str) -> str:
+def diagnosis_agent(diagnostics: dict, machine: str, domain: str = 'turbine-engine') -> str:
     """Diagnose the real-time twin: per-component health, per-sensor status,
     overall condition, likely root cause, and recommended actions."""
     comps = diagnostics.get("components", [])
@@ -411,19 +507,47 @@ def diagnosis_agent(diagnostics: dict, machine: str) -> str:
         return _stub()
     try:
         import json as _json
+        from knowledge import get_knowledge_store
+        ctx = _domain_ctx(domain)
+        # -- RAG: search knowledge base for similar faults + compliance --
+        kb = get_knowledge_store()
+        query_text = " ".join(
+            f.get("message", "") for f in findings[:3]
+        ) or machine
+        similar_faults = kb.search_faults(query_text, domain=domain, top_k=3)
+        compliance_rules = kb.search_compliance(query_text, domain=domain, top_k=2)
+        past_incidents = kb.recall_incidents(query_text, domain=domain, top_k=2)
+        # Build RAG context for Claude
+        rag_context = ""
+        if similar_faults:
+            rag_context += "\n\nSIMILAR KNOWN FAULTS FROM LIBRARY:\n"
+            for f in similar_faults:
+                rag_context += f"- {f['title']}: {f['content'][:200]}\n"
+        if compliance_rules:
+            rag_context += "\nAPPLICABLE COMPLIANCE RULES:\n"
+            for r in compliance_rules:
+                rag_context += f"- {r['title']}: {r['content'][:200]}\n"
+        if past_incidents:
+            rag_context += "\nSIMILAR PAST INCIDENTS:\n"
+            for inc in past_incidents:
+                rag_context += f"- {inc['title']}: {inc['content'][:200]}\n"
         system = (
-            "You are an aerospace MRO diagnostic engineer. Given a structured "
-            "snapshot of a gas-turbine digital twin (components, sensors, findings), "
+            f"You are a {ctx['role']}. Given a structured "
+            f"snapshot of a {ctx['industry']} digital twin (components, sensors, findings), "
             "write a clear diagnosis report: (1) overall condition, (2) a line per "
             "component with its health and what it implies, (3) any sensors out of "
-            "band, (4) the most likely root cause, (5) recommended actions. Be "
-            "specific and grounded in the numbers. Use short sections, no preamble.")
+            "band, (4) the most likely root cause — reference similar known faults if "
+            "provided, (5) recommended actions with specific compliance references. "
+            f"Reference applicable standards ({ctx['compliance']}) where relevant. "
+            "Be specific and grounded in the numbers. Use short sections, no preamble.")
+        user_content = f"Machine: {machine}\nSnapshot: {_json.dumps(diagnostics, default=str)[:5000]}"
+        if rag_context:
+            user_content += rag_context
         resp = _anthropic().messages.create(
-            model=config.CLAUDE_MODEL, max_tokens=1000,
+            model=config.CLAUDE_MODEL, max_tokens=1200,
             system=[{"type": "text", "text": system,
                      "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content":
-                f"Machine: {machine}\nSnapshot: {_json.dumps(diagnostics, default=str)[:6000]}"}])
+            messages=[{"role": "user", "content": user_content}])
         return "".join(b.text for b in resp.content if b.type == "text").strip() or _stub()
     except Exception as e:  # noqa: BLE001
         logger.warning("diagnosis_agent failed (%s); stub", e)
@@ -618,8 +742,8 @@ class WorkOrder(BaseModel):
     sign_off: str = Field(default="Level II Inspector", description="Required sign-off authority")
 
 
-def generate_work_order(diagnostics: dict, machine: str) -> WorkOrder:
-    """Generate an AS9100-compliant maintenance work order from diagnosis results."""
+def generate_work_order(diagnostics: dict, machine: str, domain: str = 'turbine-engine') -> WorkOrder:
+    """Generate a compliant maintenance work order from diagnosis results."""
     comps = diagnostics.get("components", [])
     findings = diagnostics.get("findings", [])
     sensors = diagnostics.get("sensors", [])
@@ -649,13 +773,14 @@ def generate_work_order(diagnostics: dict, machine: str) -> WorkOrder:
         return _stub()
     try:
         import json as _json
+        ctx = _domain_ctx(domain)
         system = (
-            "You are an aerospace MRO documentation system. Generate an AS9100-compliant "
-            "maintenance work order from this fault diagnosis. Use correct ATA chapter "
-            "references. Each step must include acceptance criteria and safety warnings "
-            "where applicable. Include EASA Part 145 and FAA 14 CFR 145 references. "
-            "Language must be precise enough for a Level II-certified technician. "
-            "Estimate realistic labour hours and list specific parts/tools needed.")
+            f"You are a {ctx['industry']} documentation system. Generate a compliant "
+            f"maintenance work order from this fault diagnosis. Reference applicable "
+            f"standards ({ctx['compliance']}). Each step must include acceptance criteria "
+            "and safety warnings where applicable. Language must be precise enough for "
+            "a certified technician. Estimate realistic labour hours and list specific "
+            "parts/tools needed.")
         resp = _anthropic().messages.parse(
             model=config.CLAUDE_MODEL, max_tokens=4000,
             system=[{"type": "text", "text": system,
@@ -710,6 +835,33 @@ def predictive_alert(prediction: dict, machine: str) -> str | None:
     except Exception as e:
         logger.warning("predictive_alert failed (%s); stub", e)
         return _stub()
+
+
+# ── Knowledge capture (learning loop — resolved incidents → memory) ──
+
+def remember_resolution(domain: str, title: str, diagnosis: str,
+                        resolution: str, metadata: dict | None = None) -> str:
+    """Store a resolved incident in the knowledge base for future retrieval.
+    Called when an incident is closed — the resolution becomes training data
+    for future diagnosis agents working on similar faults."""
+    try:
+        from knowledge import get_knowledge_store
+        kb = get_knowledge_store()
+        entry_id = kb.remember_incident(domain, title, diagnosis, resolution, metadata)
+        logger.info("knowledge: captured resolution '%s' as %s", title, entry_id)
+        return entry_id
+    except Exception as e:  # noqa: BLE001
+        logger.warning("remember_resolution failed (%s)", e)
+        return ""
+
+
+def knowledge_stats() -> dict:
+    """Return knowledge store statistics for the health endpoint."""
+    try:
+        from knowledge import get_knowledge_store
+        return get_knowledge_store().stats()
+    except Exception:  # noqa: BLE001
+        return {"total_entries": 0}
 
 
 # ── Cascade reasoning (cross-system failure propagation) ──
@@ -896,8 +1048,8 @@ class IncidentReport(BaseModel):
 
 
 def generate_incident_report(diagnostics: dict, findings: list,
-                             machine: str) -> IncidentReport:
-    """Generate a formal MRO incident report with regulatory closure references."""
+                             machine: str, domain: str = 'turbine-engine') -> IncidentReport:
+    """Generate a formal incident report with regulatory closure references."""
     def _stub() -> IncidentReport:
         return IncidentReport(
             report_id="IR-2026-0627-001",
@@ -929,12 +1081,13 @@ def generate_incident_report(diagnostics: dict, findings: list,
         return _stub()
     try:
         import json as _json
+        ctx = _domain_ctx(domain)
         system = (
-            "You are an aerospace MRO documentation specialist generating a formal "
-            "incident report. Include ATA chapter classification, observed symptoms with "
+            f"You are a {ctx['industry']} documentation specialist generating a formal "
+            "incident report. Include appropriate classification, observed symptoms with "
             "specific sensor values, physics-based evidence, probable cause, corrective "
-            "action steps, EASA/FAA regulatory closure references, and return-to-service "
-            "acceptance criteria. Be precise enough for regulatory submission.")
+            f"action steps, regulatory closure references ({ctx['compliance']}), and "
+            "return-to-service acceptance criteria. Be precise enough for regulatory submission.")
         resp = _anthropic().messages.parse(
             model=config.CLAUDE_MODEL, max_tokens=1500,
             system=[{"type": "text", "text": system,

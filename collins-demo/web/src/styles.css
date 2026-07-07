@@ -338,6 +338,35 @@ table.tbl td{padding:6px 0;border-bottom:1px solid var(--border)}
 [data-theme="dark"] table.tbl td{border-color:rgba(124,150,255,.1)}
 [data-theme="dark"] ::-webkit-scrollbar-thumb{background:#2a3058;border-color:#070912}
 
+/* ── Vertical switcher (topbar domain pills) ─────────────────────── */
+.vertical-switcher{display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:2px;margin:0 8px;flex-shrink:0}
+.v-pill{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap;font-family:var(--font)}
+.v-pill:hover{background:var(--surface);color:var(--text)}
+.v-pill.active{color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.v-pill i{font-size:14px}
+.v-pill-label{display:none}
+@media(min-width:1100px){.v-pill-label{display:inline}}
+
+/* ── Mobile responsive ───────────────────────────────────────────── */
+.mobile-menu{display:none !important}
+.sidebar-overlay{display:none}
+@media(max-width:768px){
+  .body{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:-270px;width:270px;height:100dvh;z-index:50;transition:left .2s ease;background:var(--surface);border-right:1px solid var(--border);box-shadow:4px 0 24px rgba(0,0,0,.12)}
+  .sidebar.open{left:0}
+  .sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:49;animation:fadeIn .15s ease}
+  .mobile-menu{display:flex !important}
+  .topbar{padding:10px 12px;gap:8px}
+  .brand-word{display:none}
+  .vertical-switcher{margin:0 4px}
+  .v-pill{padding:4px 6px}
+  .v-pill-label{display:none !important}
+  .crumb{display:none}
+  .topstat{font-size:9px;padding:4px 8px}
+  .acct{display:none}
+  .content{padding:16px 14px}
+}
+
 @media print{
   .app-root>.topbar,.sidebar,.panel-actions,.btn,.nav-item,.sidebar-foot,.v-top,.v-tools,.v-palette,.v-tip{display:none !important}
   .body{display:block !important}.content{padding:0 !important;overflow:visible !important}

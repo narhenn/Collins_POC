@@ -55,6 +55,7 @@ export default function App() {
   const saveTwin = (entry) => persistSaved([entry, ...saved.filter(s => s.id !== entry.id)].slice(0, 24))
   const removeSaved = (id) => persistSaved(saved.filter(s => s.id !== id))
   const [cmdPalette, setCmdPalette] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [auditEntries, setAuditEntries] = useState([])
   const addAudit = (type, summary, detail, agent) => setAuditEntries(prev => [...prev,
     { id: Date.now() + '-' + Math.random().toString(36).slice(2, 6), timestamp: Date.now(),
@@ -68,6 +69,15 @@ export default function App() {
   useEffect(() => { api.health().then(setHealth).catch(() => {}) }, [])
   // restore theme on mount
   useEffect(() => { const t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t) }, [])
+  // -- apply domain accent as CSS variable when domain changes --
+  useEffect(() => {
+    const meta = DOMAINS[domain]
+    if (meta?.accent) {
+      document.documentElement.style.setProperty('--brand', meta.accent)
+      document.documentElement.style.setProperty('--brand-2', meta.accent)
+      document.documentElement.style.setProperty('--brand-strong', meta.accent)
+    }
+  }, [domain])
   // Cmd+K command palette
   useEffect(() => {
     const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdPalette(p => !p) } }
@@ -161,12 +171,24 @@ export default function App() {
   return (
     <div className="app-root">
       <div className="topbar">
+        <button className="btn btn-ghost mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <Icon n="ti-menu-2" />
+        </button>
         <span className="brand"><Logo size={32} />
           <span className="brand-word">
             <span className="brand-name">Goalcert</span>
             <span className="brand-tag">Digital Twin Platform</span>
           </span>
         </span>
+        <div className="vertical-switcher">
+          {Object.entries(DOMAINS).filter(([,d]) => d.library !== false).map(([key, d]) => (
+            <button key={key} className={`v-pill ${domain === key ? 'active' : ''}`}
+              style={domain === key ? { background: d.accent, color: '#fff' } : {}}
+              onClick={() => { setDomain(key); setRoute('twins'); setSidebarOpen(false) }}>
+              <Icon n={d.icon} /><span className="v-pill-label">{d.tag?.split(' ')[0] || d.label.split(' ')[0]}</span>
+            </button>
+          ))}
+        </div>
         <div className="crumb">{source
           ? <><b>{machineName}</b> · {meta.tag} · live twin</>
           : 'Pick a twin from the Twins library to begin'}</div>
@@ -189,15 +211,16 @@ export default function App() {
           onClick={() => setCmdPalette(true)}>
           <Icon n="ti-command" />
         </button>
-        <div className="acct"><span className="av">C</span>Collins MRO</div>
+        <div className="acct"><span className="av" style={{ background: domainMeta(domain).accent }}>{domainMeta(domain).label[0]}</span>{domainMeta(domain).tag}</div>
       </div>
 
       <div className="body">
-        <div className="sidebar">
+        {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+        <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-nav">
             <div className="sidebar-section">Operations</div>
             {NAV.map(it => (
-              <a key={it.id} className={`nav-item ${route === it.id ? 'active' : ''}`} onClick={() => setRoute(it.id)}>
+              <a key={it.id} className={`nav-item ${route === it.id ? 'active' : ''}`} onClick={() => { setRoute(it.id); setSidebarOpen(false) }}>
                 <Icon n={it.icon} />{it.label}
                 {it.id === 'dashboard' && nIncidents > 0 && <span className="nav-badge badge-red">{nIncidents}</span>}
                 {it.id === 'agents' && <span className="nav-badge badge-blue">2</span>}
