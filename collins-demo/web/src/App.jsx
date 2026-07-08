@@ -12,6 +12,7 @@ import TurbineModel from './TurbineModel.jsx'
 import Scene3D from './Scene3D.jsx'
 import ModelViewer from './ModelViewer.jsx'
 import NetworkMap from './NetworkMap.jsx'
+import MRTMap from './MRTMap.jsx'
 import BimViewer from './BimViewer.jsx'
 import Chat from './Chat.jsx'
 import Markdown from './Markdown.jsx'
@@ -696,7 +697,9 @@ function Dashboard({ ctx }) {
           reconstructed GLB (Build-a-Twin) takes priority, else the turbine
           model, else the procedural domain scene. */}
       <div className="section-gap">
-        {domain === 'tram-network' && isLive
+        {domain === 'mrt-line'
+          ? <MRTMap twin={twin} height={460} />
+          : domain === 'tram-network' && isLive
           ? <NetworkMap tenant={tenant} height={460} running={running} />
           : modelUrl
           ? (domain === 'turbine-engine'
