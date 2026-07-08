@@ -313,6 +313,18 @@ def knowledge_search(query: str, domain: str | None = None,
         return {"query": query, "results": [], "error": str(e)}
 
 
+@router.get("/agents/registry")
+def get_agent_registry(domain: str = "edm-machine"):
+    """Return agents available for a specific domain, grouped by category."""
+    from agent_registry import agents_for_domain, agents_by_category, agent_count
+    return {
+        "domain": domain,
+        "agents": agents_for_domain(domain),
+        "by_category": agents_by_category(domain),
+        "counts": agent_count(),
+    }
+
+
 @router.post("/knowledge/remember")
 def knowledge_remember(domain: str, title: str, diagnosis: str, resolution: str):
     """Store a resolved incident in the knowledge base for future agent retrieval."""

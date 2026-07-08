@@ -421,7 +421,8 @@ def author_scenario(prompt: str, machine: str, sensors: list[str],
         return _author_stub(prompt)
 
 
-def analyze_outcome(scenario: dict, projection: dict, machine: str) -> str:
+def analyze_outcome(scenario: dict, projection: dict, machine: str,
+                    domain: str = 'turbine-engine') -> str:
     """Agent: plain-English analysis of the projected outcome — what happens, how
     the machine behaves, and what to do to be ready. Stub falls back to a
     deterministic summary from the projection data."""
@@ -455,10 +456,11 @@ def analyze_outcome(scenario: dict, projection: dict, machine: str) -> str:
         return _stub()
     try:
         import json as _json
+        ctx = _domain_ctx(domain)
         system = (
-            "You are an aerospace MRO reliability engineer. Given a turbine what-if "
+            f"You are a {ctx['role']}. Given a what-if "
             "projection, write a concise, actionable briefing (4-6 sentences): what "
-            "happens to the engine, how it behaves over time, the key risk and "
+            "happens to the system, how it behaves over time, the key risk and "
             "time-to-action, and the precautions/maintenance to be ready. Be specific "
             "and grounded in the numbers; no preamble.")
         resp = _anthropic().messages.create(
@@ -866,7 +868,8 @@ def knowledge_stats() -> dict:
 
 # ── Cascade reasoning (cross-system failure propagation) ──
 
-def cascade_analysis(diagnostics: dict, prediction: dict, machine: str) -> str:
+def cascade_analysis(diagnostics: dict, prediction: dict, machine: str,
+                     domain: str = 'turbine-engine') -> str:
     """Reason about multi-system failure cascades — how degradation in one
     subsystem propagates to others."""
     def _stub() -> str:
@@ -884,12 +887,14 @@ def cascade_analysis(diagnostics: dict, prediction: dict, machine: str) -> str:
         return _stub()
     try:
         import json as _json
+        ctx = _domain_ctx(domain)
         system = (
-            "You are an aerospace systems engineer specializing in failure mode cascade "
-            "analysis. Given live turbine telemetry and a forward prediction, identify "
-            "if any degradation in one subsystem is likely to propagate to another. "
+            f"You are a {ctx['role']} specializing in failure mode cascade "
+            f"analysis for {ctx['industry']}. Given live telemetry and a forward prediction, "
+            "identify if any degradation in one subsystem is likely to propagate to another. "
             "Format each cascade as: [System A] degradation -> [System B] impact in ~N "
             "minutes because [physics reason]. Be specific and grounded in the data. "
+            f"Reference applicable standards ({ctx['compliance']}) where relevant. "
             "If no cascades are likely, say so clearly. Max 4-5 sentences.")
         payload = {"diagnostics": diagnostics, "prediction": prediction}
         resp = _anthropic().messages.create(
