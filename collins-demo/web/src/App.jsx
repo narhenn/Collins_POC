@@ -35,7 +35,7 @@ const NAV = [
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
   { id: 'audit', label: 'Audit Trail', icon: 'ti-history' },
 ]
-// Gaadin-only tools, appended to the nav when the EV energy twin is active.
+// EV energy-site tools, appended to the nav when the EV energy twin is active.
 const EV_NAV = [
   { id: 'sitepredict', label: 'SitePredict', icon: 'ti-map-search' },
   { id: 'loadbalance', label: 'Energy & Load', icon: 'ti-adjustments-bolt' },
@@ -279,7 +279,7 @@ export default function App() {
               <div className="panel-header">
                 <div>
                   <div className="panel-title">Energy & Load Management</div>
-                  <div className="panel-subtitle">Gaadin EMS — dynamic load balancing, peak shaving and BESS dispatch keeping the site under its grid limit.</div>
+                  <div className="panel-subtitle">GoalCert EMS — dynamic load balancing, peak shaving and BESS dispatch keeping the site under its grid limit.</div>
                 </div>
               </div>
               <LoadBalance />
@@ -303,8 +303,8 @@ export default function App() {
         { label: 'Audit Trail', icon: 'ti-history', group: 'Navigate', action: () => setRoute('audit') },
         { label: 'AI Maintenance Director', icon: 'ti-tool', group: 'Action', action: () => { setMaint(true); setCmdPalette(false) }, hint: 'Cinematic guided repair' },
         ...(domain === 'ev-network' ? [
-          { label: 'SitePredict — location & ROI', icon: 'ti-map-search', group: 'Gaadin', action: () => setRoute('sitepredict'), hint: 'Rank charging sites by predicted ROI' },
-          { label: 'Energy & Load Management', icon: 'ti-adjustments-bolt', group: 'Gaadin', action: () => setRoute('loadbalance'), hint: 'EMS load balancing & peak shaving' },
+          { label: 'SitePredict — location & ROI', icon: 'ti-map-search', group: 'GoalCert', action: () => setRoute('sitepredict'), hint: 'Rank charging sites by predicted ROI' },
+          { label: 'Energy & Load Management', icon: 'ti-adjustments-bolt', group: 'GoalCert', action: () => setRoute('loadbalance'), hint: 'EMS load balancing & peak shaving' },
         ] : []),
         ...Object.keys(DOMAINS).filter(k => DOMAINS[k].library !== false).map(k => ({
           label: `Open ${DOMAINS[k].label}`, icon: DOMAINS[k].icon || 'ti-cube', group: 'Twin',
@@ -753,7 +753,7 @@ function Dashboard({ ctx }) {
             : <Scene3D domain={domain} machine={machineName} live={live} height={380} />}
       </div>
 
-      {/* Gaadin EV twin — cell-level battery health + EMS load balancing */}
+      {/* GoalCert EV twin — cell-level battery health + EMS load balancing */}
       {domain === 'ev-network' && (
         <>
           <div className="section-gap"><BatteryPack live={live} /></div>

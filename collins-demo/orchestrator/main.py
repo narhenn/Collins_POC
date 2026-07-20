@@ -21,7 +21,7 @@ from routes import router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("orchestrator")
 
-app = FastAPI(title="Gaadin.AI Living Energy Twin — Orchestrator", version="1.0.0")
+app = FastAPI(title="GoalCert Workforce Intelligence — Orchestrator", version="1.0.0")
 
 # The web app (Vite dev server on :5174) calls us cross-origin.
 app.add_middleware(

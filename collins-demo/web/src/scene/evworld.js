@@ -1,5 +1,5 @@
 // evworld.js — the "living energy site": a stylised miniature world twin of a
-// Gaadin.AI-managed charging hub. A commercial lot with DC-fast + AC bays, an
+// GoalCert-managed charging hub. A commercial lot with DC-fast + AC bays, an
 // on-site BESS container, a solar canopy, a grid transformer and the building it
 // serves — with EVs driving in, chargers pulsing, and power visibly flowing
 // between grid ⇄ transformer ⇄ BESS ⇄ solar ⇄ chargers. Vanilla Three.js, mounted
@@ -314,7 +314,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const bus = grp()
   bus.add(box(1.6, 1.8, 1.0, M.white, 0, 0.9, 0)); bus.add(box(1.2, 0.7, 0.08, M.screen, 0, 1.05, 0.52))
   bus.position.set(-11, 0, -2)
-  bus.userData.asset = { id: 'EMS-1', name: 'Gaadin EMS Controller', type: 'Load balancer / peak-shave', icon: 'ti-cpu',
+  bus.userData.asset = { id: 'EMS-1', name: 'GoalCert EMS Controller', type: 'Load balancer / peak-shave', icon: 'ti-cpu',
     status: 'ok', metrics: [['Site demand', 'kW', 420], ['Limit', 'kW', 550], ['Headroom', '%', 32], ['Mode', '', 'balancing']] }
   bus.traverse(o => { o.userData.pickRoot = bus })
   scene.add(bus); selectable.push(bus)
@@ -365,7 +365,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
 
   // ── overlays: chips + tools + legend + inspector ──
   host.append(el('div', { class: 'v-top' },
-    el('div', { class: 'v-chip' }, icon('ti-charging-pile'), el('b', {}, 'Gaadin Energy Site')),
+    el('div', { class: 'v-chip' }, icon('ti-charging-pile'), el('b', {}, 'GoalCert Energy Site')),
     el('div', { class: 'v-chip' }, el('span', { class: 'status-dot live', style: { width: '7px', height: '7px' } }), 'LIVE'),
     el('div', { class: 'v-chip', id: 'evw-fps' }, '-- fps')))
   const tAuto = el('div', { class: 'v-tool on', title: 'Auto-orbit' }, icon('ti-rotate-360'))

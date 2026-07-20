@@ -49,7 +49,7 @@ from fleet.physics import FleetPhysics, SIGNALS as FLT_SIG, UNITS as FLT_UNITS, 
 from fleet.predict import component_health as flt_ch, predict as flt_predict  # noqa: E402
 from behaviors.fleet import build_fleet_registry           # noqa: E402
 
-# ── EV / Gaadin energy-site domain wiring ────────────────────────────
+# ── EV / GoalCert energy-site domain wiring ──────────────────────────
 from ev.physics import EVPhysics, SIGNALS as EV_SIG, UNITS as EV_UNITS, redlines as EV_RED  # noqa: E402
 from ev.predict import component_health as ev_ch, predict as ev_predict  # noqa: E402
 from behaviors.ev import build_ev_registry                 # noqa: E402
@@ -114,7 +114,7 @@ EV_SENSORS = {
 
 DOMAINS = {
     "ev-network": {
-        "label": "Gaadin Energy Site", "control": "demand",
+        "label": "GoalCert Energy Site", "control": "demand",
         "physics": EVPhysics, "ch": ev_ch, "predict": ev_predict,
         "registry": build_ev_registry, "sig": EV_SIG, "units": EV_UNITS,
         "sensors": EV_SENSORS,

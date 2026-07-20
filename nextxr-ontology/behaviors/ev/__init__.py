@@ -1,5 +1,5 @@
 """
-behaviors.ev — the behaviour rules that watch a Gaadin EV charging-site twin.
+behaviors.ev — the behaviour rules that watch a GoalCert EV charging-site twin.
 
 Tier-C hard-limit monitors across the four pillars: thermal-runaway risk, cell
 over-temperature, transformer over-temp, grid overload, grid-headroom exhaustion,

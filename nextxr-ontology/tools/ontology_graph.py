@@ -49,10 +49,16 @@ EDM_FILES = [
     "packs/edm/edm-shapes.ttl",
 ]
 
+# Layer 4 — EV / e-mobility charging + energy pack (GoalCert energy-site twin).
+EV_FILES = [
+    "packs/ev/ev-classes.ttl",
+    "packs/ev/ev-shapes.ttl",
+]
+
 PACK_FILES = CFP_FILES + [
     "packs/hvac/hvac-classes.ttl",
     "packs/hvac/hvac-shapes.ttl",
-] + AEROSPACE_FILES + EDM_FILES
+] + AEROSPACE_FILES + EDM_FILES + EV_FILES
 
 # Governance shapes validate the T-Box, NOT tenant mutations. They are
 # intentionally excluded from the gate's bundle so they never fire on a

@@ -1,6 +1,6 @@
 // BatteryPack.jsx — a 3-D (CSS perspective) battery module: a grid of cylindrical
 // cells that glow by temperature/health. Healthy cells read blue, warm cells amber,
-// the failing hot-spot pulses red — and Gaadin's predictive-battery-health AI calls
+// the failing hot-spot pulses red — and GoalCert's predictive-battery-health AI calls
 // the failure ("Cell 17 · fails in 42 days"). Reacts live to the EV telemetry frame.
 import React, { useMemo } from 'react'
 import { Icon } from './lib.jsx'

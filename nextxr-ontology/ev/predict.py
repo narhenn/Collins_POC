@@ -1,5 +1,5 @@
 """
-predict.py — the prediction engine for the Gaadin EV charging-site twin.
+predict.py — the prediction engine for the GoalCert EV charging-site twin.
 
 Same two jobs as the other twins, grounded in ev/physics.py:
 

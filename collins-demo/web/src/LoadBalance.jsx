@@ -1,4 +1,4 @@
-// LoadBalance.jsx — Gaadin EMS dynamic load-balancing / peak-shaving demo.
+// LoadBalance.jsx — GoalCert EMS dynamic load-balancing / peak-shaving demo.
 // Plug a rush of EVs into a bank of chargers: with AI off, everyone pulls max and
 // the site demand blows past the transformer limit (OVERLOAD). Flip AI on and the
 // EMS fair-shares allocation and taps the BESS for peak-shaving so the grid draw
@@ -52,7 +52,7 @@ export default function LoadBalance() {
     <div className="card" style={{ overflow: 'hidden' }}>
       <div className="card-title"><Icon n="ti-adjustments-bolt" /> EMS Load Balancing & Peak Shaving
         <span className={`pill ${overload ? 'pill-red' : 'pill-green'}`}>{overload ? 'OVERLOAD' : 'WITHIN LIMIT'}</span>
-        <div className="ai-toggle" style={{ marginLeft: 'auto' }} title="Toggle Gaadin EMS AI">
+        <div className="ai-toggle" style={{ marginLeft: 'auto' }} title="Toggle GoalCert EMS AI">
           <button className={!aiOn ? 'on' : ''} onClick={() => setAiOn(false)}><Icon n="ti-plug-off" /> AI off</button>
           <button className={aiOn ? 'on' : ''} onClick={() => setAiOn(true)}><Icon n="ti-sparkles" /> AI on</button>
         </div>
@@ -107,7 +107,7 @@ export default function LoadBalance() {
         {overload
           ? `⚠ Without dynamic balancing, ${active} vehicles each pulling ${PORT_MAX} kW demand ${Math.round(gridDraw)} kW — ${Math.round(gridDraw - LIMIT)} kW over the ${LIMIT} kW transformer limit. Utility peak-demand penalties trigger and the transformer overheats.`
           : aiOn
-            ? `Gaadin EMS holds grid draw at ${Math.round(gridDraw)} kW — under the ${LIMIT} kW limit — by fair-sharing ${Math.round(alloc)} kW to each of ${active} bays${bessDraw > 0 ? ` and peak-shaving ${Math.round(bessDraw)} kW from the on-site BESS` : ''}. No transformer upgrade required.`
+            ? `GoalCert EMS holds grid draw at ${Math.round(gridDraw)} kW — under the ${LIMIT} kW limit — by fair-sharing ${Math.round(alloc)} kW to each of ${active} bays${bessDraw > 0 ? ` and peak-shaving ${Math.round(bessDraw)} kW from the on-site BESS` : ''}. No transformer upgrade required.`
             : `${active} bays at ${PORT_MAX} kW = ${Math.round(gridDraw)} kW, still within the ${LIMIT} kW limit. Plug in the full rush to see the difference.`}
       </div>
     </div>

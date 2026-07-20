@@ -1,4 +1,4 @@
-// SitePredict.jsx — Gaadin.AI location-intelligence & ROI forecasting, as a living
+// SitePredict.jsx — GoalCert location-intelligence & ROI forecasting, as a living
 // miniature city (no real maps). Every parcel is an ROI heat-field cell (green =
 // high yield, red = poor). Press scan and the AI sweeps the city — analysing
 // demographics, traffic, EV density, grid proximity — then one parcel pulses as the

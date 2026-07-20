@@ -258,9 +258,16 @@ def balance() -> dict:
                 json={"query": "{ myself { clientBalance currentSpendPerHr } }"},
                 headers={"Content-Type": "application/json"},
             )
-            data = r.json().get("data", {}).get("myself", {})
-            return {"balance": data.get("clientBalance"),
-                    "spend_per_hr": data.get("currentSpendPerHr")}
+        if r.status_code != 200:
+            return {"error": f"HTTP {r.status_code} — check RUNPOD_API_KEY"}
+        payload = r.json()
+        if payload.get("errors"):
+            return {"error": str(payload["errors"][0].get("message", "graphql error"))}
+        data = (payload.get("data") or {}).get("myself") or {}
+        bal = data.get("clientBalance")
+        if bal is None:
+            return {"error": "no balance in response — check RUNPOD_API_KEY"}
+        return {"balance": bal, "spend_per_hr": data.get("currentSpendPerHr") or 0.0}
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
 
@@ -272,7 +279,7 @@ def log_balance(context: str = "") -> dict:
                        b["error"], f" [{context}]" if context else "")
     else:
         logger.info("RunPod balance — $%.2f, spend/hr $%.4f%s",
-                    b.get("balance", 0), b.get("spend_per_hr", 0),
+                    b.get("balance") or 0.0, b.get("spend_per_hr") or 0.0,
                     f"  [{context}]" if context else "")
     return b
 

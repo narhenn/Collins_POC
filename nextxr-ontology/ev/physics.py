@@ -1,12 +1,12 @@
 """
-physics.py — Gaadin.AI EV charging + energy-site digital-twin physics.
+physics.py — GoalCert EV charging + energy-site digital-twin physics.
 
-A compact, first-principles model of a commercial charging hub that Gaadin.AI
+A compact, first-principles model of a commercial charging hub that GoalCert
 orchestrates: a bank of DC-fast + AC bays streaming OCPP telemetry, an on-site
 BESS and solar canopy, and a grid transformer held under a fixed site limit by
 the EMS. Driven by ONE control — `demand` (0..1 site charging demand) — plus a
 slow degradation/fault state, it produces a physically consistent frame across
-the four Gaadin pillars (SitePredict is planning-side, so not simulated here).
+the four GoalCert pillars (SitePredict is planning-side, so not simulated here).
 
 Used exactly like the EDM / turbine / fleet twins:
 

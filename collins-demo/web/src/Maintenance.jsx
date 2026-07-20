@@ -9,6 +9,7 @@
 import React, { useEffect, useLayoutEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { createViewer } from './scene/engine.js'
 import ModelViewer from './ModelViewer.jsx'
+import EVWorld from './EVWorld.jsx'
 import { SIG, sevClass, fmt } from './lib.jsx'
 import './Maintenance.css'
 
@@ -16,6 +17,33 @@ const I = ({ n }) => <i className={`ti ${n}`} />
 
 // ── per-domain subsystem metadata ─────────────────────────────────────
 const DOMAIN_SUBS = {
+  'ev-network': {
+    meta: {
+      'SITE':    { label: 'GoalCert Energy Site',     icon: 'ti-charging-pile' },
+      'CHARGER': { label: 'Charging Network (OCPP)',  icon: 'ti-plug-connected' },
+      'BATTERY': { label: 'Battery Health',           icon: 'ti-battery-3' },
+      'GRID':    { label: 'Grid & EMS',               icon: 'ti-building-factory' },
+      'ENERGY':  { label: 'Solar & BESS',             icon: 'ti-sun' },
+      'THERMAL': { label: 'Thermal Management',       icon: 'ti-temperature' },
+    },
+    order: ['CHARGER', 'BATTERY', 'GRID', 'ENERGY', 'THERMAL'],
+    signalMap(sig) {
+      if (/uptime|utilization|sessions|faulted|ocpp|queue|chargingPower/i.test(sig)) return 'CHARGER'
+      if (/stateOfCharge|stateOfHealth|cellImbalance/i.test(sig)) return 'BATTERY'
+      if (/gridLoad|loadHeadroom|peakDemand|transformer/i.test(sig)) return 'GRID'
+      if (/bess|solar|selfConsumption|v2g/i.test(sig)) return 'ENERGY'
+      if (/cellTemp|coolant|insulation|runaway/i.test(sig)) return 'THERMAL'
+      return 'SITE'
+    },
+    degraded: {
+      'ev:cellTempMax': 52, 'ev:thermalRunawayRisk': 44, 'ev:cellImbalance': 58,
+      'ev:coolantTemp': 44, 'ev:insulationResistance': 90, 'ev:stateOfHealth': 72,
+      'ev:stateOfCharge': 46, 'ev:gridLoad': 96, 'ev:transformerTemp': 98,
+      'ev:loadHeadroom': 4, 'ev:peakDemand': 540, 'ev:chargerUptime': 88,
+      'ev:faultedChargers': 6, 'ev:ocppLatency': 1400, 'ev:utilization': 21,
+      'ev:bessSoc': 8, 'ev:solarOutput': 60,
+    },
+  },
   'edm-machine': {
     meta: {
       'EDM-1':   { label: 'Wire EDM Machine',    icon: 'ti-grill' },
@@ -409,8 +437,89 @@ const MANUFACTURING_PLANS = {
   },
 }
 
+// ── EV / GoalCert energy-site repair plans ──
+const EV_PLANS = {
+  'THERMAL': {
+    title: 'Battery Thermal Event — Runaway Precursor',
+    rootCause: [
+      { icon: 'ti-temperature', text: '<b>Cell temperature climbing</b> — cooling losing the pack' },
+      { icon: 'ti-arrows-diff', text: '<b>Cell imbalance rising</b> — dendrite / hot-spot precursor' },
+      { icon: 'ti-flame', text: '<b>Thermal-runaway risk high</b> — off-gassing possible' },
+      { icon: 'ti-shield-bolt', text: '<b>HV insulation degrading</b> — isolation-fault risk' },
+      { icon: 'ti-player-stop', text: '<b>Pack venting / fire</b> if untreated' },
+    ],
+    signals: [['ev:cellTempMax', 33], ['ev:thermalRunawayRisk', 2], ['ev:coolantTemp', 29], ['ev:cellImbalance', 14]],
+    steps: [
+      { t: 'Diagnose battery thermal state', d: 'Read cell temp, imbalance, coolant and runaway-risk telemetry.', f: 'THERMAL', tool: 'BMS suite', time: 15, diff: 'Low' },
+      { t: 'Derate charging & isolate pack', d: 'Cut charge current to the affected string; arm suppression.', f: 'BATTERY', tool: 'EMS · LOTO', time: 20, diff: 'Low', safety: true },
+      { t: 'Boost coolant flow', d: 'Step up the liquid-cooling loop and verify inlet temperature drops.', f: 'THERMAL', tool: 'Coolant pump', time: 25, diff: 'Medium' },
+      { t: 'Inspect module & balance cells', d: 'Locate the outlier cells; run an active-balancing cycle.', f: 'BATTERY', tool: 'Cell balancer', time: 60, diff: 'Medium' },
+      { t: 'Replace degraded module', d: 'Swap the module if imbalance / SoH is past limit; torque HV links.', f: 'BATTERY', tool: 'Module kit · torque wrench', time: 90, diff: 'High' },
+      { t: 'Verify thermal stability', d: 'Confirm cell temp, imbalance and runaway risk are nominal.', f: 'THERMAL', tool: 'BMS suite', time: 45, diff: 'Low' },
+      { t: 'Return pack to service', d: 'Clear isolation, log the event and update the PM schedule.', f: 'BATTERY', tool: '—', time: 20, diff: 'Low' },
+    ],
+  },
+  'GRID': {
+    title: 'Grid Overload — Transformer Over-Temperature',
+    rootCause: [
+      { icon: 'ti-building-factory', text: '<b>Site draw near the transformer limit</b> — headroom collapsing' },
+      { icon: 'ti-temperature', text: '<b>Transformer hot-spot rising</b> — insulation aging accelerates' },
+      { icon: 'ti-arrow-bar-to-up', text: '<b>Grid headroom exhausted</b> — no capacity for new sessions' },
+      { icon: 'ti-alert-octagon', text: '<b>Utility penalties / trip risk</b>' },
+      { icon: 'ti-player-stop', text: '<b>Site-wide outage</b> if untreated' },
+    ],
+    signals: [['ev:gridLoad', 68], ['ev:transformerTemp', 66], ['ev:loadHeadroom', 32], ['ev:peakDemand', 420]],
+    steps: [
+      { t: 'Diagnose EMS load balance', d: 'Read grid load, headroom, transformer temp and site demand.', f: 'GRID', tool: 'EMS console', time: 12, diff: 'Low' },
+      { t: 'Curtail charging & dispatch BESS', d: 'Fair-share bays down and peak-shave from the on-site BESS.', f: 'GRID', tool: 'EMS controller', time: 15, diff: 'Low', safety: true },
+      { t: 'Inspect transformer cooling', d: 'Check fans / radiators and oil temperature for the hot-spot.', f: 'GRID', tool: 'Inspection · IR camera', time: 40, diff: 'Medium' },
+      { t: 'Rebalance load & set limits', d: 'Reset the site limit and per-bay caps to restore headroom.', f: 'ENERGY', tool: 'EMS controller', time: 45, diff: 'Medium' },
+      { t: 'Verify draw under limit', d: 'Confirm grid load, headroom and transformer temp are nominal.', f: 'GRID', tool: 'EMS console', time: 40, diff: 'Low' },
+      { t: 'Sign off', d: 'Log the peak event; no transformer upgrade required.', f: 'GRID', tool: '—', time: 15, diff: 'Low' },
+    ],
+  },
+  'CHARGER': {
+    title: 'Charger Fault — OCPP Heartbeat Loss',
+    rootCause: [
+      { icon: 'ti-plug-connected-x', text: '<b>Chargers faulted</b> — sessions dropping off the network' },
+      { icon: 'ti-heartbeat', text: '<b>OCPP heartbeat latency high</b> — comms degraded' },
+      { icon: 'ti-chart-arcs', text: '<b>Utilisation falling</b> — queue wait climbing' },
+      { icon: 'ti-alert-triangle', text: '<b>Revenue & SLA at risk</b>' },
+      { icon: 'ti-player-stop', text: '<b>Truck-roll / bay offline</b> if untreated' },
+    ],
+    signals: [['ev:chargerUptime', 99], ['ev:faultedChargers', 0], ['ev:ocppLatency', 240], ['ev:utilization', 41]],
+    steps: [
+      { t: 'Diagnose OCPP telemetry', d: 'Read uptime, faulted count, heartbeat latency per EVSE.', f: 'CHARGER', tool: 'OCPP monitor', time: 12, diff: 'Low' },
+      { t: 'Remote self-healing reset', d: 'Issue OCPP soft-reset to the faulted charge points.', f: 'CHARGER', tool: 'CSMS', time: 10, diff: 'Low' },
+      { t: 'Isolate & inspect EVSE', d: 'LOTO the affected bay; inspect contactor, connector and comms.', f: 'CHARGER', tool: 'LOTO · meter', time: 40, diff: 'Medium', safety: true },
+      { t: 'Replace module / contactor', d: 'Swap the failed power module or contactor; reseat connector.', f: 'CHARGER', tool: 'EVSE spares', time: 80, diff: 'High' },
+      { t: 'Verify sessions restored', d: 'Confirm uptime, latency and utilisation are nominal.', f: 'CHARGER', tool: 'OCPP monitor', time: 30, diff: 'Low' },
+      { t: 'Sign off', d: 'Close the work order; update the reliability log.', f: 'CHARGER', tool: '—', time: 10, diff: 'Low' },
+    ],
+  },
+  'BATTERY': {
+    title: 'Fleet Battery Degradation — SoH Below Limit',
+    rootCause: [
+      { icon: 'ti-battery-3', text: '<b>Fleet SoH falling</b> — approaching end-of-life' },
+      { icon: 'ti-arrows-diff', text: '<b>Cell imbalance rising</b> — capacity loss' },
+      { icon: 'ti-trending-down', text: '<b>Usable range shrinking</b> — charge cycles up' },
+      { icon: 'ti-alert-triangle', text: '<b>Higher thermal risk</b> on degraded packs' },
+      { icon: 'ti-player-stop', text: '<b>Pack retirement</b> if untreated' },
+    ],
+    signals: [['ev:stateOfHealth', 93], ['ev:cellImbalance', 14], ['ev:stateOfCharge', 64]],
+    steps: [
+      { t: 'Diagnose pack health', d: 'Read SoH, imbalance and cycle history for the fleet packs.', f: 'BATTERY', tool: 'BMS suite', time: 15, diff: 'Low' },
+      { t: 'Run balancing cycle', d: 'Active-balance the pack to recover usable capacity.', f: 'BATTERY', tool: 'Cell balancer', time: 60, diff: 'Medium' },
+      { t: 'Assess second-life eligibility', d: 'Grade the pack against first-life vs second-life thresholds.', f: 'BATTERY', tool: 'Grading rig', time: 45, diff: 'Medium' },
+      { t: 'Swap end-of-life module', d: 'Replace modules below the SoH floor; torque HV links.', f: 'BATTERY', tool: 'Module kit · torque wrench', time: 90, diff: 'High' },
+      { t: 'Verify pack recovered', d: 'Confirm SoH, imbalance and SoC are back in band.', f: 'BATTERY', tool: 'BMS suite', time: 40, diff: 'Low' },
+      { t: 'Sign off', d: 'Update the battery register and refurbishment plan.', f: 'BATTERY', tool: '—', time: 15, diff: 'Low' },
+    ],
+  },
+}
+
 // all domain plans merged into one lookup
-const ALL_PLANS = { ...PLANS, ...TURBINE_PLANS, ...DATACENTER_PLANS, ...HOSPITAL_PLANS, ...MANUFACTURING_PLANS }
+const ALL_PLANS = { ...PLANS, ...TURBINE_PLANS, ...DATACENTER_PLANS, ...HOSPITAL_PLANS, ...MANUFACTURING_PLANS, ...EV_PLANS }
 
 function healthyTarget(key) {
   const m = SIG[key] || {}
@@ -477,10 +586,13 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const eventsRef = useRef([])
   const flowRef = useRef(null)
   const nodeRefs = useRef({})
-  // When the current twin has a reconstructed GLB, show THAT model (the twin the
-  // user is actually on) instead of the procedural domain scene — which for
-  // unmapped domains (e.g. turbine) would otherwise fall back to a data center.
-  const useGlb = !!modelUrl
+  // Always show the twin the user is actually on — never a stale/default model.
+  //  • ev-network → the live EV energy-site world (same visual as the dashboard)
+  //  • any twin with a reconstructed GLB → that GLB
+  //  • otherwise → the procedural domain scene
+  const useEVWorld = domain === 'ev-network'
+  const useGlb = !useEVWorld && !!modelUrl
+  const useCustomVisual = useEVWorld || useGlb   // not the procedural createViewer scene
 
   const plan = useMemo(() => buildPlan(domain, twin), [domain, twin?.findings?.length])
   const steps = plan.steps
@@ -515,18 +627,18 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   // Only for procedural domains; when a reconstructed GLB exists we render
   // <ModelViewer> (the actual twin model) instead.
   useEffect(() => {
-    if (useGlb || !hostRef.current) return
+    if (useCustomVisual || !hostRef.current) return
     let v
     try { v = createViewer(hostRef.current, { domain, machine: machineName, cinematic: true }) }
     catch (e) { /* graceful: HUD still works without the 3-D */ }
     viewerRef.current = v
     return () => { try { v && v.dispose() } catch {} viewerRef.current = null }
-  }, [domain, machineName, useGlb])
+  }, [domain, machineName, useCustomVisual])
 
   // keep the glued callout pinned to the focused subsystem every frame
   // (procedural scene only — the GLB has no named subsystems to project to)
   useEffect(() => {
-    if (useGlb) return
+    if (useCustomVisual) return
     let raf
     const tick = () => {
       raf = requestAnimationFrame(tick)
@@ -541,7 +653,7 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [focusSub, stage, useGlb])
+  }, [focusSub, stage, useCustomVisual])
 
   const focus = (id) => { setFocusSub(id); viewerRef.current && viewerRef.current.focusAsset(id) }
   const colorSubsystems = (allGood) => {
@@ -753,7 +865,11 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
         {/* CENTER — the 3-D twin. Shows the actual reconstructed GLB when the
             twin has one, else the procedural domain scene. */}
         <div className="mx-center">
-          {useGlb
+          {useEVWorld
+            ? <div className="mx-canvas" style={{ position: 'absolute', inset: 0 }}>
+                <EVWorld live={twin?.latest} machine={machineName} height="100%" />
+              </div>
+            : useGlb
             ? <div className="mx-canvas" style={{ position: 'absolute', inset: 0 }}>
                 <ModelViewer url={modelUrl} height="100%" autoRotate={stage !== 'repair'}
                   badge={<><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> <b>{machineName}</b>
@@ -762,7 +878,7 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
             : <div ref={hostRef} className="mx-canvas hero3d scene3d-host" />}
           <div className={`mx-scan ${scan ? 'on' : ''}`}><i /><b /></div>
           {/* glued component callout (procedural scene only) */}
-          {!useGlb && (
+          {!useCustomVisual && (
             <div ref={calloutRef} className={`mx-callout ${stage === 'repair' || stage === 'complete' ? 'repair' : ''}`} style={{ opacity: 0 }}>
               <div className="lab">
                 <div className="nm"><I n={domMeta[focusSub]?.icon || 'ti-cube'} /> {domMeta[focusSub]?.label || ''}</div>

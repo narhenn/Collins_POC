@@ -6,7 +6,7 @@ import React, { useEffect, useRef } from 'react'
 import { createEVWorld } from './scene/evworld.js'
 import api from './api'
 
-export default function EVWorld({ live, machine = 'Gaadin Energy Site', height = 460 }) {
+export default function EVWorld({ live, machine = 'GoalCert Energy Site', height = 460 }) {
   const hostRef = useRef(null)
   const worldRef = useRef(null)
 

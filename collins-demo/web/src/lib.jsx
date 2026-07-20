@@ -2,17 +2,17 @@
 import React from 'react'
 
 // ── Brand config ─────────────────────────────────────────────────────
-// One place to rebrand the whole app. This demo is tailored for Gaadin.AI
-// (EV charging + energy + fleet orchestration), presented as a living twin
-// on the Goalcert / NextXR core. Change these four strings to re-skin it.
+// One place to rebrand the whole app. This demo is presented as GoalCert
+// Workforce Intelligence — an EV charging + energy site running as a living
+// twin on the NextXR core. Change these four strings to re-skin it.
 export const BRAND = {
-  name: 'Gaadin.AI',
-  tag: 'Living Energy Twin',
-  poweredBy: 'Goalcert · NextXR core',
+  name: 'GoalCert',
+  tag: 'Workforce Intelligence',
+  poweredBy: 'NextXR core',
   accent: '#10b981',
 }
 
-// Gaadin energy mark: a charge ring cradling a lightning bolt (emerald→blue).
+// GoalCert energy mark: a charge ring cradling a lightning bolt (emerald→blue).
 export function Logo({ size = 32 }) {
   return (
     <span className="brand-mark" style={{ width: size, height: size }}
@@ -190,7 +190,7 @@ export const SIG = {
   'rail:switchFaults': { label: 'Switch Faults', unit: '', warn: 3, crit: 5, icon: 'ti-arrows-split' },
   'rail:signalFaults': { label: 'Signal Faults', unit: '', warn: 2, crit: 4, icon: 'ti-traffic-lights' },
 
-  // ── EV / Charging / Energy (Gaadin.AI) ──
+  // ── EV / Charging / Energy (GoalCert) ──
   // Pillar II — Charging Management (OCPP)
   'ev:chargerUptime': { label: 'Network Uptime', unit: '%', warnLow: 96, critLow: 90, icon: 'ti-plug-connected' },
   'ev:utilization': { label: 'Charger Utilisation', unit: '%', warnLow: 18, critLow: 8, icon: 'ti-chart-arcs' },
@@ -252,11 +252,11 @@ export const TILE_ORDER = ['aero:exhaustGasTemp', 'aero:shaftSpeedN1', 'aero:vib
 // source 'live' = real NextXR backend twin (physics + ontology + agents).
 // source 'sim'  = a light, frontend-simulated example twin (visual + telemetry).
 export const DOMAINS = {
-  // ── Gaadin.AI — the hero twin (default landing) ──
+  // ── GoalCert — the hero twin (default landing) ──
   'ev-network': {
-    label: 'Gaadin Energy Site', tag: 'EV & Energy', icon: 'ti-charging-pile',
+    label: 'GoalCert Energy Site', tag: 'EV & Energy', icon: 'ti-charging-pile',
     accent: '#10b981', source: 'live', hero: 'evcity', detailed: true,
-    blurb: 'A living twin of a Gaadin-managed charging hub: DC-fast + AC bays streaming OCPP telemetry, on-site BESS and solar, a grid transformer under AI load-balancing, and the fleet it serves — SitePredict ROI, predictive battery health and peak-shaving, all alive in 3-D.',
+    blurb: 'A living twin of a GoalCert-managed charging hub: DC-fast + AC bays streaming OCPP telemetry, on-site BESS and solar, a grid transformer under AI load-balancing, and the fleet it serves — SitePredict ROI, predictive battery health and peak-shaving, all alive in 3-D.',
     tiles: ['ev:chargerUptime', 'ev:utilization', 'ev:sessionsActive', 'ev:gridLoad',
       'ev:loadHeadroom', 'ev:stateOfHealth', 'ev:cellTempMax', 'ev:thermalRunawayRisk'],
     all: ['ev:chargerUptime', 'ev:utilization', 'ev:sessionsActive', 'ev:faultedChargers',
