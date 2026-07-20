@@ -1,18 +1,28 @@
 // lib.jsx — shared brand, helpers, signal metadata, and the twin-domain registry.
 import React from 'react'
 
-// Goalcert logo mark (from the demo): ring + bars in a purple→blue gradient.
+// ── Brand config ─────────────────────────────────────────────────────
+// One place to rebrand the whole app. This demo is tailored for Gaadin.AI
+// (EV charging + energy + fleet orchestration), presented as a living twin
+// on the Goalcert / NextXR core. Change these four strings to re-skin it.
+export const BRAND = {
+  name: 'Gaadin.AI',
+  tag: 'Living Energy Twin',
+  poweredBy: 'Goalcert · NextXR core',
+  accent: '#10b981',
+}
+
+// Gaadin energy mark: a charge ring cradling a lightning bolt (emerald→blue).
 export function Logo({ size = 32 }) {
   return (
     <span className="brand-mark" style={{ width: size, height: size }}
       dangerouslySetInnerHTML={{ __html:
         `<svg viewBox="0 0 120 120" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-          <defs><linearGradient id="gcg" x1="14" y1="14" x2="106" y2="106" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#7c3aed"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
-          <circle cx="60" cy="62" r="33" stroke="url(#gcg)" stroke-width="13" fill="none"/>
-          <rect x="53" y="11" width="14" height="100" rx="3" fill="url(#gcg)"/>
-          <rect x="44" y="11" width="32" height="9" rx="3" fill="url(#gcg)"/>
-          <rect x="44" y="102" width="32" height="9" rx="3" fill="url(#gcg)"/>
+          <defs><linearGradient id="gcg" x1="16" y1="12" x2="104" y2="108" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#10b981"/><stop offset=".55" stop-color="#0ea5e9"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+          <circle cx="60" cy="60" r="40" stroke="url(#gcg)" stroke-width="9" fill="none"
+            stroke-linecap="round" stroke-dasharray="176 76" transform="rotate(128 60 60)"/>
+          <path d="M67 22 L40 66 H58 L53 98 L82 52 H63 Z" fill="url(#gcg)"/>
         </svg>` }} />
   )
 }
@@ -180,19 +190,38 @@ export const SIG = {
   'rail:switchFaults': { label: 'Switch Faults', unit: '', warn: 3, crit: 5, icon: 'ti-arrows-split' },
   'rail:signalFaults': { label: 'Signal Faults', unit: '', warn: 2, crit: 4, icon: 'ti-traffic-lights' },
 
-  // ── EV / Charging / Battery ──
-  'ev:stateOfCharge': { label: 'Fleet Avg SoC', unit: '%', warnLow: 25, critLow: 15, icon: 'ti-battery-3' },
-  'ev:chargingPower': { label: 'Charging Power', unit: 'kW', icon: 'ti-bolt' },
-  'ev:gridLoad': { label: 'Grid Load', unit: '%', warn: 85, crit: 95, icon: 'ti-building-factory' },
-  'ev:stateOfHealth': { label: 'Battery SoH', unit: '%', warnLow: 78, critLow: 70, icon: 'ti-heart' },
-  'ev:cellTempMax': { label: 'Cell Temp Max', unit: '°C', warn: 42, crit: 55, icon: 'ti-temperature' },
-  'ev:chargerUptime': { label: 'Charger Uptime', unit: '%', warnLow: 92, critLow: 85, icon: 'ti-plug-connected' },
+  // ── EV / Charging / Energy (Gaadin.AI) ──
+  // Pillar II — Charging Management (OCPP)
+  'ev:chargerUptime': { label: 'Network Uptime', unit: '%', warnLow: 96, critLow: 90, icon: 'ti-plug-connected' },
+  'ev:utilization': { label: 'Charger Utilisation', unit: '%', warnLow: 18, critLow: 8, icon: 'ti-chart-arcs' },
   'ev:sessionsActive': { label: 'Active Sessions', unit: '', icon: 'ti-plug-connected-x' },
-  'ev:energyToday': { label: 'Energy Today', unit: 'MWh', icon: 'ti-bolt' },
-  'ev:v2gCapacity': { label: 'V2G Available', unit: 'kWh', icon: 'ti-arrows-exchange' },
-  'ev:thermalRunawayRisk': { label: 'Runaway Risk', unit: '%', warn: 15, crit: 40, icon: 'ti-alert-triangle' },
+  'ev:faultedChargers': { label: 'Faulted Chargers', unit: '', warn: 2, crit: 5, icon: 'ti-plug-x' },
+  'ev:ocppLatency': { label: 'OCPP Heartbeat', unit: 'ms', warn: 800, crit: 1500, icon: 'ti-heartbeat' },
+  'ev:queueWait': { label: 'Queue Wait', unit: 'min', warn: 8, crit: 15, icon: 'ti-hourglass' },
+  'ev:chargingPower': { label: 'Delivered Power', unit: 'kW', icon: 'ti-bolt' },
+  // Pillar IV — Energy Management (EMS / Grid)
+  'ev:gridLoad': { label: 'Grid Load', unit: '%', warn: 85, crit: 95, icon: 'ti-building-factory' },
+  'ev:loadHeadroom': { label: 'Grid Headroom', unit: '%', warnLow: 15, critLow: 5, icon: 'ti-arrow-bar-to-up' },
+  'ev:peakDemand': { label: 'Site Demand', unit: 'kW', warn: 480, crit: 540, icon: 'ti-chart-bar' },
   'ev:transformerTemp': { label: 'Transformer', unit: '°C', warn: 85, crit: 105, icon: 'ti-temperature' },
+  'ev:bessSoc': { label: 'BESS Charge', unit: '%', warnLow: 12, critLow: 5, icon: 'ti-battery-4' },
+  'ev:bessPower': { label: 'BESS Power', unit: 'kW', icon: 'ti-battery-charging' },
   'ev:solarOutput': { label: 'Solar Output', unit: 'kW', icon: 'ti-sun' },
+  'ev:selfConsumption': { label: 'Solar Self-Use', unit: '%', warnLow: 40, icon: 'ti-recycle' },
+  'ev:v2gCapacity': { label: 'V2G Available', unit: 'kWh', icon: 'ti-arrows-exchange' },
+  // Pillar III — Fleet & battery health
+  'ev:stateOfCharge': { label: 'Fleet Avg SoC', unit: '%', warnLow: 25, critLow: 15, icon: 'ti-battery-3' },
+  'ev:stateOfHealth': { label: 'Fleet Avg SoH', unit: '%', warnLow: 82, critLow: 74, icon: 'ti-heart-rate-monitor' },
+  'ev:cellTempMax': { label: 'Cell Temp Max', unit: '°C', warn: 42, crit: 55, icon: 'ti-temperature' },
+  'ev:cellImbalance': { label: 'Cell Imbalance', unit: 'mV', warn: 35, crit: 60, icon: 'ti-arrows-diff' },
+  'ev:coolantTemp': { label: 'Coolant Temp', unit: '°C', warn: 38, crit: 45, icon: 'ti-snowflake' },
+  'ev:insulationResistance': { label: 'HV Insulation', unit: 'kΩ', warnLow: 500, critLow: 100, icon: 'ti-shield-bolt' },
+  'ev:thermalRunawayRisk': { label: 'Runaway Risk', unit: '%', warn: 15, crit: 40, icon: 'ti-alert-triangle' },
+  // Commercial (SitePredict / revenue)
+  'ev:revenueToday': { label: 'Revenue Today', unit: '₹k', icon: 'ti-cash' },
+  'ev:tariffRate': { label: 'Dynamic Tariff', unit: '₹/kWh', icon: 'ti-coin' },
+  'ev:energyToday': { label: 'Energy Today', unit: 'MWh', icon: 'ti-bolt' },
+  'ev:co2Avoided': { label: 'CO₂ Avoided', unit: 'kg', icon: 'ti-leaf' },
 
   // ── Defence (military base / naval) ──
   'def:perimeterAlerts': { label: 'Perimeter Alerts', unit: '', warn: 1, crit: 3, icon: 'ti-alert-triangle' },
@@ -223,6 +252,37 @@ export const TILE_ORDER = ['aero:exhaustGasTemp', 'aero:shaftSpeedN1', 'aero:vib
 // source 'live' = real NextXR backend twin (physics + ontology + agents).
 // source 'sim'  = a light, frontend-simulated example twin (visual + telemetry).
 export const DOMAINS = {
+  // ── Gaadin.AI — the hero twin (default landing) ──
+  'ev-network': {
+    label: 'Gaadin Energy Site', tag: 'EV & Energy', icon: 'ti-charging-pile',
+    accent: '#10b981', source: 'live', hero: 'evcity', detailed: true,
+    blurb: 'A living twin of a Gaadin-managed charging hub: DC-fast + AC bays streaming OCPP telemetry, on-site BESS and solar, a grid transformer under AI load-balancing, and the fleet it serves — SitePredict ROI, predictive battery health and peak-shaving, all alive in 3-D.',
+    tiles: ['ev:chargerUptime', 'ev:utilization', 'ev:sessionsActive', 'ev:gridLoad',
+      'ev:loadHeadroom', 'ev:stateOfHealth', 'ev:cellTempMax', 'ev:thermalRunawayRisk'],
+    all: ['ev:chargerUptime', 'ev:utilization', 'ev:sessionsActive', 'ev:faultedChargers',
+      'ev:ocppLatency', 'ev:queueWait', 'ev:chargingPower', 'ev:gridLoad', 'ev:loadHeadroom',
+      'ev:peakDemand', 'ev:transformerTemp', 'ev:bessSoc', 'ev:bessPower', 'ev:solarOutput',
+      'ev:selfConsumption', 'ev:v2gCapacity', 'ev:stateOfCharge', 'ev:stateOfHealth',
+      'ev:cellTempMax', 'ev:cellImbalance', 'ev:coolantTemp', 'ev:insulationResistance',
+      'ev:thermalRunawayRisk', 'ev:revenueToday', 'ev:tariffRate', 'ev:energyToday', 'ev:co2Avoided'],
+    sim: {
+      'ev:chargerUptime': { base: 98.6, jit: 0.3, drift: -3 }, 'ev:utilization': { base: 41, jit: 4, drift: 10 },
+      'ev:sessionsActive': { base: 18, jit: 4, drift: 6 }, 'ev:faultedChargers': { base: 0, jit: 0.4, drift: 3 },
+      'ev:ocppLatency': { base: 240, jit: 60, drift: 320 }, 'ev:queueWait': { base: 3, jit: 1.5, drift: 6 },
+      'ev:chargingPower': { base: 640, jit: 60, drift: 130 }, 'ev:gridLoad': { base: 68, jit: 5, drift: 18 },
+      'ev:loadHeadroom': { base: 32, jit: 4, drift: -18 }, 'ev:peakDemand': { base: 420, jit: 25, drift: 95 },
+      'ev:transformerTemp': { base: 66, jit: 3, drift: 26 }, 'ev:bessSoc': { base: 72, jit: 3, drift: -20 },
+      'ev:bessPower': { base: -60, jit: 30 }, 'ev:solarOutput': { base: 210, jit: 25, drift: -45 },
+      'ev:selfConsumption': { base: 63, jit: 5, drift: -12 }, 'ev:v2gCapacity': { base: 320, jit: 30, drift: -60 },
+      'ev:stateOfCharge': { base: 64, jit: 4, drift: -20 }, 'ev:stateOfHealth': { base: 93, jit: 0.4, drift: -6 },
+      'ev:cellTempMax': { base: 33, jit: 2, drift: 12 }, 'ev:cellImbalance': { base: 14, jit: 3, drift: 18 },
+      'ev:coolantTemp': { base: 29, jit: 1.5, drift: 8 }, 'ev:insulationResistance': { base: 1200, jit: 80, drift: -420 },
+      'ev:thermalRunawayRisk': { base: 2, jit: 1, drift: 14 }, 'ev:revenueToday': { base: 148, jit: 8, drift: 22 },
+      'ev:tariffRate': { base: 11.5, jit: 0.6, drift: 3 }, 'ev:energyToday': { base: 5.8, jit: 0.3, drift: 1.4 },
+      'ev:co2Avoided': { base: 2100, jit: 80, drift: 420 },
+    },
+    assets: [['DCFC-01', 'ok'], ['DCFC-07', 'warn'], ['BESS-Container-A', 'ok'], ['Transformer-T1', 'crit'], ['Solar-Canopy', 'ok'], ['Depot-Fleet', 'warn']],
+  },
   'edm-machine': {
     label: 'Wire EDM Machine', tag: 'Precision Machining', icon: 'ti-grill',
     accent: '#7c3aed', source: 'live', hero: 'edm', detailed: true,
@@ -321,25 +381,6 @@ export const DOMAINS = {
     },
     assets: [['NSL-Train-041', 'ok'], ['Jurong-PSD', 'warn'], ['Bishan-ACMV', 'ok'], ['TSS-NS-03', 'crit'], ['Escalator-JE-2', 'ok'], ['ATP-Zone-7', 'warn']],
   },
-  'ev-network': {
-    label: 'EV Charging Network', tag: 'EV & Grid', icon: 'ti-charging-pile',
-    accent: '#16a34a', source: 'sim', hero: 'grid',
-    blurb: 'Island-wide EV charging network: DC fast chargers, fleet depot management, cell-level battery health monitoring, V2G grid services, transformer thermal aging and solar integration.',
-    tiles: ['ev:stateOfCharge', 'ev:chargingPower', 'ev:gridLoad', 'ev:stateOfHealth',
-      'ev:cellTempMax', 'ev:chargerUptime', 'ev:thermalRunawayRisk', 'ev:transformerTemp'],
-    all: ['ev:stateOfCharge', 'ev:chargingPower', 'ev:gridLoad', 'ev:stateOfHealth',
-      'ev:cellTempMax', 'ev:chargerUptime', 'ev:sessionsActive', 'ev:energyToday',
-      'ev:v2gCapacity', 'ev:thermalRunawayRisk', 'ev:transformerTemp', 'ev:solarOutput'],
-    sim: {
-      'ev:stateOfCharge': { base: 68, jit: 4, drift: -22 }, 'ev:chargingPower': { base: 142, jit: 15 },
-      'ev:gridLoad': { base: 72, jit: 5, drift: 18 }, 'ev:stateOfHealth': { base: 94, jit: 0.5, drift: -8 },
-      'ev:cellTempMax': { base: 32, jit: 2, drift: 14 }, 'ev:chargerUptime': { base: 97, jit: 1, drift: -6 },
-      'ev:sessionsActive': { base: 14, jit: 3 }, 'ev:energyToday': { base: 2.4, jit: 0.3 },
-      'ev:v2gCapacity': { base: 180, jit: 20 }, 'ev:thermalRunawayRisk': { base: 2, jit: 1, drift: 18 },
-      'ev:transformerTemp': { base: 68, jit: 3, drift: 25 }, 'ev:solarOutput': { base: 85, jit: 12 },
-    },
-    assets: [['DCFC-01', 'ok'], ['DCFC-07', 'warn'], ['Pack-Bus-12', 'ok'], ['Transformer-A', 'crit'], ['Solar-Array', 'ok'], ['V2G-Node', 'warn']],
-  },
   'defence-base': {
     label: 'Naval Operations', tag: 'Defence', icon: 'ti-shield-star',
     accent: '#1e40af', source: 'sim', hero: 'grid',
@@ -407,10 +448,10 @@ export const PREDICT_CHARTS = {
     { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'rolling_stock_h', label: 'Rolling stock', color: '#d97706' }, { key: 'power_h', label: 'Traction power', color: '#e11d48' }, { key: 'track_h', label: 'Track', color: '#2563eb' }, { key: 'signalling_h', label: 'Signalling', color: '#7c3aed' }, { key: 'stations_h', label: 'Stations', color: '#059669' }] },
   ],
   'ev-network': [
-    { title: 'Fleet SoC & charging power', series: [{ key: 'ev:stateOfCharge', label: 'SoC %', color: '#16a34a' }, { key: 'ev:chargingPower', label: 'Power kW', color: '#2563eb' }] },
-    { title: 'Grid & thermal', series: [{ key: 'ev:gridLoad', label: 'Grid load %', color: '#d97706' }, { key: 'ev:cellTempMax', label: 'Cell temp °C', color: '#e11d48' }] },
-    { title: 'Battery health', series: [{ key: 'ev:stateOfHealth', label: 'SoH %', color: '#0d9488' }, { key: 'ev:thermalRunawayRisk', label: 'Runaway risk %', color: '#e11d48' }] },
-    { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'battery_h', label: 'Battery', color: '#16a34a' }, { key: 'charger_h', label: 'Chargers', color: '#d97706' }, { key: 'grid_h', label: 'Grid', color: '#2563eb' }, { key: 'thermal_h', label: 'Thermal', color: '#e11d48' }] },
+    { title: 'Charging network (OCPP)', series: [{ key: 'ev:chargerUptime', label: 'Uptime %', color: '#10b981' }, { key: 'ev:utilization', label: 'Utilisation %', color: '#2563eb' }] },
+    { title: 'Grid & EMS load', redline: 550, series: [{ key: 'ev:peakDemand', label: 'Site demand kW', color: '#d97706' }, { key: 'ev:transformerTemp', label: 'Transformer °C', color: '#e11d48' }] },
+    { title: 'Battery health & thermal', series: [{ key: 'ev:stateOfHealth', label: 'SoH %', color: '#0d9488' }, { key: 'ev:cellTempMax', label: 'Cell temp °C', color: '#e11d48' }, { key: 'ev:thermalRunawayRisk', label: 'Runaway risk %', color: '#f59e0b' }] },
+    { title: 'On-site energy', series: [{ key: 'ev:solarOutput', label: 'Solar kW', color: '#f59e0b' }, { key: 'ev:bessSoc', label: 'BESS %', color: '#10b981' }, { key: 'ev:v2gCapacity', label: 'V2G kWh', color: '#2563eb' }] },
   ],
   'defence-base': [
     { title: 'Force readiness & radar', series: [{ key: 'def:forceReadiness', label: 'Readiness %', color: '#1e40af' }, { key: 'def:radarCoverage', label: 'Radar %', color: '#059669' }] },
@@ -424,7 +465,7 @@ export const SUBSYS = {
   'turbine-engine': [{ key: 'compressor', label: 'Compressor' }, { key: 'turbine', label: 'Turbine' }, { key: 'bearings', label: 'Bearings' }, { key: 'lubrication', label: 'Lubrication' }],
   'tram-network': [{ key: 'rolling_stock', label: 'Rolling stock' }, { key: 'power', label: 'Traction power' }, { key: 'track', label: 'Track & points' }, { key: 'signalling', label: 'Signalling' }, { key: 'operations', label: 'Operations' }],
   'mrt-line': [{ key: 'rolling_stock', label: 'Rolling stock' }, { key: 'power', label: 'Traction power' }, { key: 'track', label: 'Track & civil' }, { key: 'signalling', label: 'Signalling (CBTC)' }, { key: 'stations', label: 'Stations' }],
-  'ev-network': [{ key: 'battery', label: 'Battery health' }, { key: 'charger', label: 'Charger fleet' }, { key: 'grid', label: 'Grid integration' }, { key: 'thermal', label: 'Thermal mgmt' }],
+  'ev-network': [{ key: 'charger', label: 'Charging (OCPP)' }, { key: 'battery', label: 'Battery health' }, { key: 'grid', label: 'Grid & EMS' }, { key: 'energy', label: 'Solar & BESS' }, { key: 'thermal', label: 'Thermal mgmt' }],
   'hospital': [{ key: 'hvac', label: 'HVAC & pressure' }, { key: 'medical_gas', label: 'Medical gas' }, { key: 'cold_chain', label: 'Cold chain' }, { key: 'power', label: 'Power & UPS' }, { key: 'patient_safety', label: 'Patient safety' }],
   'defence-base': [{ key: 'propulsion', label: 'Propulsion' }, { key: 'weapons', label: 'Weapons' }, { key: 'comms', label: 'Comms & radar' }, { key: 'security', label: 'Force protection' }],
 }
@@ -483,10 +524,14 @@ export const FAULT_FX = {
     tunnel_overheat: { 'rail:tunnelTemp': 9, 'rail:escalatorLoad': 15 },
   },
   'ev-network': {
-    thermal_runaway_precursor: { 'ev:cellTempMax': 22, 'ev:thermalRunawayRisk': 55, 'ev:stateOfHealth': -8 },
-    grid_overload: { 'ev:gridLoad': 22, 'ev:transformerTemp': 30, 'ev:chargingPower': -40 },
-    charger_fleet_fault: { 'ev:chargerUptime': -18, 'ev:sessionsActive': -6 },
-    battery_degradation: { 'ev:stateOfHealth': -15, 'ev:stateOfCharge': -20, 'ev:cellTempMax': 8 },
+    thermal_runaway: { 'ev:cellTempMax': 25, 'ev:thermalRunawayRisk': 62, 'ev:stateOfHealth': -8, 'ev:coolantTemp': 13, 'ev:cellImbalance': 42 },
+    grid_overload: { 'ev:gridLoad': 26, 'ev:transformerTemp': 32, 'ev:loadHeadroom': -28, 'ev:peakDemand': 150, 'ev:chargingPower': -60 },
+    charger_fault: { 'ev:chargerUptime': -9, 'ev:faultedChargers': 6, 'ev:sessionsActive': -8, 'ev:ocppLatency': 1400, 'ev:utilization': -20, 'ev:queueWait': 10 },
+    battery_degradation: { 'ev:stateOfHealth': -16, 'ev:stateOfCharge': -18, 'ev:cellTempMax': 8, 'ev:cellImbalance': 30 },
+    connector_stuck: { 'ev:faultedChargers': 3, 'ev:sessionsActive': -4, 'ev:queueWait': 12, 'ev:utilization': -12 },
+    insulation_fault: { 'ev:insulationResistance': -1050, 'ev:thermalRunawayRisk': 22, 'ev:faultedChargers': 2 },
+    solar_hotcell: { 'ev:solarOutput': -120, 'ev:selfConsumption': -26, 'ev:coolantTemp': 6, 'ev:cellTempMax': 6 },
+    v2g_failure: { 'ev:v2gCapacity': -180, 'ev:bessPower': -90, 'ev:loadHeadroom': -14 },
   },
   'defence-base': {
     perimeter_breach: { 'def:perimeterAlerts': 4, 'def:forceReadiness': -5 },

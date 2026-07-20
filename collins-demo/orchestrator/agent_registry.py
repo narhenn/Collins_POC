@@ -131,6 +131,12 @@ AGENTS: list[AgentDef] = [
     AgentDef("ag-e10", "Thermal Management Optimiser", "thermal", "nextxr", "ti-temperature",
              "Optimises battery cooling system for performance and longevity.",
              ["ev-network"], "vertical-specific"),
+    AgentDef("ag-e11", "SitePredict Location Analyst", "sitepredict", "automind", "ti-map-search",
+             "Ranks candidate charging sites by predicted ROI from traffic, demographics, EV density and grid capacity.",
+             ["ev-network"], "vertical-specific"),
+    AgentDef("ag-e12", "Dynamic Tariff & Load Optimiser", "tariff_ems", "automind", "ti-adjustments-bolt",
+             "Automates time-of-use pricing and EMS load balancing to lift utilisation and shave peak demand.",
+             ["ev-network"], "vertical-specific"),
 
     # -- Hospital specific agents --
     AgentDef("ag-h01", "Bed Management Optimiser", "bed_mgmt", "automind", "ti-bed",

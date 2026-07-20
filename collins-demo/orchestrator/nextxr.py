@@ -49,6 +49,7 @@ def build_domain(name: str, domain: str, options: dict | None = None) -> dict:
 
 def list_templates() -> list[dict]:
     return [
+        {"key": "ev-network", "label": "Gaadin Energy Site"},
         {"key": "edm-machine", "label": "Wire EDM Machine"},
         {"key": "turbine-engine", "label": "Gas Turbine Engine"},
         {"key": "tram-network", "label": "Tram Fleet Network"},

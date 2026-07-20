@@ -49,6 +49,11 @@ from fleet.physics import FleetPhysics, SIGNALS as FLT_SIG, UNITS as FLT_UNITS, 
 from fleet.predict import component_health as flt_ch, predict as flt_predict  # noqa: E402
 from behaviors.fleet import build_fleet_registry           # noqa: E402
 
+# ── EV / Gaadin energy-site domain wiring ────────────────────────────
+from ev.physics import EVPhysics, SIGNALS as EV_SIG, UNITS as EV_UNITS, redlines as EV_RED  # noqa: E402
+from ev.predict import component_health as ev_ch, predict as ev_predict  # noqa: E402
+from behaviors.ev import build_ev_registry                 # noqa: E402
+
 
 def _local(sig: str) -> str:
     return sig.split("#")[-1].split(":")[-1]
@@ -92,7 +97,43 @@ FLT_SENSORS = {
     FLT_SIG["incidents"]: ("Active Incidents", ""), FLT_SIG["hvac_load"]: ("HVAC Load", "%"),
 }
 
+EV_SENSORS = {
+    EV_SIG["uptime"]: ("Network Uptime", "%"), EV_SIG["utilization"]: ("Charger Utilisation", "%"),
+    EV_SIG["sessions"]: ("Active Sessions", ""), EV_SIG["faulted"]: ("Faulted Chargers", ""),
+    EV_SIG["ocpp"]: ("OCPP Heartbeat", "ms"), EV_SIG["queue"]: ("Queue Wait", "min"),
+    EV_SIG["power"]: ("Delivered Power", "kW"), EV_SIG["grid_load"]: ("Grid Load", "%"),
+    EV_SIG["headroom"]: ("Grid Headroom", "%"), EV_SIG["peak"]: ("Site Demand", "kW"),
+    EV_SIG["tx_temp"]: ("Transformer Temp", "C"), EV_SIG["bess_soc"]: ("BESS Charge", "%"),
+    EV_SIG["bess_power"]: ("BESS Power", "kW"), EV_SIG["solar"]: ("Solar Output", "kW"),
+    EV_SIG["self_use"]: ("Solar Self-Use", "%"), EV_SIG["v2g"]: ("V2G Available", "kWh"),
+    EV_SIG["soc"]: ("Fleet Avg SoC", "%"), EV_SIG["soh"]: ("Fleet Avg SoH", "%"),
+    EV_SIG["cell_temp"]: ("Cell Temp Max", "C"), EV_SIG["imbalance"]: ("Cell Imbalance", "mV"),
+    EV_SIG["coolant"]: ("Coolant Temp", "C"), EV_SIG["insulation"]: ("HV Insulation", "kOhm"),
+    EV_SIG["runaway"]: ("Thermal Runaway Risk", "%"),
+}
+
 DOMAINS = {
+    "ev-network": {
+        "label": "Gaadin Energy Site", "control": "demand",
+        "physics": EVPhysics, "ch": ev_ch, "predict": ev_predict,
+        "registry": build_ev_registry, "sig": EV_SIG, "units": EV_UNITS,
+        "sensors": EV_SENSORS,
+        "subsys": [("charger", "Charging Network (OCPP)"), ("battery", "Battery Health"),
+                   ("grid", "Grid & EMS"), ("energy", "Solar & BESS"),
+                   ("thermal", "Thermal Management")],
+        "checks": {
+            EV_SIG["tx_temp"]: (EV_RED.tx_temp, "above"),
+            EV_SIG["grid_load"]: (EV_RED.grid_load, "above"),
+            EV_SIG["runaway"]: (EV_RED.runaway, "above"),
+            EV_SIG["cell_temp"]: (EV_RED.cell_temp, "above"),
+            EV_SIG["imbalance"]: (EV_RED.imbalance, "above"),
+            EV_SIG["headroom"]: (EV_RED.headroom_min, "below"),
+            EV_SIG["uptime"]: (EV_RED.uptime_min, "below"),
+            EV_SIG["faulted"]: (EV_RED.faulted_max, "above"),
+            EV_SIG["insulation"]: (EV_RED.insulation_min, "below"),
+            EV_SIG["soh"]: (EV_RED.soh_min, "below"),
+        },
+    },
     "edm-machine": {
         "label": "Wire EDM Machine", "control": "intensity",
         "physics": EDMPhysics, "ch": edm_ch, "predict": edm_predict,
@@ -177,9 +218,12 @@ class LiveTwin:
             if fault is not None:
                 if fault == "none":
                     self.state.fault = "none"; self.state.fault_severity = 0.0
-                    # recover EDM seeded degradation so "clear" visibly heals it
+                    # recover seeded degradation so "clear" visibly heals the twin
+                    # (EDM + EV fault seeds; permanent aging like SoH is left intact)
                     for attr, val in (("filter_clog", 0.0), ("resin_depletion", 0.0),
-                                      ("guide_wear", 0.0), ("chiller_health", 1.0), ("debris", 0.05)):
+                                      ("guide_wear", 0.0), ("chiller_health", 1.0), ("debris", 0.05),
+                                      ("charger_fault", 0.0), ("n_faulted", 0.0), ("insul_deg", 0.0),
+                                      ("solar_derate", 0.0), ("v2g_loss", 0.0), ("runaway_seed", 0.0)):
                         if hasattr(self.state, attr):
                             setattr(self.state, attr, val)
                 else:

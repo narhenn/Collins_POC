@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import api from './api'
 import { Logo, Icon, SIG, sevClass, fmt, pct, hColor, statusColor,
-  DOMAINS, domainMeta, tilesFor, simTwin,
+  DOMAINS, domainMeta, tilesFor, simTwin, BRAND,
   useCountUp, HealthRing, Sparkline } from './lib.jsx'
 import { stubNarration, stubChatReply } from './aiStubs.js'
 import Scenario from './Scenario.jsx'
@@ -21,6 +21,10 @@ import CascadeGraph from './CascadeGraph.jsx'
 import Heatmap from './Heatmap.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import AuditLog from './AuditLog.jsx'
+import EVWorld from './EVWorld.jsx'
+import BatteryPack from './BatteryPack.jsx'
+import LoadBalance from './LoadBalance.jsx'
+import SitePredict from './SitePredict.jsx'
 
 const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
@@ -31,12 +35,17 @@ const NAV = [
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
   { id: 'audit', label: 'Audit Trail', icon: 'ti-history' },
 ]
+// Gaadin-only tools, appended to the nav when the EV energy twin is active.
+const EV_NAV = [
+  { id: 'sitepredict', label: 'SitePredict', icon: 'ti-map-search' },
+  { id: 'loadbalance', label: 'Energy & Load', icon: 'ti-adjustments-bolt' },
+]
 
 export default function App() {
   const [route, setRoute] = useState('twins')
   const [health, setHealth] = useState(null)
   const [tenant, setTenant] = useState(null)
-  const [domain, setDomain] = useState('turbine-engine')
+  const [domain, setDomain] = useState('ev-network')
   const [source, setSource] = useState(null)          // 'live' | 'sim' | null
   const [machine, setMachine] = useState(null)
   const [twin, setTwin] = useState(null)              // live state (polled) or sim
@@ -177,8 +186,8 @@ export default function App() {
         </button>
         <span className="brand"><Logo size={32} />
           <span className="brand-word">
-            <span className="brand-name">Goalcert</span>
-            <span className="brand-tag">Digital Twin Platform</span>
+            <span className="brand-name">{BRAND.name}</span>
+            <span className="brand-tag">{BRAND.tag}</span>
           </span>
         </span>
         <div className="vertical-switcher">
@@ -220,18 +229,19 @@ export default function App() {
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-nav">
             <div className="sidebar-section">Operations</div>
-            {NAV.map(it => (
+            {[...NAV, ...(domain === 'ev-network' ? EV_NAV : [])].map(it => (
               <a key={it.id} className={`nav-item ${route === it.id ? 'active' : ''}`} onClick={() => { setRoute(it.id); setSidebarOpen(false) }}>
                 <Icon n={it.icon} />{it.label}
                 {it.id === 'dashboard' && nIncidents > 0 && <span className="nav-badge badge-red">{nIncidents}</span>}
                 {it.id === 'agents' && <span className="nav-badge badge-blue">2</span>}
+                {it.id === 'sitepredict' && <span className="nav-badge badge-blue">AI</span>}
               </a>
             ))}
           </div>
           <div className="sidebar-foot">
             <div className="sidebar-help" onClick={() => setRoute('twins')}>
               <Icon n="ti-stack-2" /> Twins library</div>
-            <div className="sidebar-ver">Goalcert · NextXR core · demo</div>
+            <div className="sidebar-ver">{BRAND.poweredBy} · demo</div>
           </div>
         </div>
 
@@ -253,6 +263,28 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'bim' && <BimViewer />}
           {route === 'audit' && <AuditLog entries={auditEntries} />}
+          {route === 'sitepredict' && (
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <div className="panel-title">SitePredict</div>
+                  <div className="panel-subtitle">Location intelligence & ROI forecasting — rank candidate charging sites before a rupee of CapEx is spent.</div>
+                </div>
+              </div>
+              <SitePredict />
+            </div>
+          )}
+          {route === 'loadbalance' && (
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <div className="panel-title">Energy & Load Management</div>
+                  <div className="panel-subtitle">Gaadin EMS — dynamic load balancing, peak shaving and BESS dispatch keeping the site under its grid limit.</div>
+                </div>
+              </div>
+              <LoadBalance />
+            </div>
+          )}
         </div>
       </div>
 
@@ -270,6 +302,10 @@ export default function App() {
         { label: 'Twin Intelligence', icon: 'ti-robot', group: 'Navigate', action: () => setRoute('agents') },
         { label: 'Audit Trail', icon: 'ti-history', group: 'Navigate', action: () => setRoute('audit') },
         { label: 'AI Maintenance Director', icon: 'ti-tool', group: 'Action', action: () => { setMaint(true); setCmdPalette(false) }, hint: 'Cinematic guided repair' },
+        ...(domain === 'ev-network' ? [
+          { label: 'SitePredict — location & ROI', icon: 'ti-map-search', group: 'Gaadin', action: () => setRoute('sitepredict'), hint: 'Rank charging sites by predicted ROI' },
+          { label: 'Energy & Load Management', icon: 'ti-adjustments-bolt', group: 'Gaadin', action: () => setRoute('loadbalance'), hint: 'EMS load balancing & peak shaving' },
+        ] : []),
         ...Object.keys(DOMAINS).filter(k => DOMAINS[k].library !== false).map(k => ({
           label: `Open ${DOMAINS[k].label}`, icon: DOMAINS[k].icon || 'ti-cube', group: 'Twin',
           action: () => { setRoute('twins') }, hint: DOMAINS[k].tag,
@@ -614,7 +650,7 @@ function Dashboard({ ctx }) {
     setCascadeLoading(false)
   }
 
-  const throttleLabel = domain === 'edm-machine' ? 'Intensity' : 'Throttle'
+  const throttleLabel = domain === 'edm-machine' ? 'Intensity' : domain === 'ev-network' ? 'Charge Load' : 'Throttle'
 
   // Live fault injection (drive a fault into the running twin's physics)
   const [faults, setFaults] = useState([])
@@ -697,7 +733,9 @@ function Dashboard({ ctx }) {
           reconstructed GLB (Build-a-Twin) takes priority, else the turbine
           model, else the procedural domain scene. */}
       <div className="section-gap">
-        {domain === 'mrt-line'
+        {domain === 'ev-network'
+          ? <EVWorld live={live} machine={machineName} height={470} />
+          : domain === 'mrt-line'
           ? <MRTMap twin={twin} height={460} />
           : domain === 'tram-network' && isLive
           ? <NetworkMap tenant={tenant} height={460} running={running} />
@@ -714,6 +752,14 @@ function Dashboard({ ctx }) {
               </div>
             : <Scene3D domain={domain} machine={machineName} live={live} height={380} />}
       </div>
+
+      {/* Gaadin EV twin — cell-level battery health + EMS load balancing */}
+      {domain === 'ev-network' && (
+        <>
+          <div className="section-gap"><BatteryPack live={live} /></div>
+          <div className="section-gap"><LoadBalance /></div>
+        </>
+      )}
 
       {/* Predictive alert banner (live) */}
       {isLive && alert && (
