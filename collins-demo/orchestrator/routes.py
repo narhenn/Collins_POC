@@ -535,15 +535,15 @@ TWIN_FAULTS = {
         {"id": "psd_desync", "label": "PSD-train door desync"},
         {"id": "escalator_fault", "label": "Escalator motor fault"},
     ],
+    # Only the faults with full end-to-end support — real physics inject that
+    # visibly drives the twin + a matching Repair-with-AI plan/cascade. (The thin
+    # faults connector_stuck / insulation_fault / solar_hotcell / v2g_failure were
+    # dropped from the dropdown so every option actually simulates.)
     "ev-network": [
         {"id": "thermal_runaway", "label": "Battery thermal runaway precursor"},
         {"id": "grid_overload", "label": "Grid transformer overload"},
         {"id": "charger_fault", "label": "EVSE communication fault"},
         {"id": "battery_degradation", "label": "Accelerated SoH decline"},
-        {"id": "connector_stuck", "label": "CCS2 connector locked"},
-        {"id": "insulation_fault", "label": "HV insulation degradation"},
-        {"id": "solar_hotcell", "label": "Solar panel hot cell"},
-        {"id": "v2g_failure", "label": "V2G discharge fault"},
     ],
     "defence-base": [
         {"id": "perimeter_breach", "label": "Perimeter breach detected"},

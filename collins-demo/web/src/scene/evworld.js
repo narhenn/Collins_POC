@@ -125,7 +125,7 @@ function buildFlow(points, color = 0x2563eb) {
 }
 
 // ── the world ────────────────────────────────────────────────────────
-export function createEVWorld(host, { onAskAI, onReady } = {}) {
+export function createEVWorld(host, { onAskAI, onReady, onPick } = {}) {
   const M = makeMats()
   const W = () => host.clientWidth || 900, H = () => host.clientHeight || 520
   const scene = new THREE.Scene()
@@ -156,6 +156,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const sc = sun.shadow.camera; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46; sun.shadow.bias = -0.0004
   scene.add(sun)
   const fill = new THREE.DirectionalLight(0x86f7d6, 0.35); fill.position.set(-26, 18, -18); scene.add(fill)
+  const alertLight = new THREE.PointLight(0xff1a2e, 0, 90); alertLight.position.set(0, 16, -2); scene.add(alertLight)
 
   // ground + site pad
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x0a0d18, roughness: 1 }))
@@ -164,6 +165,27 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const pad = slab(64, 52, M.pad, 3); scene.add(pad)
 
   const animators = []   // {kind, obj, ...}
+  let alertLevel = 0     // 0..1 site-wide crisis → red alert light + fog
+
+  // spark particles — a burst fires at each cascade stage
+  const SPN = 160
+  const spPos = new Float32Array(SPN * 3).fill(-999)
+  const spVel = new Float32Array(SPN * 3)
+  const spLife = new Float32Array(SPN)
+  const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3))
+  const spMat = new THREE.PointsMaterial({ color: 0xffb020, size: 0.6, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+  const sparks = new THREE.Points(spGeo, spMat); sparks.frustumCulled = false; scene.add(sparks)
+  let spHead = 0
+  function emitSparks(p, n = 30, spread = 1.6) {
+    if (!p) return
+    for (let k = 0; k < n; k++) {
+      const i = (spHead++) % SPN
+      spPos[i * 3] = p.x; spPos[i * 3 + 1] = p.y; spPos[i * 3 + 2] = p.z
+      spVel[i * 3] = (Math.random() - 0.5) * spread; spVel[i * 3 + 1] = Math.random() * 2.4 + 1.2; spVel[i * 3 + 2] = (Math.random() - 0.5) * spread
+      spLife[i] = 1
+    }
+    spGeo.attributes.position.needsUpdate = true
+  }
   const selectable = []  // clickable asset groups
   const labels = []      // world-anchored HTML callouts {el, pos}
   const flows = {}       // named flow lines
@@ -249,10 +271,10 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
 
   // ── DC fast-charging island (the hero chargers, near the entry) ──
   const dcfcGroup = []
-  for (let i = 0; i < 4; i++) {
-    const dz = -14 + i * 3.2
+  for (let i = 0; i < 8; i++) {
+    const dz = -15 + i * 2.4
     const u = grp()
-    u.add(box(1.5, 2.5, 1.1, M.white, 0, 1.25, 0))
+    const dcBody = box(1.5, 2.5, 1.1, M.white.clone(), 0, 1.25, 0); u.add(dcBody); dcBody.userData.baseColor = dcBody.material.color.getHex()
     u.add(box(1.2, 1.0, 0.12, M.screen, 0, 1.7, 0.57))
     u.add(box(1.5, 0.28, 1.1, M.dark, 0, 0.14, 0))
     const strip = box(0.12, 2.2, 0.12, M.emissive(0x10b981, 1.8), -0.72, 1.3, 0.5)
@@ -260,7 +282,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
     u.position.set(-6, 0, dz)
     const id = `DCFC-0${i + 1}`
     const st = i === 2 ? 'warn' : 'ok'
-    u.userData.asset = { id, name: `DC Fast Charger ${id}`, type: 'DC-fast (150 kW)', icon: 'ti-bolt', strip,
+    u.userData.asset = { id, name: `DC Fast Charger ${id}`, type: 'DC-fast (150 kW)', icon: 'ti-bolt', strip, body: dcBody,
       status: st, metrics: [['Power', 'kW', 148], ['Temp', '°C', 41], ['SoC add', '%/min', 2.4], ['OCPP', '', '1.6J']] }
     u.traverse(o => { o.userData.pickRoot = u })
     scene.add(u); selectable.push(u); dcfcGroup.push(u)
@@ -270,7 +292,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
 
   // ── BESS container (fill = SoC) ──
   const bess = grp()
-  bess.add(box(9, 3.2, 3, M.container, 0, 1.7, 0))              // container shell
+  const bessShell = box(9, 3.2, 3, M.container.clone(), 0, 1.7, 0); bess.add(bessShell); bessShell.userData.baseColor = bessShell.material.color.getHex()   // container shell
   bess.add(box(9.04, 0.4, 3.04, M.dark, 0, 3.3, 0))              // roof cap
   // corrugation ribs
   for (let i = -4; i <= 4; i++) bess.add(box(0.08, 3.0, 3.02, new THREE.MeshStandardMaterial({ color: 0x0c5546, roughness: 0.6 }), i * 0.95, 1.7, 0))
@@ -290,10 +312,11 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   bess.traverse(o => { o.userData.pickRoot = bess })
   scene.add(bess); selectable.push(bess)
   store.bessModules = modules
+  store.bessShell = bessShell
 
   // ── grid transformer / substation ──
   const tx = grp()
-  tx.add(box(3.2, 2.6, 2.2, M.metal, 0, 1.3, 0))
+  const txBody = box(3.2, 2.6, 2.2, M.metal.clone(), 0, 1.3, 0); tx.add(txBody)
   for (let i = 0; i < 7; i++) tx.add(box(0.08, 2.2, 2.3, M.steel, -1.5 + i * 0.5, 1.3, 0))   // radiator fins
   const bush = [-0.8, 0, 0.8].map(x => { const b = cyl(0.16, 0.22, 1.2, M.emissive(0x9fd0ff, 0.4), x, 2.9, 0); return b })
   tx.add(...bush)
@@ -306,6 +329,7 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   tx.traverse(o => { o.userData.pickRoot = tx })
   scene.add(tx); selectable.push(tx)
   store.tx = tx.userData.asset
+  store.txBody = txBody; txBody.userData.baseColor = txBody.material.color.getHex()
   // grid feed pole
   const pole = grp(); pole.add(cyl(0.14, 0.18, 6, M.steel, 0, 3, 0)); pole.add(box(2.2, 0.14, 0.14, M.steel, 0, 5.6, 0))
   pole.position.set(-30, 0, -8); scene.add(pole)
@@ -357,6 +381,15 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const lblSolar = makeLabel('solar'); lblSolar.anchor.set(13, 6.2, 8)
   const lblEms = makeLabel('ems'); lblEms.anchor.set(-11, 2.6, -2)
   const lblDcfc = makeLabel('dcfc'); lblDcfc.anchor.set(-6, 3.4, -8)
+
+  // staged cascade bubbles — numbered callouts anchored above assets
+  const stageEls = new Map()
+  const stageAnchors = {
+    transformer: new THREE.Vector3(-24, 7, 2), dcfc: new THREE.Vector3(-6, 5, -6),
+    bess: new THREE.Vector3(-20, 7, -14), ems: new THREE.Vector3(-11, 5, -2),
+    building: new THREE.Vector3(22, 15, 18), solar: new THREE.Vector3(13, 8, 8),
+    grid: new THREE.Vector3(-36, 7, 2),
+  }
   function setLabel(rec, title, val, tone = 'ok') {
     rec.el.innerHTML = `<span class="evw-l-t">${title}</span><span class="evw-l-v evw-${tone}">${val}</span>`
   }
@@ -381,14 +414,14 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const inspector = el('div', { class: 'inspector hidden' }); host.append(inspector)
 
   // ── camera + controls ──
-  camera.position.set(38, 30, 44)
+  camera.position.set(44, 34, 52)
   const camTarget = new THREE.Vector3(-4, 2, 0)
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.48
   controls.minDistance = 16; controls.maxDistance = 120; controls.target.copy(camTarget)
   controls.autoRotate = true; controls.autoRotateSpeed = 0.42
   tAuto.onclick = () => { controls.autoRotate = !controls.autoRotate; tAuto.classList.toggle('on', controls.autoRotate) }
-  tReset.onclick = () => { camera.position.set(38, 30, 44); controls.target.copy(camTarget) }
+  tReset.onclick = () => { camera.position.set(44, 34, 52); controls.target.copy(camTarget) }
 
   // ── selection / inspector ──
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2()
@@ -429,12 +462,51 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
     inspector.append(body)
   }
   function clearSel() { if (selBox) { scene.remove(selBox); selBox.geometry.dispose(); selBox = null } selected = null }
-  function selectAsset(g) {
+  function selectAsset(g, openInsp = true) {
     clearSel(); selected = g
-    if (g) { selBox = new THREE.BoxHelper(g, 0x10b981); scene.add(selBox); openInspector(g.userData.asset) }
+    if (g) { selBox = new THREE.BoxHelper(g, 0x10b981); scene.add(selBox); if (openInsp) openInspector(g.userData.asset) }
   }
+  // explainable highlight — outline the asset a simulation/answer is about, in pulsing red
+  let focusBox = null, focusTarget = null
+  function focusAsset(id) {
+    if (focusBox) { scene.remove(focusBox); focusBox.geometry.dispose(); focusBox = null }
+    focusTarget = null
+    if (!id) return
+    const g = selectable.find(s => s.userData.asset.id === id)
+    if (!g) return
+    focusBox = new THREE.BoxHelper(g, 0x22d3ee); focusBox.material.transparent = true; scene.add(focusBox)
+    const p = new THREE.Vector3(); g.getWorldPosition(p); focusTarget = p
+  }
+
+  // ── Fix It Live drill: highlight the asset the current step is working on ──
+  const STEP_TONE = { work: 0xf59e0b, fault: 0xef4444, done: 0x10b981, safe: 0x3b82f6, locked: 0x60a5fa, focus: 0x22d3ee }
+  let stepBox = null, stepAnchorV = null, stepKey = null, stepCol = 0x22d3ee
+  const stepTag = el('div', { class: 'evw-steptag' }); host.append(stepTag); stepTag.style.display = 'none'
+  function setStep(spec) {
+    if (!spec || !spec.asset) {
+      if (stepBox) { scene.remove(stepBox); stepBox.geometry.dispose(); stepBox = null }
+      stepTag.style.display = 'none'; stepAnchorV = null; stepKey = null; return
+    }
+    stepCol = STEP_TONE[spec.tone] || STEP_TONE.focus
+    const g = selectable.find(s => s.userData.asset.id === spec.asset)
+    if (g) {
+      if (stepBox) { scene.remove(stepBox); stepBox.geometry.dispose() }
+      stepBox = new THREE.BoxHelper(g, stepCol); stepBox.material.transparent = true; scene.add(stepBox)
+      const p = new THREE.Vector3(); g.getWorldPosition(p); stepAnchorV = p; focusTarget = p
+    }
+    stepTag.textContent = spec.label || ''
+    stepTag.style.display = spec.label ? 'block' : 'none'
+    stepTag.style.setProperty('--tone', '#' + stepCol.toString(16).padStart(6, '0'))
+    if (spec.key !== stepKey) { stepKey = spec.key; if (stepAnchorV && spec.ping !== false) emitSparks(stepAnchorV, spec.tone === 'work' ? 34 : 20, 1.4) }
+  }
+
   renderer.domElement.addEventListener('pointerdown', ev => {
-    const g = pickAt(ev.clientX, ev.clientY); if (g) selectAsset(g)
+    const g = pickAt(ev.clientX, ev.clientY)
+    if (g) {
+      // in drill mode, the host handles the click (opens an in-world action menu) and we skip the inspector
+      if (onPick) { const handled = onPick(g.userData.asset.id, ev.clientX, ev.clientY); if (handled) { selectAsset(g, false); return } }
+      selectAsset(g)
+    } else { inspector.classList.add('hidden'); clearSel() }   // click empty space → close
   })
   function onMove(ev) {
     const g = pickAt(ev.clientX, ev.clientY)
@@ -461,9 +533,23 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
   const alertRed = new THREE.Color(0xef4444), amber = new THREE.Color(0xf59e0b), green = new THREE.Color(0x10b981)
   const _c = new THREE.Color()
   const dat = { transformerTemp: 66, gridLoad: 68, headroom: 32, peakDemand: 420, bessSoc: 72, bessPower: -60,
-    solar: 210, sessions: 18, faulted: 0, dcfcPower: 148, runaway: 2, cellMax: 33 }
+    solar: 210, sessions: 18, faulted: 0, dcfcPower: 148, runaway: 2, cellMax: 33, soh: 93 }
   function update(live) {
     if (!live) return
+    setStep(live.__step)   // Fix It Live: spotlight + label the asset the current step works on
+    // staged cascade bubbles — sync DOM to the active stages
+    const stages = live.__stages || []
+    const want = new Set(stages.map(s => s.n))
+    for (const [n, rec] of stageEls) { if (!want.has(n)) { rec.el.remove(); stageEls.delete(n) } }
+    for (const s of stages) {
+      if (!stageEls.has(s.n)) {
+        const anchor = stageAnchors[s.anchor] || stageAnchors.transformer
+        const b = el('div', { class: 'evw-step' }, el('span', { class: 'n' }, String(s.n)), el('span', { class: 't' }, s.label))
+        host.append(b)
+        stageEls.set(s.n, { el: b, anchor })
+        emitSparks(anchor); focusTarget = anchor   // spark burst + camera follows each bubble
+      } else { stageEls.get(s.n).anchor = stageAnchors[s.anchor] || stageEls.get(s.n).anchor }
+    }
     const g = (k, d) => (live[k] == null ? d : live[k])
     dat.transformerTemp = g('ev:transformerTemp', dat.transformerTemp)
     dat.gridLoad = g('ev:gridLoad', dat.gridLoad)
@@ -477,17 +563,20 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
     dat.dcfcPower = g('ev:chargingPower', dat.dcfcPower)
     dat.runaway = g('ev:thermalRunawayRisk', dat.runaway)
     dat.cellMax = g('ev:cellTempMax', dat.cellMax)
+    dat.soh = g('ev:stateOfHealth', dat.soh)
 
     // transformer band + light colour by load
     const txTone = dat.gridLoad >= 95 ? 'crit' : dat.gridLoad >= 85 ? 'warn' : 'ok'
+    if (store.txBody) store.txBody.userData.tone = txTone
     const txCol = txTone === 'crit' ? alertRed : txTone === 'warn' ? amber : green
     const txa = store.tx
     if (txa) {
       txa.status = txTone
       txa.metrics = [['Load', '%', Math.round(dat.gridLoad)], ['Temp', '°C', Math.round(dat.transformerTemp)],
         ['Headroom', '%', Math.round(dat.headroom)], ['Peak', 'kW', Math.round(dat.peakDemand)]]
-      if (txa.band) { txa.band.material.color.copy(txCol); txa.band.material.emissive.copy(txCol) }
-      if (txa.light) { txa.light.material.color.copy(txCol); txa.light.material.emissive.copy(txCol) }
+      const txI = txTone === 'crit' ? 1.7 : txTone === 'warn' ? 1.2 : 0.7
+      if (txa.band) { txa.band.material.color.copy(txCol); txa.band.material.emissive.copy(txCol); txa.band.material.emissiveIntensity = txI }
+      if (txa.light) { txa.light.material.color.copy(txCol); txa.light.material.emissive.copy(txCol); txa.light.material.emissiveIntensity = txI }
     }
     setLabel(lblTx, 'Transformer T1', Math.round(dat.gridLoad) + '%', txTone)
     setLabel(lblEms, 'EMS headroom', Math.round(dat.headroom) + '%', dat.headroom < 8 ? 'crit' : dat.headroom < 15 ? 'warn' : 'ok')
@@ -497,12 +586,13 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
     // BESS module fill by SoC
     const mods = store.bessModules
     const lit = Math.round((dat.bessSoc / 100) * mods.length)
-    const bessTone = dat.runaway >= 40 ? 'crit' : dat.cellMax >= 42 ? 'warn' : 'ok'
+    const bessTone = dat.runaway >= 40 ? 'crit' : (dat.cellMax >= 42 || dat.soh <= 85) ? 'warn' : 'ok'
+    if (store.bessShell) store.bessShell.userData.tone = bessTone
     for (let i = 0; i < mods.length; i++) {
       const on = i < lit
       const col = bessTone === 'crit' && on ? alertRed : bessTone === 'warn' && on ? amber : on ? green : _c.set(0x0a3a30)
       mods[i].material.emissive.copy(col); mods[i].material.color.copy(col)
-      mods[i].material.emissiveIntensity = on ? 0.9 : 0.25
+      mods[i].material.emissiveIntensity = on ? (bessTone === 'crit' ? 1.7 : 0.9) : 0.25
     }
     setLabel(lblBess, 'BESS', Math.round(dat.bessSoc) + '%', bessTone)
     const bessAsset = selectable.find(s => s.userData.asset.id === 'BESS-A')
@@ -510,23 +600,36 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
       bessAsset.userData.asset.metrics = [['SoC', '%', Math.round(dat.bessSoc)], ['Power', 'kW', Math.round(dat.bessPower)],
         ['Cell max', '°C', Math.round(dat.cellMax)], ['Runaway', '%', Math.round(dat.runaway)]] }
 
-    // faulted chargers → mark some DCFC/AC red
-    let faultsLeft = dat.faulted
+    // faulted chargers → recolour their indicator red (deterministic each frame + restore)
+    let need = dat.faulted
     for (const u of [...store.dcfc, ...bays]) {
       const a = u.userData.asset
-      if (faultsLeft > 0 && a.status !== 'crit') { a.status = 'crit'; a._faulted = true; faultsLeft-- }
-      else if (a._faulted && faultsLeft <= 0) { a.status = a.id === 'DCFC-03' ? 'warn' : 'ok'; a._faulted = false }
+      const ind = a.strip || a.led
+      const crit = need > 0; if (crit) need--
+      const st = crit ? 'crit' : (a.id === 'DCFC-03' ? 'warn' : 'ok')
+      if (a.body) a.body.userData.tone = crit ? 'dead' : st   // faulted charger goes DARK
+      if (ind) ind.userData.crit = crit
+      if (a.status !== st) {
+        a.status = st; a._faulted = crit
+        if (ind) { const c = st === 'crit' ? alertRed : st === 'warn' ? amber : green; ind.material.color.copy(c); ind.material.emissive.copy(c) }
+      }
     }
 
-    // flow line intensities + direction
+    // flow line intensities + direction — more of the network reacts, not just grid→tx
     const norm = (v, m) => clamp(Math.abs(v) / m, 0.15, 1)
     setFlow(flows.gridToTx, 1, 0.6 + norm(dat.peakDemand, 550) * 1.6, dat.gridLoad >= 85 ? 0xef4444 : 0x2f7bff)
-    setFlow(flows.txToBus, 1, 0.6 + norm(dat.peakDemand, 550) * 1.6)
+    setFlow(flows.txToBus, 1, 0.6 + norm(dat.peakDemand, 550) * 1.6, dat.gridLoad >= 90 ? 0xef4444 : 0x2563eb)
     setFlow(flows.solarToBus, 1, 0.4 + norm(dat.solar, 300) * 1.8, 0x10b981)
-    setFlow(flows.bessToBus, dat.bessPower < 0 ? 1 : -1, 0.4 + norm(dat.bessPower, 120) * 1.6, 0xf59e0b)
-    setFlow(flows.busToDcfc, 1, 0.5 + norm(dat.dcfcPower, 600) * 1.6)
+    setFlow(flows.bessToBus, dat.bessPower < 0 ? 1 : -1, 0.4 + norm(dat.bessPower, 120) * 1.6, dat.runaway >= 40 ? 0xef4444 : 0xf59e0b)
+    setFlow(flows.busToDcfc, 1, 0.5 + norm(dat.dcfcPower, 600) * 1.6, dat.faulted > 0 ? 0xef4444 : 0x2563eb)
     setFlow(flows.busToAc, 1, 0.5 + norm(dat.sessions, 24) * 1.2)
     setFlow(flows.busToBldg, 1, 0.7)
+
+    // site-wide crisis level (0..1) → drives the red alert light + fog in the render loop
+    alertLevel = clamp(Math.max(
+      dat.gridLoad >= 88 ? (dat.gridLoad - 88) / 14 : 0,
+      dat.runaway >= 40 ? (dat.runaway - 40) / 40 : 0,
+      dat.faulted > 0 ? Math.min(1, dat.faulted / 6) : 0), 0, 1)
 
     // if an inspector is open, refresh its metric values in place
     if (selected && !inspector.classList.contains('hidden')) {
@@ -553,7 +656,8 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
         const p = roadCurve.getPoint(d.t); const tan = roadCurve.getTangent(d.t)
         a.obj.position.set(p.x, 0.02, p.z); a.obj.rotation.y = Math.atan2(tan.x, tan.z)
       } else if (a.kind === 'led') {
-        a.obj.material.emissiveIntensity = 1.2 + Math.sin(t * 4 + a.obj.position.x) * 0.7
+        const cr = a.obj.userData && a.obj.userData.crit
+        a.obj.material.emissiveIntensity = (cr ? 1.6 : 1.2) + Math.sin(t * (cr ? 9 : 4) + a.obj.position.x) * (cr ? 0.5 : 0.7)
       } else if (a.kind === 'cable') {
         a.obj.material.emissiveIntensity = 0.7 + Math.abs(Math.sin(t * 3)) * 1.2
       } else if (a.kind === 'flow') {
@@ -563,6 +667,22 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
       }
     }
     // gentle BESS label + module shimmer already handled in update()
+
+    // site-wide red alert — light + atmosphere react to the crisis level
+    alertLight.intensity = alertLevel * (2.6 + Math.sin(t * 7) * 1.6)
+    { const al = alertLevel * 0.82; scene.fog.color.setRGB(0.071 + 0.30 * al, 0.125 - 0.085 * al, 0.263 - 0.195 * al) }
+
+    // spark particles — rise, slow under gravity, fade out
+    for (let i = 0; i < SPN; i++) {
+      if (spLife[i] > 0) {
+        spLife[i] -= dt * 1.4
+        spPos[i * 3] += spVel[i * 3] * dt * 7
+        spPos[i * 3 + 1] += (spVel[i * 3 + 1] - 5 * (1 - spLife[i])) * dt * 7
+        spPos[i * 3 + 2] += spVel[i * 3 + 2] * dt * 7
+        if (spLife[i] <= 0) spPos[i * 3 + 1] = -999
+      }
+    }
+    spGeo.attributes.position.needsUpdate = true
 
     // project world labels to screen
     for (const rec of labels) {
@@ -574,7 +694,36 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
         rec.el.style.top = ((-_v.y * 0.5 + 0.5) * H()) + 'px'
       }
     }
+    for (const [, rec] of stageEls) {
+      _v.copy(rec.anchor).project(camera)
+      const vis = _v.z < 1
+      rec.el.style.display = vis ? 'flex' : 'none'
+      if (vis) {
+        rec.el.style.left = ((_v.x * 0.5 + 0.5) * W()) + 'px'
+        rec.el.style.top = ((-_v.y * 0.5 + 0.5) * H()) + 'px'
+      }
+    }
+    if (stepBox) { stepBox.update(); stepBox.material.color.setHex(stepCol); stepBox.material.opacity = 0.65 + 0.35 * Math.abs(Math.sin(t * 4)) }
+    if (stepAnchorV) {
+      _v.copy(stepAnchorV).project(camera); const vis = _v.z < 1
+      stepTag.style.display = vis && stepTag.textContent ? 'block' : 'none'
+      if (vis) { stepTag.style.left = ((_v.x * 0.5 + 0.5) * W()) + 'px'; stepTag.style.top = ((-_v.y * 0.5 + 0.5) * H() - 46) + 'px' }
+    }
+    // ── dramatic asset state: flush RED when critical, go BLACK when dead, pulsing ──
+    {
+      const bods = store.__bodies || (store.__bodies = [store.txBody, store.bessShell, ...(store.dcfc || []).map(u => u.userData.asset && u.userData.asset.body)].filter(Boolean))
+      const pulse = Math.abs(Math.sin(t * 8)), pulseS = Math.abs(Math.sin(t * 3))
+      for (const m of bods) {
+        const tone = m.userData.tone || 'ok'; const mat = m.material; const hasE = !!mat.emissive
+        if (tone === 'crit') { if (hasE) { mat.emissive.copy(alertRed); mat.emissiveIntensity = 0.9 + 1.4 * pulse } mat.color.setRGB(0.7 + 0.25 * pulse, 0.08, 0.11) }
+        else if (tone === 'warn') { if (hasE) { mat.emissive.copy(amber); mat.emissiveIntensity = 0.35 + 0.5 * pulseS } if (m.userData.baseColor != null) mat.color.setHex(m.userData.baseColor) }
+        else if (tone === 'dead') { mat.color.setRGB(0.04, 0.045, 0.06); if (hasE) { mat.emissive.setRGB(0.18 + 0.12 * pulseS, 0.02, 0.02); mat.emissiveIntensity = 0.6 } }
+        else { if (hasE) { mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0 } if (m.userData.baseColor != null) mat.color.setHex(m.userData.baseColor) }
+      }
+    }
     if (selBox) selBox.update()
+    if (focusBox) { focusBox.update(); focusBox.material.opacity = 0.6 + 0.4 * Math.abs(Math.sin(t * 3)) }
+    if (focusTarget) controls.target.lerp(focusTarget, 0.035)
     controls.update()
     if (composer) composer.render(); else renderer.render(scene, camera)
   }
@@ -582,16 +731,17 @@ export function createEVWorld(host, { onAskAI, onReady } = {}) {
 
   function onResize() { camera.aspect = W() / H(); camera.updateProjectionMatrix(); renderer.setSize(W(), H()); if (composer) composer.setSize(W(), H()) }
   window.addEventListener('resize', onResize)
+  const ro = new ResizeObserver(() => onResize()); ro.observe(host)   // shrink canvas to its column
 
   return {
-    update,
+    update, focusAsset,
     dispose() {
       cancelAnimationFrame(raf)
-      window.removeEventListener('resize', onResize)
+      window.removeEventListener('resize', onResize); ro.disconnect()
       renderer.domElement.removeEventListener('pointermove', onMove)
       pmrem.dispose(); renderer.dispose()
       scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose && m.dispose()) })
-      try { host.querySelectorAll('canvas,.v-top,.v-tools,.v-tip,.v-tooltip,.inspector,.evw-legend,.evw-label').forEach(n => n.remove()) } catch {}
+      try { host.querySelectorAll('canvas,.v-top,.v-tools,.v-tip,.v-tooltip,.inspector,.evw-legend,.evw-label,.evw-steptag,.evw-step').forEach(n => n.remove()) } catch {}
     }
   }
 }

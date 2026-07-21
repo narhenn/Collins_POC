@@ -438,9 +438,30 @@ const MANUFACTURING_PLANS = {
 }
 
 // ── EV / GoalCert energy-site repair plans ──
+// Healthy baseline for the 3-D energy-site world. The Repair flow interpolates
+// each plan's `degrade` overrides on top of this by a "crisis" fraction, so the
+// world visibly slides into a fault during scan/diagnose and recovers step-by-step.
+const EV_NOMINAL = {
+  'ev:transformerTemp': 62, 'ev:gridLoad': 64, 'ev:loadHeadroom': 34, 'ev:peakDemand': 410,
+  'ev:bessSoc': 72, 'ev:bessPower': -60, 'ev:solarOutput': 210, 'ev:sessionsActive': 16,
+  'ev:faultedChargers': 0, 'ev:chargingPower': 148, 'ev:thermalRunawayRisk': 2, 'ev:cellTempMax': 33,
+}
+
 const EV_PLANS = {
   'THERMAL': {
     title: 'Battery Thermal Event — Runaway Precursor',
+    // 3-D cascade: numbered bubbles pop over each asset the fault reaches, the
+    // camera sweeps to follow, then the bubbles recede as the AI works the fix.
+    world: {
+      focus: 'BESS-A',
+      cascade: [
+        { anchor: 'bess', label: 'Battery over-temp' },
+        { anchor: 'transformer', label: 'BESS derated · grid covers' },
+        { anchor: 'dcfc', label: 'Fast-charging throttled' },
+      ],
+      degrade: { 'ev:cellTempMax': 54, 'ev:thermalRunawayRisk': 46, 'ev:bessSoc': 12, 'ev:bessPower': 45,
+        'ev:transformerTemp': 86, 'ev:gridLoad': 90, 'ev:chargingPower': 70 },
+    },
     rootCause: [
       { icon: 'ti-temperature', text: '<b>Cell temperature climbing</b> — cooling losing the pack' },
       { icon: 'ti-arrows-diff', text: '<b>Cell imbalance rising</b> — dendrite / hot-spot precursor' },
@@ -461,6 +482,16 @@ const EV_PLANS = {
   },
   'GRID': {
     title: 'Grid Overload — Transformer Over-Temperature',
+    world: {
+      focus: 'TX-1',
+      cascade: [
+        { anchor: 'transformer', label: 'Transformer over-temp' },
+        { anchor: 'ems', label: 'Grid headroom exhausted' },
+        { anchor: 'dcfc', label: 'Sessions curtailed' },
+      ],
+      degrade: { 'ev:transformerTemp': 98, 'ev:gridLoad': 97, 'ev:loadHeadroom': 4, 'ev:peakDemand': 540,
+        'ev:faultedChargers': 3, 'ev:chargingPower': 90 },
+    },
     rootCause: [
       { icon: 'ti-building-factory', text: '<b>Site draw near the transformer limit</b> — headroom collapsing' },
       { icon: 'ti-temperature', text: '<b>Transformer hot-spot rising</b> — insulation aging accelerates' },
@@ -480,6 +511,15 @@ const EV_PLANS = {
   },
   'CHARGER': {
     title: 'Charger Fault — OCPP Heartbeat Loss',
+    world: {
+      focus: 'EMS-1',
+      cascade: [
+        { anchor: 'dcfc', label: 'Chargers faulted' },
+        { anchor: 'ems', label: 'OCPP heartbeat lost' },
+        { anchor: 'building', label: 'Revenue & SLA at risk' },
+      ],
+      degrade: { 'ev:faultedChargers': 6, 'ev:chargingPower': 60, 'ev:sessionsActive': 6, 'ev:gridLoad': 58 },
+    },
     rootCause: [
       { icon: 'ti-plug-connected-x', text: '<b>Chargers faulted</b> — sessions dropping off the network' },
       { icon: 'ti-heartbeat', text: '<b>OCPP heartbeat latency high</b> — comms degraded' },
@@ -499,6 +539,14 @@ const EV_PLANS = {
   },
   'BATTERY': {
     title: 'Fleet Battery Degradation — SoH Below Limit',
+    world: {
+      focus: 'BESS-A',
+      cascade: [
+        { anchor: 'bess', label: 'Pack SoH below limit' },
+        { anchor: 'dcfc', label: 'Charge rate limited' },
+      ],
+      degrade: { 'ev:bessSoc': 30, 'ev:cellTempMax': 44, 'ev:thermalRunawayRisk': 30, 'ev:chargingPower': 95 },
+    },
     rootCause: [
       { icon: 'ti-battery-3', text: '<b>Fleet SoH falling</b> — approaching end-of-life' },
       { icon: 'ti-arrows-diff', text: '<b>Cell imbalance rising</b> — capacity loss' },
@@ -622,6 +670,31 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
   const frac = stage === 'complete' ? 1 : stage === 'repair' ? Math.min(1, (step + 1) / total) : 0
   const startHealth = twin?.health != null ? twin.health : 0.23
   const health = stage === 'complete' ? 1 : lerp(startHealth, 0.99, frac)
+
+  // ── EV energy-site cinematic: drive the 3-D world through the fault cascade ──
+  // crisis 0→1 slides the world into the fault (scan/diagnose) then back out as
+  // the repair progresses; numbered stage bubbles pop over the affected assets and
+  // the camera sweeps to follow, then the bubbles recede step-by-step as it heals.
+  const evWorld = plan.world
+  const crisis = stage === 'complete' ? 0
+    : stage === 'repair' ? Math.max(0, 1 - frac)
+    : (stage === 'diagnose' || stage === 'scan') ? 1 : 0
+  const worldLive = useMemo(() => {
+    if (!useEVWorld) return twin?.latest
+    const out = { ...EV_NOMINAL }
+    const deg = evWorld?.degrade || {}
+    for (const k of Object.keys(out)) if (deg[k] != null) out[k] = lerp(out[k], deg[k], crisis)
+    out['ev:faultedChargers'] = Math.round(out['ev:faultedChargers'])
+    return out
+  }, [useEVWorld, evWorld, crisis, twin])
+  const worldStages = useMemo(() => {
+    if (!useEVWorld || !evWorld) return []
+    const casc = (evWorld.cascade || []).map((c, i) => ({ n: i + 1, anchor: c.anchor, label: c.label }))
+    if (stage === 'diagnose') return casc.slice(0, Math.min(casc.length, rcLit))
+    if (stage === 'repair') return casc.slice(Math.round(casc.length * frac))   // root clears first, stable numbering
+    return []
+  }, [useEVWorld, evWorld, stage, rcLit, frac])
+  const worldFocus = (useEVWorld && (stage === 'diagnose' || stage === 'repair')) ? (evWorld?.focus || null) : null
 
   // ── mount the cinematic 3-D viewer (scene loads behind the intro) ──
   // Only for procedural domains; when a reconstructed GLB exists we render
@@ -867,7 +940,8 @@ export default function Maintenance({ domain = 'edm-machine', machineName = 'Wir
         <div className="mx-center">
           {useEVWorld
             ? <div className="mx-canvas" style={{ position: 'absolute', inset: 0 }}>
-                <EVWorld live={twin?.latest} machine={machineName} height="100%" />
+                <EVWorld live={{ ...(worldLive || {}), __stages: worldStages }} machine={machineName}
+                  focusId={worldFocus} height="100%" />
               </div>
             : useGlb
             ? <div className="mx-canvas" style={{ position: 'absolute', inset: 0 }}>

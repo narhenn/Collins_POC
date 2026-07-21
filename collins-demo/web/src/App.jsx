@@ -24,7 +24,7 @@ import AuditLog from './AuditLog.jsx'
 import EVWorld from './EVWorld.jsx'
 import BatteryPack from './BatteryPack.jsx'
 import LoadBalance from './LoadBalance.jsx'
-import SitePredict from './SitePredict.jsx'
+import EVScenario from './EVScenario.jsx'
 
 const NAV = [
   { id: 'twins', label: 'Twins', icon: 'ti-stack-2' },
@@ -35,12 +35,6 @@ const NAV = [
   { id: 'agents', label: 'Twin Intelligence', icon: 'ti-robot' },
   { id: 'audit', label: 'Audit Trail', icon: 'ti-history' },
 ]
-// EV energy-site tools, appended to the nav when the EV energy twin is active.
-const EV_NAV = [
-  { id: 'sitepredict', label: 'SitePredict', icon: 'ti-map-search' },
-  { id: 'loadbalance', label: 'Energy & Load', icon: 'ti-adjustments-bolt' },
-]
-
 export default function App() {
   const [route, setRoute] = useState('twins')
   const [health, setHealth] = useState(null)
@@ -190,15 +184,6 @@ export default function App() {
             <span className="brand-tag">{BRAND.tag}</span>
           </span>
         </span>
-        <div className="vertical-switcher">
-          {Object.entries(DOMAINS).filter(([,d]) => d.library !== false).map(([key, d]) => (
-            <button key={key} className={`v-pill ${domain === key ? 'active' : ''}`}
-              style={domain === key ? { background: d.accent, color: '#fff' } : {}}
-              onClick={() => { setDomain(key); setRoute('twins'); setSidebarOpen(false) }}>
-              <Icon n={d.icon} /><span className="v-pill-label">{d.tag?.split(' ')[0] || d.label.split(' ')[0]}</span>
-            </button>
-          ))}
-        </div>
         <div className="crumb">{source
           ? <><b>{machineName}</b> · {meta.tag} · live twin</>
           : 'Pick a twin from the Twins library to begin'}</div>
@@ -229,12 +214,11 @@ export default function App() {
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-nav">
             <div className="sidebar-section">Operations</div>
-            {[...NAV, ...(domain === 'ev-network' ? EV_NAV : [])].map(it => (
+            {NAV.map(it => (
               <a key={it.id} className={`nav-item ${route === it.id ? 'active' : ''}`} onClick={() => { setRoute(it.id); setSidebarOpen(false) }}>
                 <Icon n={it.icon} />{it.label}
                 {it.id === 'dashboard' && nIncidents > 0 && <span className="nav-badge badge-red">{nIncidents}</span>}
                 {it.id === 'agents' && <span className="nav-badge badge-blue">2</span>}
-                {it.id === 'sitepredict' && <span className="nav-badge badge-blue">AI</span>}
               </a>
             ))}
           </div>
@@ -255,7 +239,10 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'build' && <BuildTwin machine={machine} domain={domain}
             onBuilt={onBuilt} onSave={saveTwin} goDashboard={() => setRoute('dashboard')} />}
-          {route === 'scenario' && (source ? <Scenario tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} setSimFault={setSimFault} simFault={simFault} aiMode={aiMode} />
+          {route === 'scenario' && (source
+            ? (domain === 'ev-network'
+              ? <EVScenario tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} setSimFault={setSimFault} simFault={simFault} aiMode={aiMode} />
+              : <Scenario tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} setSimFault={setSimFault} simFault={simFault} aiMode={aiMode} />)
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'predict' && (source ? <Prediction tenant={tenant} machineName={machineName} domain={domain} isLive={isLive} twin={twin} />
             : <NeedTwin onPick={() => setRoute('twins')} />)}
@@ -263,28 +250,6 @@ export default function App() {
             : <NeedTwin onPick={() => setRoute('twins')} />)}
           {route === 'bim' && <BimViewer />}
           {route === 'audit' && <AuditLog entries={auditEntries} />}
-          {route === 'sitepredict' && (
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <div className="panel-title">SitePredict</div>
-                  <div className="panel-subtitle">Location intelligence & ROI forecasting — rank candidate charging sites before a rupee of CapEx is spent.</div>
-                </div>
-              </div>
-              <SitePredict />
-            </div>
-          )}
-          {route === 'loadbalance' && (
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <div className="panel-title">Energy & Load Management</div>
-                  <div className="panel-subtitle">GoalCert EMS — dynamic load balancing, peak shaving and BESS dispatch keeping the site under its grid limit.</div>
-                </div>
-              </div>
-              <LoadBalance />
-            </div>
-          )}
         </div>
       </div>
 
@@ -302,10 +267,6 @@ export default function App() {
         { label: 'Twin Intelligence', icon: 'ti-robot', group: 'Navigate', action: () => setRoute('agents') },
         { label: 'Audit Trail', icon: 'ti-history', group: 'Navigate', action: () => setRoute('audit') },
         { label: 'AI Maintenance Director', icon: 'ti-tool', group: 'Action', action: () => { setMaint(true); setCmdPalette(false) }, hint: 'Cinematic guided repair' },
-        ...(domain === 'ev-network' ? [
-          { label: 'SitePredict — location & ROI', icon: 'ti-map-search', group: 'GoalCert', action: () => setRoute('sitepredict'), hint: 'Rank charging sites by predicted ROI' },
-          { label: 'Energy & Load Management', icon: 'ti-adjustments-bolt', group: 'GoalCert', action: () => setRoute('loadbalance'), hint: 'EMS load balancing & peak shaving' },
-        ] : []),
         ...Object.keys(DOMAINS).filter(k => DOMAINS[k].library !== false).map(k => ({
           label: `Open ${DOMAINS[k].label}`, icon: DOMAINS[k].icon || 'ti-cube', group: 'Twin',
           action: () => { setRoute('twins') }, hint: DOMAINS[k].tag,
