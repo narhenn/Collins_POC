@@ -55,10 +55,23 @@ EV_FILES = [
     "packs/ev/ev-shapes.ttl",
 ]
 
+# Layer 4 — hospital pack. Two layers: the clinically-distinct ASSETS
+# (imaging, medical gas, cold chain, OR/ICU/isolation spaces) and the
+# campus-scale MACHINE-TWIN vocabulary (departments, beds, water/gas/power
+# infrastructure + the observables HospitalCampusPhysics emits). Physics,
+# behaviour rules and clinical views live in nextxr-ontology/hospital/ +
+# behaviors/hospital/. The twin layer extends the asset layer, so order matters.
+HOSPITAL_FILES = [
+    "packs/hospital/hospital-classes.ttl",
+    "packs/hospital/hospital-shapes.ttl",
+    "packs/hospital/hospital-twin-classes.ttl",
+    "packs/hospital/hospital-twin-shapes.ttl",
+]
+
 PACK_FILES = CFP_FILES + [
     "packs/hvac/hvac-classes.ttl",
     "packs/hvac/hvac-shapes.ttl",
-] + AEROSPACE_FILES + EDM_FILES + EV_FILES
+] + AEROSPACE_FILES + EDM_FILES + EV_FILES + HOSPITAL_FILES
 
 # Governance shapes validate the T-Box, NOT tenant mutations. They are
 # intentionally excluded from the gate's bundle so they never fire on a

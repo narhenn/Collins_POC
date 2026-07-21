@@ -53,19 +53,20 @@ function datacenterUpdates(live) {
 
 // ── Hospital domain ─────────────────────────────────────────────────
 function hospitalUpdates(live) {
-  if (!live || live['hosp:orPressure'] == null) return null
+  if (!live || live['hsp:orPressure'] == null) return null
   return {
-    'MRI-1': { status: 'ok', metrics: [['Status', '', 'Online'], ['Field', 'T', '3.0']] },
-    'ED-HVAC': { status: worst(['hosp:airChanges'], live),
-      metrics: [metric('hosp:airChanges', live), metric('hosp:orPressure', live)] },
-    'PHARM': { status: worst(['hosp:fridgeTemp'], live),
-      metrics: [metric('hosp:fridgeTemp', live)] },
-    'OR-GAS': { status: worst(['hosp:o2Pressure'], live),
-      metrics: [metric('hosp:o2Pressure', live)] },
-    'OR-LAF': { status: worst(['hosp:orPressure', 'hosp:airChanges'], live),
-      metrics: [metric('hosp:orPressure', live), metric('hosp:airChanges', live)] },
-    'ICU-NC': { status: worst(['hosp:nurseCalls'], live),
-      metrics: [metric('hosp:nurseCalls', live)] },
+    'MRI-1': { status: worst(['hsp:criticalPowerLoad'], live),
+      metrics: [metric('hsp:criticalPowerLoad', live), ['Field', 'T', '3.0']] },
+    'ED-HVAC': { status: worst(['hsp:airChanges'], live),
+      metrics: [metric('hsp:airChanges', live), metric('hsp:edWaitTime', live)] },
+    'PHARM': { status: worst(['hsp:bloodBankTemp'], live),
+      metrics: [metric('hsp:bloodBankTemp', live)] },
+    'OR-GAS': { status: worst(['hsp:medGasO2Pressure'], live),
+      metrics: [metric('hsp:medGasO2Pressure', live), metric('hsp:medGasReserve', live)] },
+    'OR-LAF': { status: worst(['hsp:orPressure', 'hsp:airChanges'], live),
+      metrics: [metric('hsp:orPressure', live), metric('hsp:airChanges', live)] },
+    'ICU-NC': { status: worst(['hsp:infectionRisk', 'hsp:upsRuntime'], live),
+      metrics: [metric('hsp:infectionRisk', live), metric('hsp:upsRuntime', live)] },
   }
 }
 

@@ -113,15 +113,15 @@ const DOMAIN_SUBS = {
     },
     order: ['OR-LAF', 'OR-GAS', 'PHARM', 'ED-HVAC'],
     signalMap(sig) {
-      if (/orPressure|airChanges|laminar/i.test(sig)) return 'OR-LAF'
-      if (/o2|medgas/i.test(sig)) return 'OR-GAS'
-      if (/fridge|coldchain/i.test(sig)) return 'PHARM'
-      if (/nurseCalls|hvac/i.test(sig)) return 'ED-HVAC'
+      if (/orPressure|isoPressure|laminar|autoclaveF0/i.test(sig)) return 'OR-LAF'
+      if (/medGas|o2|n2o/i.test(sig)) return 'OR-GAS'
+      if (/bloodBank|fridge|coldchain/i.test(sig)) return 'PHARM'
+      if (/airChanges|hvac|ups|generator|criticalPower|edWait|bedOcc|infection/i.test(sig)) return 'ED-HVAC'
       return 'OR-LAF'
     },
     degraded: {
-      'hosp:orPressure': 4, 'hosp:airChanges': 8, 'hosp:fridgeTemp': 9.2,
-      'hosp:o2Pressure': 3.1, 'hosp:nurseCalls': 11,
+      'hsp:orPressure': 4, 'hsp:airChanges': 8, 'hsp:bloodBankTemp': 9.2,
+      'hsp:medGasO2Pressure': 305, 'hsp:infectionRisk': 7.5, 'hsp:upsRuntime': 9,
     },
   },
   'manufacturing': {
@@ -360,7 +360,7 @@ const HOSPITAL_PLANS = {
       { icon: 'ti-alert-octagon', text: '<b>Surgical site infection risk</b>' },
       { icon: 'ti-player-stop', text: '<b>OR must close</b> until restored' },
     ],
-    signals: [['hosp:orPressure', 12], ['hosp:airChanges', 16]],
+    signals: [['hsp:orPressure', 15], ['hsp:airChanges', 22]],
     steps: [
       { t: 'Confirm pressure/velocity loss', d: 'Read OR differential pressure and air velocity at the diffuser.', f: 'OR-LAF', tool: 'Manometer · anemometer', time: 10, diff: 'Low' },
       { t: 'Close OR to procedures', d: 'Notify charge nurse; divert scheduled cases.', f: 'OR-LAF', tool: 'Protocol', time: 5, diff: 'Low', safety: true },
@@ -380,7 +380,7 @@ const HOSPITAL_PLANS = {
       { icon: 'ti-alert-triangle', text: '<b>Mandatory reporting</b> if threshold exceeded' },
       { icon: 'ti-trash', text: '<b>Stock destruction</b> — financial and patient impact' },
     ],
-    signals: [['hosp:fridgeTemp', 4.5]],
+    signals: [['hsp:bloodBankTemp', 4.0]],
     steps: [
       { t: 'Confirm excursion', d: 'Read fridge probe vs backup thermometer; check duration.', f: 'PHARM', tool: 'Thermometer', time: 5, diff: 'Low' },
       { t: 'Relocate critical stock', d: 'Move biologics/vaccines to backup cold storage immediately.', f: 'PHARM', tool: 'Cool box', time: 15, diff: 'Low', safety: true },

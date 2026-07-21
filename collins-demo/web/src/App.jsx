@@ -22,6 +22,7 @@ import Heatmap from './Heatmap.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import AuditLog from './AuditLog.jsx'
 import EVWorld from './EVWorld.jsx'
+import HospitalViews from './HospitalViews.jsx'
 import BatteryPack from './BatteryPack.jsx'
 import LoadBalance from './LoadBalance.jsx'
 import EVScenario from './EVScenario.jsx'
@@ -720,6 +721,12 @@ function Dashboard({ ctx }) {
           <div className="section-gap"><BatteryPack live={live} /></div>
           <div className="section-gap"><LoadBalance /></div>
         </>
+      )}
+
+      {/* St. Vera Hospital — the 3-D equipment catalog + the five clinical
+          views, layered under the campus building (which stays the hero). */}
+      {domain === 'hospital' && isLive && (
+        <HospitalViews tenant={tenant} running={running} />
       )}
 
       {/* Predictive alert banner (live) */}

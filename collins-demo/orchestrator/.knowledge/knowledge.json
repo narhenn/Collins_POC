@@ -6,7 +6,7 @@
     "title": "EGT exceedance \u2014 blade erosion",
     "content": "Exhaust gas temperature exceeds baseline by 15-25\u00b0C at constant N1. Physics residual shows measured EGT cannot be explained by fuel flow alone. Root cause: HP turbine blade tip erosion reducing stage efficiency. Resolution: borescope per CMM 72-00-00, replace blade set if tip loss >0.5mm. Typical repair time: 4.5 hours.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "5c88efb5f78f",
@@ -15,7 +15,7 @@
     "title": "Compressor surge \u2014 N1 collapse with EGT spike",
     "content": "Sudden N1 drop 200+ RPM with simultaneous EGT spike 50-80\u00b0C. Characteristic of compressor stall/surge event. Causes: FOD ingestion, blade fouling, variable vane malfunction, inlet distortion. Immediate action: reduce throttle. Inspect compressor per CMM 72-30-00.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "86b8e1cad764",
@@ -24,7 +24,7 @@
     "title": "Oil system starvation \u2014 bearing distress",
     "content": "Oil pressure drops below 40 PSI with oil temperature rising above 85\u00b0C. Vibration increases on bearing-related frequencies. Root cause: oil pump degradation, filter blockage, or leak. Resolution: immediate shutdown, inspect oil pump and filter, check bearing surfaces.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "760cc49621b2",
@@ -33,7 +33,7 @@
     "title": "Nozzle coking \u2014 uneven combustion",
     "content": "EGT spread between sectors exceeds 30\u00b0C. Indicates nozzle fouling from carbon deposits. Progressive degradation. Resolution: remove and clean nozzle guide vanes, chemical soak, verify spray pattern uniformity.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "3b87e2074d23",
@@ -42,7 +42,7 @@
     "title": "CBTC zone controller failure \u2014 communications loss",
     "content": "Zone controller hardware fault causes loss of train position data for 2-5 station section. ATS shows COMM LOSS for affected zone. Trains held at boundary. Resolution: switch to backup zone controller if available. If both failed: manual block working per OCC procedure. Recovery time: 15-45 minutes depending on fault type.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "f8eb9b47ba79",
@@ -51,7 +51,7 @@
     "title": "Platform screen door desynchronization",
     "content": "PSD opening time exceeds 6 seconds or fails to align with train doors. Causes: stopping position drift >200mm, PSD motor degradation, door enabling loop signal loss. Resolution: adjust ATO stopping accuracy, replace PSD motor if cycle count >500K.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "e4efc6a4d0a9",
@@ -60,7 +60,7 @@
     "title": "Third rail undervoltage \u2014 traction power loss",
     "content": "Third rail voltage drops below 680V at train location. Causes: high simultaneous load (multiple trains accelerating), rectifier transformer fault at substation, rail bond failure increasing resistance. Resolution: check substation rectifier, inspect rail bonds in affected section, verify load balancing between substations.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "6149e07b1311",
@@ -69,7 +69,7 @@
     "title": "Station flooding \u2014 surface water ingress",
     "content": "Heavy rainfall (>50mm/hr) overwhelms surface drainage. Water enters underground station via escalator shaft or entrance staircase. Sump pumps at capacity. Resolution: deploy flood barriers at station entrances (LTA mandatory post-2017), close escalators channeling water, activate emergency sump pump boost, consider service suspension for affected stations.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "e849de57c0ef",
@@ -78,7 +78,7 @@
     "title": "Escalator motor overload \u2014 step chain tension",
     "content": "Escalator motor current rising 15-20% above baseline at same passenger load. Causes: step chain elongation (>0.5% stretch triggers replacement), handrail drive bearing wear, comb plate interference. Resolution: measure chain pitch, replace if elongated, lubricate bearings, inspect comb plate clearance.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "a363d815bb99",
@@ -87,7 +87,7 @@
     "title": "Cell voltage imbalance \u2014 dendrite growth precursor",
     "content": "Individual cell voltage deviating >50mV from pack average at same SoC. Indicates internal resistance asymmetry from SEI non-uniformity or early dendrite formation. If temperature also elevated: thermal runaway precursor. Resolution: reduce charge rate to 0.5C max, schedule cell-level impedance test, consider pack retirement if SoH <80%.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "656c04540e44",
@@ -96,7 +96,7 @@
     "title": "Thermal runaway propagation \u2014 battery fire risk",
     "content": "Cell temperature exceeding 55\u00b0C with positive dT/dt (>2\u00b0C/min). Stage 1: SEI decomposition. Stage 2: separator melting (>130\u00b0C for PE). Stage 3: electrolyte venting and ignition. NMC cells: onset at ~90\u00b0C. LFP cells: onset at ~180\u00b0C. Resolution: immediate BMS contactor open, activate cooling, establish 50m exclusion zone, notify fire brigade with HF gas warning.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "38c7f5e9c55d",
@@ -105,7 +105,7 @@
     "title": "EVSE communication fault \u2014 CP pilot signal loss",
     "content": "OCPP session shows EVCommunicationError. Control Pilot signal lost between EVSE and vehicle. Causes: cable damage, connector corrosion, onboard charger fault. Vehicle automatically opens contactor on CP loss. Resolution: inspect cable and connector, measure CP signal with oscilloscope (should be 1kHz \u00b112V PWM), replace cable if damaged.",
     "metadata": {},
-    "timestamp": 1784607850.6055517
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "99cf6b6a547b",
@@ -114,7 +114,7 @@
     "title": "Transformer thermal aging \u2014 EV load spike",
     "content": "Distribution transformer winding hot-spot exceeding 120\u00b0C under EV charging load. Normal aging rate doubles for every 6\u00b0C above 98\u00b0C (IEC 60076-7). At 140\u00b0C: rapid insulation degradation. Resolution: implement smart charging demand response, stagger vehicle departure times, consider transformer upgrade if sustained loading >90% nameplate.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "46ffc9197841",
@@ -123,7 +123,7 @@
     "title": "Operating room positive pressure loss",
     "content": "OR differential pressure drops below +5 Pa relative to corridor. HEPA AHU fan failure or duct breach. Contamination ingress risk \u2014 airborne particles can enter sterile field. Resolution: immediately close OR doors, activate backup AHU if available, postpone elective cases until pressure restored. Check HEPA filter DP (replacement if >350 Pa), verify fan belt/motor. Comply with ASHRAE 170 minimum +8 Pa requirement.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "bf33866b3b1b",
@@ -132,7 +132,7 @@
     "title": "Medical gas O2 zone pressure drop",
     "content": "Zone alarm panel shows O2 pressure below 345 kPa (50 PSI). Causes: manifold bank depletion with auto-switchover failure, pipeline leak, zone valve inadvertently closed, excessive simultaneous demand. Resolution: check manifold status (primary vs secondary bank), verify zone valve positions, switch to cylinder backup if pipeline fault, notify all clinical areas served by affected zone. Per NFPA 99 Chapter 5.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "93fed8248bcf",
@@ -141,7 +141,7 @@
     "title": "Blood bank cold chain excursion \u2014 temperature above 6\u00b0C",
     "content": "Blood bank refrigerator temperature exceeds 6\u00b0C for >30 minutes. Product integrity compromised for RBCs (1-6\u00b0C required). Causes: door left open, compressor failure, thermostat malfunction, power interruption. Resolution: transfer products to backup fridge, quarantine affected units pending quality review, investigate root cause, file deviation report per AABB standards. Do not use quarantined units without pathologist sign-off.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "9129ef8a6425",
@@ -150,7 +150,7 @@
     "title": "Isolation room negative pressure lost \u2014 airborne pathogen risk",
     "content": "AIIR room pressure rises above -2.5 Pa (approaches neutral or positive). Airborne pathogens (TB, measles, COVID) can escape to corridor. Causes: AHU exhaust fan failure, HEPA filter blockage, anteroom door propped open. Resolution: close all room doors immediately, staff wear N95 outside room, repair exhaust system within 2 hours or transfer patient to functioning isolation room. Per CDC/HICPAC and ASHRAE 170.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "c3e1017c110d",
@@ -159,7 +159,7 @@
     "title": "Radar TX power degradation \u2014 detection range loss",
     "content": "Surveillance radar transmit power dropping below 80% of rated output. Detection range shrinks proportionally (R_max proportional to P_tx^0.25). Causes: magnetron aging, waveguide arcing, modulator fault. Resolution: switch to backup transmitter if available, replace magnetron tube, check waveguide pressurization (SF6 or dry air). Combat effectiveness assessment required per MIL-STD-882.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "eb717cf66ba2",
@@ -168,7 +168,7 @@
     "title": "Ship compartment flooding \u2014 stability risk",
     "content": "Watertight compartment reporting water ingress. Free surface effect reduces metacentric height (GM). List angle increasing. Causes: hull breach (combat damage, corrosion), watertight door failure, piping failure. Resolution: set maximum watertight condition (Zebra), activate bilge pumps, compute counterflooding requirements to correct list, assess time-to-capsize from flooding rate. Per STANAG 4154.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "0fbef108b18a",
@@ -177,7 +177,7 @@
     "title": "EASA Part 145.A.45 \u2014 Maintenance data",
     "content": "All maintenance must be carried out using applicable maintenance data from the design approval holder. Maintenance data must be current and accessible to maintenance personnel. Digital twin diagnosis must reference specific CMM chapter numbers.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "c81c224a4e0a",
@@ -186,7 +186,7 @@
     "title": "AS9100D Clause 8.5.1 \u2014 Production and service provision",
     "content": "Organisation must implement production and service provision under controlled conditions including monitoring and measurement at appropriate stages, use of suitable infrastructure, and competent personnel. Work orders must include acceptance criteria per step.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "cca7f98cbc04",
@@ -195,7 +195,7 @@
     "title": "LTA Railway Safety Directive \u2014 incident reporting",
     "content": "All safety incidents must be reported to LTA within defined timeframes. Category A incidents (serious injury/death): immediate verbal notification + written report within 24 hours. Category B (service disruption >30 min): written report within 48 hours.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "fcdd67d97ec8",
@@ -204,7 +204,7 @@
     "title": "SFSRTS 2000 \u2014 tunnel ventilation for smoke control",
     "content": "Tunnel ventilation must maintain critical velocity >2.5 m/s face velocity for smoke control. Ventilation direction must push smoke away from evacuation path. Emergency ventilation mode must be activatable from OCC within 120 seconds of smoke detection.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "99eba55cce17",
@@ -213,7 +213,7 @@
     "title": "EN 50126 \u2014 RAMS for railway applications",
     "content": "All safety-critical systems (signalling, ATP, ATO) must demonstrate Reliability, Availability, Maintainability and Safety per EN 50126 lifecycle. Hazard log must be maintained throughout system life. SIL 4 required for ATP functions.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "0ba6ef28eab4",
@@ -222,7 +222,7 @@
     "title": "IEC 61851-1 \u2014 EV conductive charging system",
     "content": "Defines Mode 1-4 charging, CP pilot state machine (A through F), current rating encoding via PWM duty cycle. All EVSE must implement control pilot safety functions. Connector temperature must not exceed 90\u00b0C per IEC 62196.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "48df581c893a",
@@ -231,7 +231,7 @@
     "title": "NFPA 855 \u2014 Energy storage systems",
     "content": "Battery energy storage systems must comply with separation distances, suppression system requirements (water mist preferred for Li-ion), ventilation for off-gas management, and emergency response information signage. Maximum 50MWh per zone for utility scale.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "35ffbd2884bd",
@@ -240,7 +240,7 @@
     "title": "UN ECE R100 \u2014 EV battery safety",
     "content": "No HV electrolyte leakage, fire, or explosion within 1 hour post-crash. Vibration, thermal stability (oven test to 130\u00b0C for 30min), external short circuit, overcharge tests required. BMS must open contactors within 10ms of crash sensor activation.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "757e322a4df8",
@@ -249,7 +249,7 @@
     "title": "NFPA 99 Chapter 5 \u2014 Medical gas pipeline systems",
     "content": "Area alarm panels required outside each zone served (OR, ICU, NICU, ED). Master alarm in at least 2 continuously staffed locations. O2 warning pressure: <345 kPa. Emergency pressure: <280 kPa. Zone valve boxes must be accessible for emergency isolation.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "24be08149591",
@@ -258,7 +258,7 @@
     "title": "ASHRAE 170-2021 \u2014 Healthcare ventilation",
     "content": "Operating room: minimum 20 ACH total, 4 ACH outdoor air, positive pressure. AIIR rooms: minimum 12 ACH, 2 ACH outdoor air, negative pressure. Burn unit: 10 ACH, positive, HEPA. Maximum 60% RH in all clinical spaces.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "3962d0146189",
@@ -267,7 +267,7 @@
     "title": "JCI FMS.7 \u2014 Utility systems",
     "content": "Hospital must document and test all utility systems including water, electrical, HVAC. All utility failures must be reported, investigated, and corrective action documented. Generator testing required monthly with documented load verification.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "b1db83ec8a7f",
@@ -276,7 +276,7 @@
     "title": "MIL-STD-882E \u2014 System safety",
     "content": "Hazard severity categories: I (Catastrophic), II (Critical), III (Marginal), IV (Negligible). Digital twin must not take autonomous action in Categories I or II without human authorization. Software safety assessment required per Task 202.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   },
   {
     "id": "3287c6592120",
@@ -285,6 +285,6 @@
     "title": "NIST SP 800-171 \u2014 CUI protection",
     "content": "All 110 security requirements across 14 control families must be met for handling CUI. Includes access control, audit and accountability, configuration management, identification and authentication, incident response, media protection, and system integrity.",
     "metadata": {},
-    "timestamp": 1784607850.6060584
+    "timestamp": 1784622529.0016468
   }
 ]

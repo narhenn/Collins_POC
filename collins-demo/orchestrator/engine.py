@@ -54,6 +54,12 @@ from ev.physics import EVPhysics, SIGNALS as EV_SIG, UNITS as EV_UNITS, redlines
 from ev.predict import component_health as ev_ch, predict as ev_predict  # noqa: E402
 from behaviors.ev import build_ev_registry                 # noqa: E402
 
+# ── Hospital-campus domain wiring ────────────────────────────────────
+from hospital.physics import HospitalCampusPhysics, SIGNALS as HSP_SIG, UNITS as HSP_UNITS  # noqa: E402
+from hospital import SENSORS as HSP_SENSORS, SUBSYSTEMS as HSP_SUBSYS, CHECKS as HSP_CHECKS  # noqa: E402
+from hospital.predict import component_health as hsp_ch, predict as hsp_predict  # noqa: E402
+from behaviors.hospital import build_hospital_registry     # noqa: E402
+
 
 def _local(sig: str) -> str:
     return sig.split("#")[-1].split(":")[-1]
@@ -151,6 +157,14 @@ DOMAINS = {
                    ("turbine", "Turbine"), ("bearings", "Rotor & Bearings"),
                    ("lubrication", "Lubrication System")],
     },
+    "hospital": {
+        "label": "St. Vera Hospital", "control": "patient_load",
+        "physics": HospitalCampusPhysics, "ch": hsp_ch, "predict": hsp_predict,
+        "registry": build_hospital_registry, "sig": HSP_SIG, "units": HSP_UNITS,
+        "sensors": HSP_SENSORS,
+        "subsys": HSP_SUBSYS,
+        "checks": HSP_CHECKS,
+    },
     "tram-network": {
         "label": "Tram Fleet Network", "control": "service_level",
         "physics": FleetPhysics, "ch": flt_ch, "predict": flt_predict,
@@ -217,15 +231,22 @@ class LiveTwin:
                 self._set_control(throttle)
             if fault is not None:
                 if fault == "none":
-                    self.state.fault = "none"; self.state.fault_severity = 0.0
-                    # recover seeded degradation so "clear" visibly heals the twin
-                    # (EDM + EV fault seeds; permanent aging like SoH is left intact)
-                    for attr, val in (("filter_clog", 0.0), ("resin_depletion", 0.0),
-                                      ("guide_wear", 0.0), ("chiller_health", 1.0), ("debris", 0.05),
-                                      ("charger_fault", 0.0), ("n_faulted", 0.0), ("insul_deg", 0.0),
-                                      ("solar_derate", 0.0), ("v2g_loss", 0.0), ("runaway_seed", 0.0)):
-                        if hasattr(self.state, attr):
-                            setattr(self.state, attr, val)
+                    # A domain that knows how to heal itself does it properly
+                    # (hospital resets AHU capacity, gas reserve, mains/UPS…);
+                    # otherwise fall back to clearing the known EDM/EV seeds.
+                    clear = getattr(self.physics, "clear", None)
+                    if callable(clear):
+                        clear(self.state)
+                    else:
+                        self.state.fault = "none"; self.state.fault_severity = 0.0
+                        # recover seeded degradation so "clear" visibly heals the twin
+                        # (EDM + EV fault seeds; permanent aging like SoH is left intact)
+                        for attr, val in (("filter_clog", 0.0), ("resin_depletion", 0.0),
+                                          ("guide_wear", 0.0), ("chiller_health", 1.0), ("debris", 0.05),
+                                          ("charger_fault", 0.0), ("n_faulted", 0.0), ("insul_deg", 0.0),
+                                          ("solar_derate", 0.0), ("v2g_loss", 0.0), ("runaway_seed", 0.0)):
+                            if hasattr(self.state, attr):
+                                setattr(self.state, attr, val)
                 else:
                     self.physics.inject(self.state, fault, severity)
             return self._step(dt=dt)
@@ -295,16 +316,22 @@ class LiveTwin:
         return self.cfg["predict"](st, horizon_min=horizon_min, points=points, physics=self.physics)
 
     def network(self) -> dict | None:
-        """Live network-map payload (fleet-domain twins only): geometry +
-        vehicles + per-route status. None for domains without a network."""
+        """Live 'network' payload for domains that publish one — the fleet map
+        (geometry + vehicles + per-route status) or the hospital campus's
+        clinical views (bed board, OR schedule, patient flow, infection map,
+        medical gas, equipment roster). None for domains without one."""
         if not hasattr(self.physics, "network_state"):
             return None
         with self.lock:
             payload = self.physics.network_state(self.state)
             frame = dict(self.latest)
         payload["latest"] = frame
+        # Route/vehicle geometry is fleet-specific — domains whose views are
+        # self-describing (hospital) simply have no static geometry to ship.
+        net = getattr(self.physics, "net", None)
+        if not net:
+            return payload
         # ship the (static) geometry once per call — the frontend caches it
-        net = self.physics.net
         payload["geometry"] = {
             "nodes": net["nodes"], "routes": [
                 {k: r[k] for k in ("id", "name", "color", "path", "points",

@@ -501,11 +501,17 @@ TWIN_FAULTS = {
         {"id": "ups_depletion", "label": "UPS battery depletion"},
         {"id": "power_surge", "label": "Power distribution surge"},
     ],
+    # Only the faults with full end-to-end support — real campus physics that
+    # visibly drives the twin, a clinical view that reacts, matching behaviour
+    # rules and a Repair-with-AI plan. (v3's thin faults generator_fail /
+    # legionella_risk / autoclave_fault were dropped so every option simulates.)
     "hospital": [
-        {"id": "laminar_loss", "label": "OR laminar-flow loss"},
-        {"id": "medgas_drop", "label": "Medical gas pressure drop"},
-        {"id": "coldchain_excursion", "label": "Pharmacy cold-chain excursion"},
-        {"id": "hvac_fault", "label": "Ward HVAC fault"},
+        {"id": "or_ahu_fault", "label": "OR AHU / laminar-flow failure"},
+        {"id": "medical_gas_leak", "label": "Medical gas pipeline leak"},
+        {"id": "cold_chain_fault", "label": "Blood-bank cold-chain failure"},
+        {"id": "mains_failure", "label": "Mains failure + genset fail-to-start"},
+        {"id": "infection_outbreak", "label": "Airborne infection outbreak"},
+        {"id": "ed_surge", "label": "ED demand surge"},
     ],
     "manufacturing": [
         {"id": "spindle_bearing", "label": "CNC spindle bearing wear"},

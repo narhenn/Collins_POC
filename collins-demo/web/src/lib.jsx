@@ -155,19 +155,36 @@ export const SIG = {
   'dc:upsCharge': { label: 'UPS Charge', unit: '%', warnLow: 60, critLow: 40, icon: 'ti-battery-charging' },
   'dc:pue': { label: 'PUE', unit: '', warn: 1.6, crit: 1.9, icon: 'ti-bolt' },
 
-  // ── Hospital (facility management) ──
-  'hosp:orPressure': { label: 'OR Pressure', unit: 'Pa', warnLow: 8, critLow: 5, icon: 'ti-wind' },
-  'hosp:airChanges': { label: 'Air Changes', unit: 'ACH', warnLow: 12, critLow: 9, icon: 'ti-air-conditioning' },
-  'hosp:fridgeTemp': { label: 'Pharmacy Fridge', unit: '°C', warn: 7, crit: 9, icon: 'ti-temperature-snow' },
-  'hosp:o2Pressure': { label: 'O₂ Pressure', unit: 'bar', warnLow: 3.6, critLow: 3.2, icon: 'ti-vaccine' },
-  'hosp:nurseCalls': { label: 'Open Nurse Calls', unit: '', warn: 6, crit: 10, icon: 'ti-urgent' },
-  'hosp:bedOccupancy': { label: 'Bed Occupancy', unit: '%', warn: 90, crit: 97, icon: 'ti-bed' },
-  'hosp:orUtilisation': { label: 'OR Utilisation', unit: '%', icon: 'ti-calendar-event' },
-  'hosp:edWaitTime': { label: 'ED Wait', unit: 'min', warn: 30, crit: 60, icon: 'ti-clock-exclamation' },
-  'hosp:isolationPressure': { label: 'Isolation Room', unit: 'Pa', warn: -3, crit: -1, icon: 'ti-lock' },
-  'hosp:steriliserF0': { label: 'Autoclave F₀', unit: '', warnLow: 15, critLow: 10, icon: 'ti-flame' },
-  'hosp:waterReturnTemp': { label: 'HW Return', unit: '°C', warnLow: 50, critLow: 45, icon: 'ti-droplet' },
-  'hosp:upsRuntime': { label: 'UPS Runtime', unit: 'min', warnLow: 20, critLow: 10, icon: 'ti-battery-charging' },
+  // ── Hospital campus — mirrors hospital/physics.py redlines ──
+  // Clinical environment
+  'hsp:orPressure': { label: 'OR Pressure', unit: 'Pa', warnLow: 10, critLow: 8, icon: 'ti-wind' },
+  'hsp:isoPressure': { label: 'Isolation Pressure', unit: 'Pa', warn: -4, crit: -2.5, icon: 'ti-lock' },
+  'hsp:airChanges': { label: 'Air Changes', unit: 'ACH', warnLow: 18, critLow: 15, icon: 'ti-air-conditioning' },
+  'hsp:autoclaveF0': { label: 'Autoclave F₀', unit: 'min', warnLow: 17, critLow: 15, icon: 'ti-flame' },
+  // Medical gas
+  'hsp:medGasO2Pressure': { label: 'O₂ Pressure', unit: 'kPa', warnLow: 378, critLow: 350, icon: 'ti-vaccine' },
+  'hsp:medGasN2OPressure': { label: 'N₂O Pressure', unit: 'kPa', warnLow: 346, critLow: 320, icon: 'ti-vaccine' },
+  'hsp:medGasReserve': { label: 'Gas Reserve', unit: '%', warnLow: 40, critLow: 25, icon: 'ti-gauge' },
+  // Cold chain
+  'hsp:bloodBankTemp': { label: 'Blood Bank', unit: '°C', warn: 5.5, crit: 6, icon: 'ti-temperature-snow' },
+  // Infection control
+  'hsp:infectionRisk': { label: 'Infection Risk', unit: '%', warn: 3, crit: 5, icon: 'ti-virus' },
+  'hsp:quantaConcentration': { label: 'Quanta Conc.', unit: 'q/m³', icon: 'ti-cloud' },
+  // Power resilience
+  'hsp:upsStateOfCharge': { label: 'UPS Charge', unit: '%', warnLow: 50, critLow: 30, icon: 'ti-battery-charging' },
+  'hsp:upsRuntime': { label: 'UPS Runtime', unit: 'min', warnLow: 25, critLow: 15, icon: 'ti-clock-bolt' },
+  'hsp:generatorReady': { label: 'Generator Ready', unit: '', warnLow: 1, critLow: 0.5, icon: 'ti-engine' },
+  'hsp:criticalPowerLoad': { label: 'Critical Load', unit: '%', warn: 82, crit: 90, icon: 'ti-bolt' },
+  // Water safety
+  'hsp:hotWaterReturnTemp': { label: 'HW Return', unit: '°C', warnLow: 52, critLow: 50, icon: 'ti-droplet' },
+  'hsp:coldWaterSupplyTemp': { label: 'CW Supply', unit: '°C', warn: 18, crit: 20, icon: 'ti-droplet-half' },
+  'hsp:legionellaDeadLegs': { label: 'Dead-Legs', unit: '', warn: 1, crit: 2, icon: 'ti-bacteria' },
+  // Patient flow
+  'hsp:edArrivalRate': { label: 'ED Arrivals', unit: '/h', icon: 'ti-door-enter' },
+  'hsp:edWaitTime': { label: 'ED Wait', unit: 'min', warn: 180, crit: 240, icon: 'ti-clock-exclamation' },
+  'hsp:patientsInSystem': { label: 'Patients In System', unit: '', icon: 'ti-users' },
+  'hsp:bedOccupancy': { label: 'Bed Occupancy', unit: '%', warn: 85, crit: 92, icon: 'ti-bed' },
+  'hsp:orUtilisation': { label: 'OR Utilisation', unit: '%', icon: 'ti-calendar-event' },
 
   // ── Manufacturing unit (simulated example) ──
   'mfg:oee': { label: 'OEE', unit: '%', warnLow: 75, critLow: 60, icon: 'ti-gauge' },
@@ -331,22 +348,16 @@ export const DOMAINS = {
   },
   'hospital': {
     label: 'St. Vera Hospital', tag: 'Healthcare', icon: 'ti-building-hospital',
-    accent: '#0891b2', source: 'sim', hero: 'grid',
-    blurb: 'Full hospital campus twin: operating theatre pressure cascade, medical gas pipeline monitoring, cold chain compliance, sterilisation F₀ tracking, patient flow, bed management and infection risk modeling.',
-    tiles: ['hosp:orPressure', 'hosp:o2Pressure', 'hosp:fridgeTemp', 'hosp:bedOccupancy',
-      'hosp:airChanges', 'hosp:edWaitTime', 'hosp:upsRuntime', 'hosp:nurseCalls'],
-    all: ['hosp:orPressure', 'hosp:airChanges', 'hosp:fridgeTemp', 'hosp:o2Pressure', 'hosp:nurseCalls',
-      'hosp:bedOccupancy', 'hosp:orUtilisation', 'hosp:edWaitTime', 'hosp:isolationPressure',
-      'hosp:steriliserF0', 'hosp:waterReturnTemp', 'hosp:upsRuntime'],
-    sim: {
-      'hosp:orPressure': { base: 12, jit: 1, drift: -5 }, 'hosp:airChanges': { base: 16, jit: 0.6 },
-      'hosp:fridgeTemp': { base: 5.5, jit: 0.4, drift: 2.5 }, 'hosp:o2Pressure': { base: 4.1, jit: 0.05 },
-      'hosp:nurseCalls': { base: 3, jit: 1, drift: 3 }, 'hosp:bedOccupancy': { base: 78, jit: 3, drift: 14 },
-      'hosp:orUtilisation': { base: 72, jit: 4 }, 'hosp:edWaitTime': { base: 18, jit: 5, drift: 25 },
-      'hosp:isolationPressure': { base: -8, jit: 0.5, drift: 5 }, 'hosp:steriliserF0': { base: 18, jit: 0.5, drift: -5 },
-      'hosp:waterReturnTemp': { base: 55, jit: 1, drift: -8 }, 'hosp:upsRuntime': { base: 28, jit: 1, drift: -12 },
-    },
-    assets: [['OR-Theatre-1', 'ok'], ['ICU-Bed-12', 'warn'], ['Med-Gas-Zone-A', 'ok'], ['Blood-Bank-Fridge', 'crit'], ['Autoclave-1', 'ok'], ['ED-HVAC', 'warn']],
+    accent: '#0891b2', source: 'live', hero: 'grid', detailed: true,
+    blurb: 'A living twin of a whole hospital campus: the operating-theatre pressure cascade, medical-gas pipeline hydraulics, cold-chain compliance, sterilisation F₀, UPS/generator resilience, Legionella control and Wells-Riley infection modelling — with a live bed board, OR calendar, ED patient-flow funnel, infection map and the full 3-D equipment catalog.',
+    tiles: ['hsp:orPressure', 'hsp:medGasO2Pressure', 'hsp:bloodBankTemp', 'hsp:bedOccupancy',
+      'hsp:airChanges', 'hsp:edWaitTime', 'hsp:upsRuntime', 'hsp:infectionRisk'],
+    all: ['hsp:orPressure', 'hsp:isoPressure', 'hsp:airChanges', 'hsp:autoclaveF0',
+      'hsp:medGasO2Pressure', 'hsp:medGasN2OPressure', 'hsp:medGasReserve', 'hsp:bloodBankTemp',
+      'hsp:infectionRisk', 'hsp:quantaConcentration', 'hsp:upsStateOfCharge', 'hsp:upsRuntime',
+      'hsp:generatorReady', 'hsp:criticalPowerLoad', 'hsp:hotWaterReturnTemp', 'hsp:coldWaterSupplyTemp',
+      'hsp:legionellaDeadLegs', 'hsp:edArrivalRate', 'hsp:edWaitTime', 'hsp:patientsInSystem',
+      'hsp:bedOccupancy', 'hsp:orUtilisation'],
   },
   'manufacturing': {
     label: 'Forge Plant 7', tag: 'Manufacturing', icon: 'ti-building-factory-2',
@@ -431,10 +442,10 @@ export const PREDICT_CHARTS = {
     { title: 'Overall health', series: [{ key: 'health', label: 'Health', color: '#0d9488' }] },
   ],
   'hospital': [
-    { title: 'OR pressure & ventilation', series: [{ key: 'hosp:orPressure', label: 'OR Pa', color: '#2563eb' }, { key: 'hosp:airChanges', label: 'ACH', color: '#0d9488' }, { key: 'hosp:isolationPressure', label: 'Isolation Pa', color: '#7c3aed' }] },
-    { title: 'Medical gas & cold chain', series: [{ key: 'hosp:o2Pressure', label: 'O₂ bar', color: '#7c3aed' }, { key: 'hosp:fridgeTemp', label: 'Fridge °C', color: '#e11d48' }] },
-    { title: 'Patient flow', series: [{ key: 'hosp:bedOccupancy', label: 'Beds %', color: '#0891b2' }, { key: 'hosp:edWaitTime', label: 'ED wait min', color: '#d97706' }] },
-    { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'hvac_h', label: 'HVAC', color: '#2563eb' }, { key: 'medical_gas_h', label: 'Med gas', color: '#7c3aed' }, { key: 'cold_chain_h', label: 'Cold chain', color: '#e11d48' }, { key: 'power_h', label: 'Power', color: '#d97706' }, { key: 'patient_safety_h', label: 'Safety', color: '#059669' }] },
+    { title: 'OR pressure & ventilation', redline: 8, series: [{ key: 'hsp:orPressure', label: 'OR Pa', color: '#2563eb' }, { key: 'hsp:airChanges', label: 'ACH', color: '#0d9488' }] },
+    { title: 'Medical gas & cold chain', series: [{ key: 'hsp:medGasO2Pressure', label: 'O₂ kPa', color: '#7c3aed' }, { key: 'hsp:bloodBankTemp', label: 'Blood bank °C', color: '#e11d48' }] },
+    { title: 'Patient flow & infection', series: [{ key: 'hsp:bedOccupancy', label: 'Beds %', color: '#0891b2' }, { key: 'hsp:edWaitTime', label: 'ED wait min', color: '#d97706' }, { key: 'hsp:infectionRisk', label: 'Infection %', color: '#e11d48' }] },
+    { title: 'Subsystem health', series: [{ key: 'health', label: 'Overall', color: '#0d9488' }, { key: 'clinical_environment_h', label: 'Clinical env', color: '#2563eb' }, { key: 'medical_gas_h', label: 'Med gas', color: '#7c3aed' }, { key: 'cold_chain_h', label: 'Cold chain', color: '#e11d48' }, { key: 'power_resilience_h', label: 'Power', color: '#d97706' }, { key: 'water_safety_h', label: 'Water', color: '#0891b2' }, { key: 'patient_flow_h', label: 'Patient flow', color: '#059669' }] },
   ],
   'manufacturing': [
     { title: 'OEE & throughput', series: [{ key: 'mfg:oee', label: 'OEE %', color: '#0d9488' }, { key: 'mfg:throughput', label: 'Units/h', color: '#2563eb' }] },
@@ -466,7 +477,7 @@ export const SUBSYS = {
   'tram-network': [{ key: 'rolling_stock', label: 'Rolling stock' }, { key: 'power', label: 'Traction power' }, { key: 'track', label: 'Track & points' }, { key: 'signalling', label: 'Signalling' }, { key: 'operations', label: 'Operations' }],
   'mrt-line': [{ key: 'rolling_stock', label: 'Rolling stock' }, { key: 'power', label: 'Traction power' }, { key: 'track', label: 'Track & civil' }, { key: 'signalling', label: 'Signalling (CBTC)' }, { key: 'stations', label: 'Stations' }],
   'ev-network': [{ key: 'charger', label: 'Charging (OCPP)' }, { key: 'battery', label: 'Battery health' }, { key: 'grid', label: 'Grid & EMS' }, { key: 'energy', label: 'Solar & BESS' }, { key: 'thermal', label: 'Thermal mgmt' }],
-  'hospital': [{ key: 'hvac', label: 'HVAC & pressure' }, { key: 'medical_gas', label: 'Medical gas' }, { key: 'cold_chain', label: 'Cold chain' }, { key: 'power', label: 'Power & UPS' }, { key: 'patient_safety', label: 'Patient safety' }],
+  'hospital': [{ key: 'clinical_environment', label: 'Clinical environment' }, { key: 'medical_gas', label: 'Medical gas' }, { key: 'cold_chain', label: 'Cold chain' }, { key: 'power_resilience', label: 'Power resilience' }, { key: 'water_safety', label: 'Water safety' }, { key: 'patient_flow', label: 'Patient flow' }],
   'defence-base': [{ key: 'propulsion', label: 'Propulsion' }, { key: 'weapons', label: 'Weapons' }, { key: 'comms', label: 'Comms & radar' }, { key: 'security', label: 'Force protection' }],
 }
 export const predictCharts = (domain) => PREDICT_CHARTS[domain] || PREDICT_CHARTS['turbine-engine']
@@ -503,14 +514,8 @@ export const FAULT_FX = {
     ups_depletion: { 'dc:upsCharge': -62, 'dc:pue': 0.2 },
     power_surge: { 'dc:pue': 0.5, 'dc:upsCharge': -25 },
   },
-  hospital: {
-    laminar_loss: { 'hosp:orPressure': -9, 'hosp:airChanges': -7, 'hosp:isolationPressure': 6 },
-    medgas_drop: { 'hosp:o2Pressure': -1.1 },
-    coldchain_excursion: { 'hosp:fridgeTemp': 5 },
-    hvac_fault: { 'hosp:airChanges': -6, 'hosp:orPressure': -5, 'hosp:isolationPressure': 5 },
-    power_failure: { 'hosp:upsRuntime': -18, 'hosp:airChanges': -4 },
-    legionella_risk: { 'hosp:waterReturnTemp': -10 },
-  },
+  // (hospital is a live backend twin now — its faults are driven by
+  // HospitalCampusPhysics.inject(), not by a frontend bias map.)
   manufacturing: {
     spindle_bearing: { 'mfg:spindleVib': 6, 'mfg:motorTemp': 16, 'mfg:oee': -16 },
     robot_overload: { 'mfg:motorTemp': 22, 'mfg:oee': -11 },
